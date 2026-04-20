@@ -1,0 +1,251 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║        🚀 SISTEMITA → TURSO + VERCEL - GUÍA DE INICIO RÁPIDO 🚀             ║
+║                                                                              ║
+║                        Sistema Listo para Deployar                          ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📋 RESUMEN EJECUTIVO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Hemos adaptado tu sistema para Turso + Vercel
+✅ Frontend: React/Vite en Vercel
+✅ Backend: Vercel Functions con JWT
+✅ Database: Turso (SQLite Serverless)
+✅ Costo: $0/mes (gratis para educación)
+✅ Documentación: Completa y lista
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 5 PASOS PARA DEPLOYAR (30 minutos)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ CREAR BASE DE DATOS EN TURSO
+   ──────────────────────────────
+   👉 https://turso.tech
+   • Sign up (gratis)
+   • Create new database
+   • Copia: Connection URL + Auth Token
+   ⏱️ 5 minutos
+
+
+2️⃣ PREPARAR PROYECTO LOCALMENTE
+   ──────────────────────────────
+   👉 Terminal:
+      cd /Users/osmer/Downloads/Abril\ 2026/Sistemita_Nuevo
+      cp .env.local.example .env.local
+
+   👉 Editar .env.local con:
+      - TURSO_CONNECTION_URL (de Turso)
+      - TURSO_AUTH_TOKEN (de Turso)
+      - JWT_SECRET (cualquier texto largo)
+      - VITE_API_URL (https://tu-proyecto.vercel.app)
+
+   👉 Instalar:
+      npm install
+   ⏱️ 5 minutos
+
+
+3️⃣ PROBAR LOCALMENTE
+   ──────────────────
+   👉 npm run build
+   👉 npm run preview
+   👉 Abre: http://localhost:4173
+   👉 Login: admin@sistemita.edu / admin123
+   ⏱️ 5 minutos
+
+
+4️⃣ DEPLOYAR EN VERCEL
+   ───────────────────
+   👉 https://vercel.com
+   • Sign up con GitHub
+   • Import Project
+   • Settings → Environment Variables
+     (Copia las 5 variables del .env.local)
+   • Deploy
+   ⏱️ 10 minutos
+
+
+5️⃣ INICIALIZAR BASE DE DATOS
+   ──────────────────────────
+   👉 Instalar Turso CLI:
+      npm install -g @turso/cli
+
+   👉 Conectar:
+      turso auth login
+      turso db shell sistemita_db
+
+   👉 Ejecutar SQL (ver DEPLOY_TURSO_VERCEL.md)
+   ⏱️ 5 minutos
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 ARCHIVOS NUEVOS CREADOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+API Routes (Backend Serverless):
+  📄 api/auth.js          ← Autenticación JWT
+  📄 api/users.js         ← CRUD de usuarios
+  📄 api/grades.js        ← Calificaciones
+  📄 api/health.js        ← Health check
+
+Librerías:
+  📄 lib/turso.js         ← Cliente de Turso
+
+Configuración:
+  📄 vercel.json          ← Config Vercel (ACTUALIZADO)
+  📄 package.json         ← Dependencias (ACTUALIZADO)
+  📄 .env.local.example   ← Variables de entorno
+
+Scripts:
+  📄 scripts/init-db.js   ← Inicializar BD
+
+Documentación:
+  📄 DEPLOY_TURSO_VERCEL.md      ← Guía completa ⭐
+  📄 INSTRUCCIONES_MIGRACION.md  ← Cambios en frontend
+  📄 INICIO_RAPIDO.txt           ← Este archivo
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ ENDPOINTS DE LA API
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+POST   /api/auth                    → Login
+GET    /api/users                   → Listar usuarios
+POST   /api/users                   → Crear usuario
+PUT    /api/users?id=xxx            → Actualizar usuario
+DELETE /api/users?id=xxx            → Eliminar usuario
+GET    /api/grades                  → Listar calificaciones
+GET    /api/grades?studentId=xxx    → Calificaciones de estudiante
+POST   /api/grades                  → Crear calificación
+GET    /api/health                  → Status de la API
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 COSTOS MENSUALES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌────────────┬─────────┬──────────────┐
+│ Servicio   │ Precio  │ Límite       │
+├────────────┼─────────┼──────────────┤
+│ Vercel     │ $0      │ 100 GB/mes   │
+│ Turso      │ $0      │ 9 GB         │
+├────────────┼─────────┼──────────────┤
+│ TOTAL      │ $0      │ ✅ Gratis    │
+└────────────┴─────────┴──────────────┘
+
+Si creces:
+  • Turso: $15/mes (100 GB)
+  • Vercel: $20/mes (4 TB)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📖 DOCUMENTACIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👉 LEE PRIMERO:
+   DEPLOY_TURSO_VERCEL.md
+   (Guía paso a paso completa con screenshots)
+
+👉 DESPUÉS:
+   INSTRUCCIONES_MIGRACION.md
+   (Cómo actualizar el frontend)
+
+👉 REFERENCIA:
+   README_TURSO_VERCEL.md
+   (Documentación técnica)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🆘 TROUBLESHOOTING RÁPIDO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ "Build failed en Vercel"
+✅ Solución: npm run build localmente primero
+
+❌ "Database connection failed"
+✅ Solución: Verifica TURSO_CONNECTION_URL y TURSO_AUTH_TOKEN
+
+❌ "Token inválido"
+✅ Solución: Mismo JWT_SECRET en todas partes
+
+❌ "Email ya existe"
+✅ Solución: Usa diferente email para probar
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👤 USUARIOS DE PRUEBA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Admin:
+  Email: admin@sistemita.edu
+  Contraseña: admin123
+
+Docente:
+  Email: juan.perez@sistemita.edu
+  Contraseña: teacher123
+
+Estudiante:
+  Email: carlos.mendez@estudiantes.edu
+  Contraseña: student123
+
+Apoderado:
+  Email: pedro.hernandez@apoderados.edu
+  Contraseña: parent123
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 FLUJO GENERAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tu Computadora
+     ↓
+   git push (GitHub)
+     ↓
+   Vercel (Auto Deploy)
+     ↓
+Frontend + Backend Functions
+     ↓
+   Turso Database
+     ↓
+¡Sistema en línea! 🎉
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ PRÓXIMOS PASOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Lee: DEPLOY_TURSO_VERCEL.md
+2. Crea BD en Turso
+3. Actualiza .env.local
+4. npm install
+5. npm run build
+6. Crea proyecto en Vercel
+7. Deploy
+8. Inicializa tablas
+9. ¡A usar!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📞 ENLACES ÚTILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Turso:      https://turso.tech
+Vercel:     https://vercel.com
+JWT:        https://jwt.io
+Docs Turso: https://docs.turso.tech
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                     ✨ ¡SISTEMA LISTO PARA DEPLOYAR! ✨                     ║
+║                                                                              ║
+║              👉 Lee DEPLOY_TURSO_VERCEL.md para continuar 👈                ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Generado: 2026-04-20
+Sistema: Sistemita v1.0 (Turso + Vercel)
+Para: Osmer (osanliam@gmail.com)
