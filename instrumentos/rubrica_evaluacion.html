@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rúbrica de Evaluación</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-guardar {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-guardar:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-limpiar {
+            background: #FF9800;
+            color: white;
+        }
+
+        .btn-limpiar:hover {
+            background: #e68900;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+        }
+
+        .btn-editar {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-editar:hover {
+            background: #0b7dda;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+        }
+
+        .btn-cerrar {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-cerrar:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .form-section {
+            margin-bottom: 25px;
+        }
+
+        .form-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="date"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .criteria-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .criteria-table th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .criteria-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .criteria-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .criteria-table input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .add-row-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .add-row-btn:hover {
+            background: #5568d3;
+        }
+
+        .delete-row {
+            background: #f44336;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .delete-row:hover {
+            background: #da190b;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 12px;
+        }
+
+        .success-message {
+            display: none;
+            background: #4CAF50;
+            color: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            text-align: center;
+            animation: slideDown 0.3s ease;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Rúbrica de Evaluación</h1>
+            <p>Instrumento autónomo e independiente para cada uso</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn-guardar" onclick="guardar()">💾 Guardar</button>
+            <button class="btn-limpiar" onclick="limpiar()">🗑️ Limpiar</button>
+            <button class="btn-editar" onclick="abrirEditar()">✏️ Editar</button>
+            <button class="btn-cerrar" onclick="cerrar()">❌ Cerrar</button>
+        </div>
+
+        <div class="content">
+            <div class="success-message" id="successMsg">✓ Datos guardados correctamente</div>
+
+            <div class="form-section">
+                <h3>Información General</h3>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Estudiante/Grupo</label>
+                        <input type="text" id="estudiante" placeholder="Nombre del estudiante o grupo">
+                    </div>
+                    <div class="form-group">
+                        <label>Área/Competencia</label>
+                        <input type="text" id="area" placeholder="Ej: Comunicación, Matemática">
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="fecha">
+                    </div>
+                    <div class="form-group">
+                        <label>Docente</label>
+                        <input type="text" id="docente" placeholder="Nombre del docente">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Criterios de Evaluación</h3>
+                <table class="criteria-table">
+                    <thead>
+                        <tr>
+                            <th>Criterio</th>
+                            <th>Excelente (4)</th>
+                            <th>Bueno (3)</th>
+                            <th>Regular (2)</th>
+                            <th>Bajo (1)</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="criteriosBody">
+                        <tr>
+                            <td><input type="text" placeholder="Ej: Originalidad"></td>
+                            <td><input type="text" placeholder="Totalmente original"></td>
+                            <td><input type="text" placeholder="Mayormente original"></td>
+                            <td><input type="text" placeholder="Parcialmente original"></td>
+                            <td><input type="text" placeholder="No es original"></td>
+                            <td><button class="delete-row" onclick="eliminarFila(this)">Eliminar</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button class="add-row-btn" onclick="agregarFila()">+ Agregar Criterio</button>
+            </div>
+
+            <div class="form-section">
+                <div class="form-group">
+                    <label>Observaciones</label>
+                    <textarea id="observaciones" placeholder="Notas adicionales sobre la evaluación"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editarModal">
+        <div class="modal-content">
+            <h2>Editar Rúbrica</h2>
+            <div class="form-group">
+                <label>¿Qué deseas editar?</label>
+                <select id="editarOpcion">
+                    <option value="">-- Selecciona --</option>
+                    <option value="titulo">Título del instrumento</option>
+                    <option value="encabezados">Encabezados de la tabla</option>
+                    <option value="escalas">Escalas de calificación</option>
+                </select>
+            </div>
+            <div id="editarContenido" style="margin-top: 15px;"></div>
+            <div class="modal-buttons">
+                <button class="btn-guardar" onclick="guardarEdicion()">Guardar</button>
+                <button class="btn-cerrar" onclick="cerrarEditar()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Asegurar que cada apertura es independiente
+        function inicializar() {
+            const fecha = new Date().toISOString().split('T')[0];
+            document.getElementById('fecha').value = fecha;
+            // No cargar datos previos - cada apertura es nueva
+        }
+
+        function agregarFila() {
+            const tbody = document.getElementById('criteriosBody');
+            const fila = document.createElement('tr');
+            fila.innerHTML = `
+                <td><input type="text" placeholder="Criterio"></td>
+                <td><input type="text" placeholder="Excelente"></td>
+                <td><input type="text" placeholder="Bueno"></td>
+                <td><input type="text" placeholder="Regular"></td>
+                <td><input type="text" placeholder="Bajo"></td>
+                <td><button class="delete-row" onclick="eliminarFila(this)">Eliminar</button></td>
+            `;
+            tbody.appendChild(fila);
+        }
+
+        function eliminarFila(btn) {
+            btn.closest('tr').remove();
+        }
+
+        function guardar() {
+            const datos = {
+                estudiante: document.getElementById('estudiante').value,
+                area: document.getElementById('area').value,
+                fecha: document.getElementById('fecha').value,
+                docente: document.getElementById('docente').value,
+                observaciones: document.getElementById('observaciones').value,
+                criterios: recolectarCriterios()
+            };
+
+            const json = JSON.stringify(datos, null, 2);
+            descargarJSON('rubrica_evaluacion.json', json);
+
+            const msg = document.getElementById('successMsg');
+            msg.classList.add('show');
+            setTimeout(() => msg.classList.remove('show'), 3000);
+        }
+
+        function recolectarCriterios() {
+            const criterios = [];
+            document.querySelectorAll('#criteriosBody tr').forEach(fila => {
+                const inputs = fila.querySelectorAll('input');
+                criterios.push({
+                    criterio: inputs[0].value,
+                    excelente: inputs[1].value,
+                    bueno: inputs[2].value,
+                    regular: inputs[3].value,
+                    bajo: inputs[4].value
+                });
+            });
+            return criterios;
+        }
+
+        function limpiar() {
+            if (confirm('¿Estás seguro de que deseas limpiar todos los datos?')) {
+                document.getElementById('estudiante').value = '';
+                document.getElementById('area').value = '';
+                document.getElementById('docente').value = '';
+                document.getElementById('observaciones').value = '';
+                const tbody = document.getElementById('criteriosBody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td><input type="text" placeholder="Ej: Originalidad"></td>
+                        <td><input type="text" placeholder="Totalmente original"></td>
+                        <td><input type="text" placeholder="Mayormente original"></td>
+                        <td><input type="text" placeholder="Parcialmente original"></td>
+                        <td><input type="text" placeholder="No es original"></td>
+                        <td><button class="delete-row" onclick="eliminarFila(this)">Eliminar</button></td>
+                    </tr>
+                `;
+                inicializar();
+            }
+        }
+
+        function abrirEditar() {
+            document.getElementById('editarModal').classList.add('active');
+            document.getElementById('editarOpcion').value = '';
+            document.getElementById('editarContenido').innerHTML = '';
+        }
+
+        function cerrarEditar() {
+            document.getElementById('editarModal').classList.remove('active');
+        }
+
+        function guardarEdicion() {
+            // Lógica de edición general
+            cerrarEditar();
+        }
+
+        function cerrar() {
+            if (confirm('¿Cerrar sin guardar?')) {
+                window.close();
+            }
+        }
+
+        function descargarJSON(nombre, contenido) {
+            const blob = new Blob([contenido], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Inicializar al cargar
+        window.addEventListener('load', inicializar);
+    </script>
+</body>
+</html>

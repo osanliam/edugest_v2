@@ -1,0 +1,150 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                   🎨 DISEÑO CAMBIADO A PASTEL SOFT COLORS                 ║
+║                                                                            ║
+║              De Cyberpunk Neon → Colores Pastel Suaves y Claros          ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════
+
+🎨 PALETA DE COLORES ACTUALIZADA:
+
+ANTES (Cyberpunk Dark):
+  • Fondo: #050a14 (muy oscuro)
+  • Cyan: #00f2ff (neón brillante)
+  • Magenta: #ff00ff (neón brillante)
+  • Orange: #ff8c00 (neón brillante)
+  • Texto: gris claro
+
+AHORA (Pastel Soft):
+  • Fondo: #f5f7fa (blanco/gris muy claro)
+  • Cyan: #7eb3d4 (azul pastel suave)
+  • Magenta: #d4a5c8 (rosa pastel suave)
+  • Orange: #b5c994 (verde menta pastel)
+  • Texto: gris oscuro (#4b5563)
+
+═══════════════════════════════════════════════════════════════════════════
+
+📝 CAMBIOS ESPECÍFICOS:
+
+✅ Fondo General
+  De: #050a14 (muy oscuro)
+  A: #f5f7fa (blanco suave)
+
+✅ Cards/Paneles
+  De: rgba(10, 20, 40, 0.7) (muy oscuro)
+  A: rgba(255, 255, 255, 0.85) (blanco translúcido)
+
+✅ Colores Principales
+  Cyan: #00f2ff → #7eb3d4 (pastel azul)
+  Magenta: #ff00ff → #d4a5c8 (pastel rosa)
+  Orange: #ff8c00 → #b5c994 (pastel verde menta)
+
+✅ Texto
+  De: text-gray-100 (blanco)
+  A: text-gray-700 (gris oscuro)
+
+✅ Bordes
+  De: Neón glow
+  A: Suave shadow
+
+✅ Efectos
+  De: Drop shadow neon (0_0_5px)
+  A: Sombra suave (shadow-lg)
+
+═══════════════════════════════════════════════════════════════════════════
+
+📁 ARCHIVOS MODIFICADOS:
+
+1. src/index.css
+   ✓ Colores en @theme actualizados
+   ✓ Drop shadows removidos
+   ✓ Efectos suavizados
+
+2. src/App.tsx
+   ✓ Texto: gray-100 → gray-700
+   ✓ Fondo sidebar: cyber-bg/50 → white/40
+   ✓ Botones: colores pastel
+   ✓ Efectos: glow → shadow
+
+3. src/components/layout/Navbar.tsx
+   ✓ Fondo: cyber-bg/50 → white/50
+   ✓ Texto: gray-100 → gray-800
+   ✓ Colores principales: pastel
+   ✓ Input: texto visible en fondo claro
+
+4. src/components/screens/Login.tsx
+   ✓ Fondo: dark → light
+   ✓ Cards: botones con colores pastel
+   ✓ Efectos: suavizados
+   ✓ Texto: visible en fondo claro
+
+═══════════════════════════════════════════════════════════════════════════
+
+✨ APARIENCIA NUEVA:
+
+✓ Fondo blanco/gris muy claro (#f5f7fa)
+✓ Cards blancas translúcidas (0.85 opacity)
+✓ Colores pastel suaves (no neón)
+✓ Texto gris oscuro (visible)
+✓ Bordes suaves con shadows
+✓ Estilo profesional y limpio
+✓ Fácil de leer en el día
+
+═══════════════════════════════════════════════════════════════════════════
+
+🚀 PARA PROBAR:
+
+cd ~/Downloads/Sistemita/Sistemita_Nuevo/modelito-main
+rm -rf node_modules && npm install
+npm run dev
+
+Luego: http://localhost:3000
+
+═══════════════════════════════════════════════════════════════════════════
+
+🔐 CREDENCIALES (igual):
+
+✓ admin@escuela.edu (Admin)
+✓ director@escuela.edu (Director)
+✓ teacher@escuela.edu (Teacher)
+✓ student@escuela.edu (Student)
+✓ parent@escuela.edu (Parent)
+
+═══════════════════════════════════════════════════════════════════════════
+
+✅ RESULTADO:
+
+Mismo sistema (13 pantallas + RBAC)
+Pero con diseño:
+  • Pastel suave (no cyberpunk)
+  • Colores claros (azul, rosa, verde)
+  • Fondo claro (no oscuro)
+  • Texto visible (gris oscuro)
+  • Estilo profesional y moderno
+
+═══════════════════════════════════════════════════════════════════════════
+
+🎯 COMPARATIVA DE DISEÑOS:
+
+CYBERPUNK (Anterior):
+  ✓ Oscuro y futurista
+  ✓ Neón brillante
+  ✓ Estilo hacker/tech
+  ✗ Difícil de leer en día
+
+PASTEL (Actual):
+  ✓ Claro y profesional
+  ✓ Colores suaves
+  ✓ Estilo moderno/creativo
+  ✓ Fácil de leer
+  ✓ Mejor para oficina
+
+═══════════════════════════════════════════════════════════════════════════
+
+✨ LISTO PARA PROBAR 🎨
+
+Mismo código, nuevo diseño pastel suave.
+
+═══════════════════════════════════════════════════════════════════════════

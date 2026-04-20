@@ -1,0 +1,58 @@
+{
+  "sistema_usuarios": [
+    {
+      "id": "1",
+      "nombre": "Administrador del Sistema",
+      "email": "admin@sistemita.edu",
+      "contraseña": "admin123",
+      "rol": "admin",
+      "activo": true,
+      "creado": "2026-04-19T18:00:00Z"
+    },
+    {
+      "id": "2",
+      "nombre": "Juan Pérez García",
+      "email": "juan.perez@sistemita.edu",
+      "contraseña": "teacher123",
+      "rol": "teacher",
+      "activo": true,
+      "creado": "2026-04-19T18:05:00Z"
+    },
+    {
+      "id": "3",
+      "nombre": "María López Rodríguez",
+      "email": "maria.lopez@sistemita.edu",
+      "contraseña": "teacher123",
+      "rol": "teacher",
+      "activo": true,
+      "creado": "2026-04-19T18:10:00Z"
+    },
+    {
+      "id": "4",
+      "nombre": "Carlos Mendez Flores",
+      "email": "carlos.mendez@estudiantes.edu",
+      "contraseña": "student123",
+      "rol": "student",
+      "activo": true,
+      "creado": "2026-04-19T18:15:00Z"
+    },
+    {
+      "id": "5",
+      "nombre": "Ana García Morales",
+      "email": "ana.garcia@estudiantes.edu",
+      "contraseña": "student123",
+      "rol": "student",
+      "activo": true,
+      "creado": "2026-04-19T18:20:00Z"
+    },
+    {
+      "id": "6",
+      "nombre": "Pedro Hernández López",
+      "email": "pedro.hernandez@apoderados.edu",
+      "contraseña": "parent123",
+      "rol": "parent",
+      "activo": true,
+      "creado": "2026-04-19T18:25:00Z"
+    }
+  ]
+}

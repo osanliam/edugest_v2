@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  sistemita_nuevo:
+    build: .
+    container_name: sistemita_nuevo
+    ports:
+      - "3000:3000"
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped
+    command: npm run dev
+

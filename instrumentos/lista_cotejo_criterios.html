@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Cotejo</title>
+    <script src="calculos.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+        .btn-guardar { background: #4CAF50; color: white; }
+        .btn-guardar:hover { background: #45a049; }
+        .btn-limpiar { background: #FF9800; color: white; }
+        .btn-limpiar:hover { background: #e68900; }
+        .btn-cerrar { background: #f44336; color: white; }
+        .btn-cerrar:hover { background: #da190b; }
+        .content { padding: 30px; }
+        .form-section {
+            margin-bottom: 25px;
+        }
+        .form-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+            border-bottom: 2px solid #1abc9c;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        input[type="text"], input[type="date"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #1abc9c;
+            box-shadow: 0 0 0 3px rgba(26, 188, 156, 0.1);
+        }
+        .checklist-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .checklist-table th {
+            background: #1abc9c;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .checklist-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .checklist-table tbody tr:hover {
+            background: #f5f5f5;
+        }
+        .indicador-row {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        .indicador-nombre {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+        }
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            margin: 0;
+            font-weight: normal;
+            font-size: 13px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 6px;
+            cursor: pointer;
+            width: auto;
+        }
+        .resultado-section {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+        .resultado-section h3 {
+            border: none;
+            margin-bottom: 15px;
+        }
+        .resultado-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .resultado-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        .resultado-item strong {
+            display: block;
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .resultado-item .valor {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1abc9c;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .controls { flex-direction: column; }
+            button { width: 100%; }
+            .checkbox-group { flex-direction: column; }
+            .resultado-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>☑️ Lista de Cotejo</h1>
+            <p>Verificación de cumplimiento de indicadores</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn-guardar" onclick="guardar()">💾 Guardar</button>
+            <button class="btn-limpiar" onclick="limpiar()">🗑️ Limpiar</button>
+            <button class="btn-cerrar" onclick="cerrar()">❌ Cerrar</button>
+        </div>
+
+        <div class="content">
+            <div class="form-section">
+                <h3>Información General</h3>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Estudiante/Grupo</label>
+                        <input type="text" id="estudiante" placeholder="Nombre">
+                    </div>
+                    <div class="form-group">
+                        <label>Competencia</label>
+                        <input type="text" id="competencia" placeholder="Ej: Lee textos diversos">
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="fecha">
+                    </div>
+                    <div class="form-group">
+                        <label>Docente</label>
+                        <input type="text" id="docente" placeholder="Nombre">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>5 Indicadores / Criterios</h3>
+                <p style="color: #666; font-size: 13px; margin-bottom: 15px;">
+                    Marca SÍ o NO para cada indicador
+                </p>
+
+                <div id="indicadores-container">
+                    <!-- Se genera dinámicamente -->
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-group">
+                    <label>Observaciones</label>
+                    <textarea id="observaciones" placeholder="Notas sobre el desempeño"></textarea>
+                </div>
+            </div>
+
+            <div class="resultado-section">
+                <h3>Resultado Calculado</h3>
+                <div class="resultado-grid">
+                    <div class="resultado-item">
+                        <strong>Total Logrado</strong>
+                        <div class="valor" id="total-si">0 de 5</div>
+                    </div>
+                    <div class="resultado-item">
+                        <strong>Calificativo</strong>
+                        <div class="valor" id="resultado-calif">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+            const fecha = new Date().toISOString().split('T')[0];
+            document.getElementById('fecha').value = fecha;
+            generarIndicadores();
+        });
+
+        function generarIndicadores() {
+            const container = document.getElementById('indicadores-container');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= 5; i++) {
+                const div = document.createElement('div');
+                div.className = 'indicador-row';
+                div.innerHTML = `
+                    <div class="indicador-nombre">Indicador ${i}</div>
+                    <div class="checkbox-group">
+                        <label>
+                            <input type="checkbox" name="indicador${i}" value="si"
+                                   onchange="calcularResultado()">
+                            Sí
+                        </label>
+                        <label>
+                            <input type="checkbox" name="indicador${i}" value="no"
+                                   onchange="calcularResultado()">
+                            No
+                        </label>
+                    </div>
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        function calcularResultado() {
+            let totalSi = 0;
+            const respuestas = [];
+
+            for (let i = 1; i <= 5; i++) {
+                const siCheckbox = document.querySelector(`input[name="indicador${i}"][value="si"]`);
+                if (siCheckbox && siCheckbox.checked) {
+                    totalSi++;
+                    respuestas.push('A');
+                } else {
+                    respuestas.push('C');
+                }
+            }
+
+            document.getElementById('total-si').textContent = `${totalSi} de 5`;
+
+            // Calcular calificativo basado en porcentaje
+            // 5 de 5 = A (100%), 4 de 5 = A (80%), 3 de 5 = B, menos = C
+            let calificativo = '--';
+            if (totalSi === 5) {
+                calificativo = 'A';
+            } else if (totalSi >= 3) {
+                calificativo = 'B';
+            } else if (totalSi > 0) {
+                calificativo = 'C';
+            }
+
+            document.getElementById('resultado-calif').textContent = calificativo;
+        }
+
+        function guardar() {
+            const respuestas = [];
+            for (let i = 1; i <= 5; i++) {
+                const siCheckbox = document.querySelector(`input[name="indicador${i}"][value="si"]`);
+                respuestas.push(siCheckbox && siCheckbox.checked ? 'Sí' : 'No');
+            }
+
+            let totalSi = respuestas.filter(r => r === 'Sí').length;
+            let calificativo = '--';
+            if (totalSi === 5) calificativo = 'A';
+            else if (totalSi >= 3) calificativo = 'B';
+            else if (totalSi > 0) calificativo = 'C';
+
+            const datos = {
+                estudiante: document.getElementById('estudiante').value,
+                competencia: document.getElementById('competencia').value,
+                fecha: document.getElementById('fecha').value,
+                docente: document.getElementById('docente').value,
+                respuestas: respuestas,
+                observaciones: document.getElementById('observaciones').value,
+                resultado: {
+                    calificativo: calificativo,
+                    totalSi: totalSi,
+                    total: 5
+                }
+            };
+
+            const json = JSON.stringify(datos, null, 2);
+            descargarJSON('lista_cotejo.json', json);
+            alert('✓ Lista de Cotejo guardada');
+        }
+
+        function limpiar() {
+            if (confirm('¿Limpiar todos los datos?')) {
+                document.getElementById('estudiante').value = '';
+                document.getElementById('competencia').value = '';
+                document.getElementById('docente').value = '';
+                document.getElementById('observaciones').value = '';
+                generarIndicadores();
+                document.getElementById('total-si').textContent = '0 de 5';
+                document.getElementById('resultado-calif').textContent = '--';
+            }
+        }
+
+        function cerrar() {
+            if (confirm('¿Cerrar sin guardar?')) {
+                window.close();
+            }
+        }
+
+        function descargarJSON(nombre, contenido) {
+            const blob = new Blob([contenido], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                      🎯 ACCESO AL SISTEMA - LEE ESTO 🎯                     ║
+║                                                                              ║
+║              El sistema está en http://192.168.100.71:3000/                 ║
+║                                                                              ║
+║              (También disponible en http://localhost:3000/)                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+🚀 ACCESO INMEDIATO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPCIÓN 1: Usar la IP directa (RECOMENDADO)
+→ Abre en tu navegador:
+  http://192.168.100.71:3000/
+
+✅ Verás la pantalla de login
+
+OPCIÓN 2: Usar localhost (Si estás en la misma máquina)
+→ Abre en tu navegador:
+  http://localhost:3000/
+
+✅ También funciona
+
+
+📋 PASO A PASO PARA LOGUEAR:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ CARGAR USUARIOS (PRIMERO):
+
+   Abre en tu navegador:
+   file:///Users/osmer/Downloads/Sistemita_Nuevo/CARGAR_USUARIOS_DEMO.html
+
+   ✅ Verás una página con botones
+
+   Haz clic en: "✅ Cargar Todos los Usuarios"
+
+   ✅ Los 6 usuarios se cargarán en tu navegador
+
+2️⃣ LOGUEAR EN EL SISTEMA:
+
+   Abre:
+   http://192.168.100.71:3000/
+
+   ✅ Verás la pantalla de login
+
+   Completa con:
+   📧 Email: admin@sistemita.edu
+   🔑 Contraseña: admin123
+
+   Haz clic en: "Iniciar Sesión"
+
+3️⃣ ¡LISTO!
+
+   ✅ Ya estás dentro del sistema
+   ✅ Verás el menú principal
+   ✅ Puedes navegar por todos los módulos
+
+
+👥 USUARIOS DE PRUEBA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👑 ADMIN: admin@sistemita.edu / admin123
+👨‍🏫 DOCENTE: juan.perez@sistemita.edu / teacher123
+👨‍🎓 ESTUDIANTE: carlos.mendez@estudiantes.edu / student123
+👨‍👩‍👧 APODERADO: pedro.hernandez@apoderados.edu / parent123
+
+
+⚙️ GESTIONAR USUARIOS (COMO ADMIN):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Si estás logueado como ADMIN:
+
+Menú Lateral → SISTEMA → Gestionar Usuarios
+
+✅ CREAR usuarios
+✅ EDITAR usuarios
+✅ ELIMINAR usuarios
+✅ BUSCAR usuarios
+
+
+⚠️ SI VES PANTALLA NEGRA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Espera 5-10 segundos y recarga (F5)
+
+Si persiste:
+→ Verifica que uses: http://192.168.100.71:3000/
+→ NO https:// (sin s)
+
+
+🆘 PROBLEMAS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Email o contraseña incorrectos"
+→ Primero: Abre CARGAR_USUARIOS_DEMO.html
+→ Haz clic: "✅ Cargar Todos los Usuarios"
+
+"No veo el menú"
+→ Presiona F5 para recargar
+
+"Usuarios desaparecieron"
+→ Recarga: CARGAR_USUARIOS_DEMO.html
+
+
+📍 PUERTO CORRECTO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+USA SOLO ESTO:
+✅ http://192.168.100.71:3000/
+✅ http://localhost:3000/
+
+IGNORA ESTOS (no funcionan):
+❌ :3001
+❌ :3002
+❌ :3003
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  RESUMEN:                                                                    ║
+║  1. CARGAR_USUARIOS_DEMO.html                                               ║
+║  2. Clic: "✅ Cargar Todos los Usuarios"                                    ║
+║  3. http://192.168.100.71:3000/                                             ║
+║  4. Login: admin@sistemita.edu / admin123                                    ║
+║  ¡LISTO! 🎉                                                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝

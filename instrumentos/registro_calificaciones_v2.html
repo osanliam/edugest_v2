@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Calificaciones - MINEDU</title>
+    <link rel="stylesheet" href="estilos.css">
+    <script src="calculos.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .info-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .info-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-group label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .info-group input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .competencia {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .competencia-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .competencia-header h3 {
+            color: #667eea;
+            font-size: 16px;
+        }
+
+        .competencia-header .resultado {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .resultado-item {
+            text-align: center;
+        }
+
+        .resultado-item label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .resultado-item .valor {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+            min-width: 60px;
+        }
+
+        .criterios-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .criterio {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .criterio label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .criterio-opciones {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .criterio-opciones label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            font-size: 12px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .criterio-opciones input[type="radio"] {
+            margin-right: 6px;
+            cursor: pointer;
+        }
+
+        .instrumentos-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .instrumentos-section h4 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .instrumento-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+
+        .instrumento-item .tipo {
+            font-weight: 600;
+            color: #667eea;
+            min-width: 150px;
+        }
+
+        .instrumento-item .nota {
+            text-align: center;
+            min-width: 80px;
+            font-weight: 600;
+        }
+
+        .instrumento-item .acciones {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-editar {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-editar:hover {
+            background: #0b7dda;
+        }
+
+        .btn-eliminar {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-eliminar:hover {
+            background: #da190b;
+        }
+
+        .btn-agregar {
+            background: #4CAF50;
+            color: white;
+            margin-top: 10px;
+        }
+
+        .btn-agregar:hover {
+            background: #45a049;
+        }
+
+        .selector-instrumento {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .selector-instrumento select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-guardar {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-guardar:hover {
+            background: #45a049;
+        }
+
+        .btn-limpiar {
+            background: #FF9800;
+            color: white;
+        }
+
+        .btn-limpiar:hover {
+            background: #e68900;
+        }
+
+        .btn-cerrar {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-cerrar:hover {
+            background: #da190b;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            background: #f8f9fa;
+        }
+
+        @media (max-width: 768px) {
+            .info-section {
+                grid-template-columns: 1fr;
+            }
+
+            .criterios-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .competencia-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .competencia-header .resultado {
+                width: 100%;
+                justify-content: space-around;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Registro de Calificaciones</h1>
+            <p>Sistema MINEDU de Evaluación por Competencias</p>
+        </div>
+
+        <div class="info-section">
+            <div class="info-group">
+                <label>Estudiante</label>
+                <input type="text" id="estudiante" placeholder="Nombre del estudiante">
+            </div>
+            <div class="info-group">
+                <label>Período / Bimestre</label>
+                <input type="text" id="periodo" placeholder="Ej: Bimestre I">
+            </div>
+            <div class="info-group">
+                <label>Grado / Sección</label>
+                <input type="text" id="grado" placeholder="Ej: 5to A">
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- COMPETENCIA 1 -->
+            <div class="competencia">
+                <div class="competencia-header">
+                    <h3>📚 Competencia 1: Lee textos diversos</h3>
+                    <div class="resultado">
+                        <div class="resultado-item">
+                            <label>Calificativo</label>
+                            <div class="valor" id="comp1-calif">--</div>
+                        </div>
+                        <div class="resultado-item">
+                            <label>% Logro</label>
+                            <div class="valor" id="comp1-pct">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="criterios-grid" id="comp1-criterios">
+                    <!-- Se genera dinámicamente -->
+                </div>
+
+                <div class="instrumentos-section">
+                    <h4>📋 Instrumentos Aplicados</h4>
+                    <div id="comp1-instrumentos" class="instrumentos-list"></div>
+                    <div class="selector-instrumento">
+                        <select id="comp1-selector">
+                            <option value="">-- Seleccionar Instrumento --</option>
+                            <option value="Rúbrica">Rúbrica de Evaluación</option>
+                            <option value="Lista de Cotejo">Lista de Cotejo</option>
+                            <option value="Portafolio">Portafolio de Evidencias</option>
+                            <option value="Registro Anecdótico">Registro Anecdótico</option>
+                            <option value="Escala Valorativa">Escala Valorativa</option>
+                            <option value="Ficha de Observación">Ficha de Observación</option>
+                            <option value="Evaluación Diagnóstica">Evaluación Diagnóstica</option>
+                            <option value="Ficha de Análisis Literario">Ficha de Análisis Literario</option>
+                        </select>
+                        <button class="btn-agregar" onclick="abrirInstrumento('comp1')">Usar Instrumento</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMPETENCIA 2 -->
+            <div class="competencia">
+                <div class="competencia-header">
+                    <h3>✍️ Competencia 2: Produce textos escritos</h3>
+                    <div class="resultado">
+                        <div class="resultado-item">
+                            <label>Calificativo</label>
+                            <div class="valor" id="comp2-calif">--</div>
+                        </div>
+                        <div class="resultado-item">
+                            <label>% Logro</label>
+                            <div class="valor" id="comp2-pct">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="criterios-grid" id="comp2-criterios">
+                    <!-- Se genera dinámicamente -->
+                </div>
+
+                <div class="instrumentos-section">
+                    <h4>📋 Instrumentos Aplicados</h4>
+                    <div id="comp2-instrumentos" class="instrumentos-list"></div>
+                    <div class="selector-instrumento">
+                        <select id="comp2-selector">
+                            <option value="">-- Seleccionar Instrumento --</option>
+                            <option value="Rúbrica">Rúbrica de Evaluación</option>
+                            <option value="Lista de Cotejo">Lista de Cotejo</option>
+                            <option value="Portafolio">Portafolio de Evidencias</option>
+                            <option value="Registro Anecdótico">Registro Anecdótico</option>
+                            <option value="Escala Valorativa">Escala Valorativa</option>
+                            <option value="Ficha de Observación">Ficha de Observación</option>
+                            <option value="Evaluación Diagnóstica">Evaluación Diagnóstica</option>
+                            <option value="Ficha de Análisis Literario">Ficha de Análisis Literario</option>
+                        </select>
+                        <button class="btn-agregar" onclick="abrirInstrumento('comp2')">Usar Instrumento</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMPETENCIA 3 -->
+            <div class="competencia">
+                <div class="competencia-header">
+                    <h3>🗣️ Competencia 3: Interactúa oralmente</h3>
+                    <div class="resultado">
+                        <div class="resultado-item">
+                            <label>Calificativo</label>
+                            <div class="valor" id="comp3-calif">--</div>
+                        </div>
+                        <div class="resultado-item">
+                            <label>% Logro</label>
+                            <div class="valor" id="comp3-pct">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="criterios-grid" id="comp3-criterios">
+                    <!-- Se genera dinámicamente -->
+                </div>
+
+                <div class="instrumentos-section">
+                    <h4>📋 Instrumentos Aplicados</h4>
+                    <div id="comp3-instrumentos" class="instrumentos-list"></div>
+                    <div class="selector-instrumento">
+                        <select id="comp3-selector">
+                            <option value="">-- Seleccionar Instrumento --</option>
+                            <option value="Rúbrica">Rúbrica de Evaluación</option>
+                            <option value="Lista de Cotejo">Lista de Cotejo</option>
+                            <option value="Portafolio">Portafolio de Evidencias</option>
+                            <option value="Registro Anecdótico">Registro Anecdótico</option>
+                            <option value="Escala Valorativa">Escala Valorativa</option>
+                            <option value="Ficha de Observación">Ficha de Observación</option>
+                            <option value="Evaluación Diagnóstica">Evaluación Diagnóstica</option>
+                            <option value="Ficha de Análisis Literario">Ficha de Análisis Literario</option>
+                        </select>
+                        <button class="btn-agregar" onclick="abrirInstrumento('comp3')">Usar Instrumento</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-guardar" onclick="guardar()">💾 Guardar</button>
+            <button class="btn-limpiar" onclick="limpiar()">🗑️ Limpiar</button>
+            <button class="btn-cerrar" onclick="cerrar()">❌ Cerrar</button>
+        </div>
+    </div>
+
+    <!-- MODAL PARA INSTRUMENTOS -->
+    <div class="modal" id="instrumentoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitulo">Instrumento</h2>
+                <button class="modal-close" onclick="cerrarModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Contenido del instrumento aquí -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cerrar" onclick="cerrarModal()">Cancelar</button>
+                <button class="btn-guardar" onclick="guardarInstrumento()">Guardar Respuesta</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="registro.js"></script>
+</body>
+</html>

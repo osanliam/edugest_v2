@@ -1,0 +1,205 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║                         EMPIEZA AQUÍ - GUÍA RÁPIDA                       ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+¡Hola Osmer! Aquí está TODO lo que necesitas.
+
+═══════════════════════════════════════════════════════════════════════════
+
+🎯 TIENES 2 OPCIONES:
+═══════════════════════════════════════════════════════════════════════════
+
+OPCIÓN A: USAR EL SISTEMA CON TUS DATOS ANTIGUOS
+───────────────────────────────────────────────────────────────────────
+
+¿Quieres migrar estudiantes, maestros y notas de EduGest?
+
+Sigue estos 3 pasos:
+
+1. Lee:     INSTRUCCIONES_MIGRACION_COMPLETA.md
+2. Ejecuta: MIGRACION_DATOS_MANUAL.txt (paso 1)
+3. Usa:     CONVERSOR_DATOS.html (paso 2)
+4. Importa: Datos a registro_calificaciones_v2.html (paso 3)
+
+⏱️ Tiempo total: 20 minutos
+
+─────────────────────────────────────────────────────────────────────────
+
+OPCIÓN B: EMPEZAR DESDE CERO (sin datos antiguos)
+───────────────────────────────────────────────────────────────────────
+
+¿Prefieres comenzar nuevo sin importar datos de EduGest?
+
+1. Abre en navegador:
+   file:///Users/osmer/Downloads/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html
+
+2. ¡Comienza a evaluar! Los datos se guardan automáticamente
+
+⏱️ Tiempo: Inmediato
+
+═══════════════════════════════════════════════════════════════════════════
+
+📁 ARCHIVOS QUE NECESITAS:
+═══════════════════════════════════════════════════════════════════════════
+
+OPCIÓN A (Con migración):
+├─ INSTRUCCIONES_MIGRACION_COMPLETA.md   ← Lee primero
+├─ MIGRACION_DATOS_MANUAL.txt            ← Paso 1: Extrae datos
+├─ CONVERSOR_DATOS.html                  ← Paso 2: Convierte datos
+└─ registro_calificaciones_v2.html       ← Paso 3: Usa datos
+
+OPCIÓN B (Sin migración):
+└─ registro_calificaciones_v2.html       ← Abre directamente
+
+═══════════════════════════════════════════════════════════════════════════
+
+🔥 SI ELIGES OPCIÓN A (MIGRACIÓN):
+═══════════════════════════════════════════════════════════════════════════
+
+AHORA MISMO:
+
+1. Abre EduGest en navegador:
+   file:///Users/osmer/Downloads/Sistemita/EduGest.html
+
+2. Inicia sesión (admin)
+
+3. Abre Consola:
+   Mac: Cmd + Option + J
+   Windows: Ctrl + Shift + J
+
+4. En archivo MIGRACION_DATOS_MANUAL.txt:
+   └─ Copia TODO el código JavaScript
+
+5. Pégalo en la consola del navegador y presiona ENTER
+
+6. Se descargará un archivo JSON
+
+7. Guarda en:
+   /Users/osmer/Downloads/Sistemita_Nuevo/
+
+8. Luego sigue INSTRUCCIONES_MIGRACION_COMPLETA.md
+
+═══════════════════════════════════════════════════════════════════════════
+
+💡 SI ELIGES OPCIÓN B (SIN MIGRACIÓN):
+═══════════════════════════════════════════════════════════════════════════
+
+AHORA MISMO:
+
+Copia esta URL en navegador:
+
+file:///Users/osmer/Downloads/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html
+
+¡Listo! Ya puedes empezar a evaluar estudiantes.
+
+Los datos se guardan automáticamente en formato JSON.
+
+═══════════════════════════════════════════════════════════════════════════
+
+📊 EL SISTEMA TIENE:
+═══════════════════════════════════════════════════════════════════════════
+
+✅ 8 INSTRUMENTOS PEDAGÓGICOS:
+  1. Rúbrica de Evaluación
+  2. Lista de Cotejo
+  3. Portafolio de Evidencias
+  4. Registro Anecdótico
+  5. Escala Valorativa
+  6. Ficha de Observación
+  7. Evaluación Diagnóstica
+  8. Ficha de Análisis Literario
+
+✅ 3 COMPETENCIAS MINEDU:
+  • Lee textos diversos
+  • Produce textos escritos
+  • Interactúa oralmente
+
+✅ CÁLCULOS AUTOMÁTICOS:
+  • Escala: C (Inicio) | B (Proceso) | A (Esperado) | AD (Destacado)
+  • Conversión a porcentaje
+  • Rúbrica domina si hay múltiples instrumentos
+
+═══════════════════════════════════════════════════════════════════════════
+
+❓ ¿CUÁL DEBO ELEGIR?
+═══════════════════════════════════════════════════════════════════════════
+
+OPCIÓN A si:
+├─ Tienes estudiantes y notas en EduGest
+├─ Quieres preservar datos históricos
+├─ Necesitas continuidad de registros
+└─ ⏱️ Tienes 20 minutos
+
+OPCIÓN B si:
+├─ Es un nuevo período académico
+├─ Quieres empezar limpio
+├─ No necesitas datos antiguos
+└─ ⏱️ Tienes 1 minuto
+
+═══════════════════════════════════════════════════════════════════════════
+
+⚠️ ADVERTENCIA IMPORTANTE:
+═══════════════════════════════════════════════════════════════════════════
+
+Si eliges OPCIÓN A (MIGRACIÓN):
+
+Los datos de EduGest están en localStorage del navegador.
+
+SI CIERRAS EL NAVEGADOR O LIMPIAS CACHE, PODRÍAN PERDERSE.
+
+ACTÚA AHORA:
+1. Abre EduGest
+2. Inicia sesión
+3. Abre consola (F12)
+4. Ejecuta código de extracción
+5. Descarga el JSON
+
+NO ESPERES MÁS.
+
+═══════════════════════════════════════════════════════════════════════════
+
+🎓 DOCUMENTACIÓN ADICIONAL:
+═══════════════════════════════════════════════════════════════════════════
+
+├─ README.md                    → Resumen ejecutivo
+├─ INSTRUMENTOS_COMPLETOS.txt   → Guía detallada de instrumentos
+├─ SISTEMA_NUEVO.txt            → Especificaciones técnicas
+├─ ABRIR_SISTEMA.txt            → Instrucciones de acceso
+├─ VERIFICACION_SISTEMA.txt     → Estado final del sistema
+└─ MIGRACION_DATOS_MANUAL.txt   → Guía de extracción
+
+═══════════════════════════════════════════════════════════════════════════
+
+✅ DECISIÓN RÁPIDA:
+═══════════════════════════════════════════════════════════════════════════
+
+Responde estas preguntas:
+
+1. ¿Tienes estudiantes y notas en EduGest?
+   → SÍ  → Elige OPCIÓN A (Migración)
+   → NO  → Elige OPCIÓN B (Nuevo)
+
+2. ¿Necesitas migrar ahora?
+   → SÍ  → Ve a INSTRUCCIONES_MIGRACION_COMPLETA.md
+   → NO  → Abre registro_calificaciones_v2.html
+
+═══════════════════════════════════════════════════════════════════════════
+
+🚀 ¡VAMOS!
+═══════════════════════════════════════════════════════════════════════════
+
+Elige tu opción y sigue los pasos.
+
+Si tienes preguntas, consulta la documentación en esta carpeta.
+
+Todo está listo. Solo necesitas actuar.
+
+═══════════════════════════════════════════════════════════════════════════
+
+Creado: 19 de Abril de 2026
+Estado: 100% Listo para usar
+Versión: Sistemita_Nuevo v2.0 + Migración v1.0
+
+═══════════════════════════════════════════════════════════════════════════

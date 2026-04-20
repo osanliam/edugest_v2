@@ -1,0 +1,160 @@
+═════════════════════════════════════════════════════════════════════════════════
+    CENTRO DE INSTRUMENTOS PEDAGÓGICOS - SISTEMITA_NUEVO
+═════════════════════════════════════════════════════════════════════════════════
+
+📚 INSTRUMENTOS DISPONIBLES:
+
+1. 📋 RÚBRICA DE EVALUACIÓN (rubrica_evaluacion.html)
+   - Para evaluar competencias y desempeños con criterios claros
+   - Escalas de 1 a 4 puntos personalizables
+   - Permite agregar/eliminar criterios según necesidad
+   - Exporta datos en JSON
+
+2. 👁️ FICHA DE OBSERVACIÓN (ficha_observacion.html)
+   - Para registrar conductas, comportamientos y actitudes
+   - Frecuencias de observación (siempre, frecuente, ocasional, nunca)
+   - Contexto de observación definible
+   - Notas detalladas de comportamiento
+
+3. 📊 REGISTRO DE CALIFICACIONES (registro_calificaciones.html)
+   - Para consolidar notas de actividades múltiples
+   - Cálculo automático de promedios por estudiante
+   - Estadísticas en vivo (promedio general, máxima, mínima)
+   - Observaciones individuales por estudiante
+
+═════════════════════════════════════════════════════════════════════════════════
+🎯 CARACTERÍSTICAS CLAVE:
+═════════════════════════════════════════════════════════════════════════════════
+
+✅ AUTONOMÍA:
+   - Cada instrumento abre NUEVO, sin memoria de usos anteriores
+   - No toma datos guardados previamente
+   - Cada sesión es completamente independiente
+   - Perfecto para usar varias veces en el mismo día sin contaminación de datos
+
+✅ BOTONES EN TODOS LOS INSTRUMENTOS:
+   💾 GUARDAR: Descarga los datos en archivo JSON (nombre_instrumento.json)
+   🗑️ LIMPIAR: Borra todos los datos y reinicia el instrumento
+   ✏️ EDITAR: Personaliza títulos, encabezados, escalas y criterios
+   ❌ CERRAR: Cierra la ventana del instrumento (pregunta si guardar)
+
+✅ EDICIÓN GLOBAL:
+   - El botón EDITAR permite modificar TODOS los elementos:
+   - Títulos del instrumento
+   - Encabezados de columnas/tablas
+   - Escalas de calificación
+   - Criterios o conductas predefinidas
+   - Los cambios aplican a todo el instrumento simultáneamente
+
+✅ DATOS EN FORMATO JSON:
+   - Al guardar, los datos se descargan en JSON
+   - Fácil de migrar desde tu sistema anterior
+   - Compatible con bases de datos y Excel
+   - Texto plano, legible y portable
+
+═════════════════════════════════════════════════════════════════════════════════
+📝 PASO A PASO DE USO:
+═════════════════════════════════════════════════════════════════════════════════
+
+OPCIÓN A: Desde el INDEX (Recomendado)
+1. Abre "index.html" en tu navegador
+2. Verás tarjetas de los tres instrumentos
+3. Haz clic en "Abrir →" en la tarjeta que necesites
+4. Se abrirá en una ventana nueva
+
+OPCIÓN B: Directa
+1. Abre directamente el archivo HTML del instrumento en tu navegador
+2. Ej: rubrica_evaluacion.html, ficha_observacion.html, etc.
+
+PARA USAR UN INSTRUMENTO:
+1. Rellena los campos de información general (fecha, estudiante, etc.)
+2. Personaliza criterios/conductas si es necesario (botón EDITAR)
+3. Agrega filas con el botón "+ Agregar..."
+4. Completa todos los datos
+5. Haz clic en GUARDAR para descargar el JSON
+6. Haz clic en CERRAR para terminar
+
+═════════════════════════════════════════════════════════════════════════════════
+🔄 MIGRACIÓN DE DATOS DEL SISTEMA ANTERIOR:
+═════════════════════════════════════════════════════════════════════════════════
+
+Cuando migres datos del sistema anterior:
+
+1. Los archivos JSON descargados de los instrumentos pueden procesarse
+   con scripts Python o importarse directamente en Excel
+
+2. Los JSONs tendrán estructura clara:
+   {
+     "estudiante": "...",
+     "fecha": "...",
+     "datos": [...]
+   }
+
+3. Para automatizar la migración:
+   - Proporciona los datos antiguos en Excel o CSV
+   - Se crearán scripts para convertir formatos automáticamente
+   - Los datos se cargarán en los registros nuevos
+
+═════════════════════════════════════════════════════════════════════════════════
+⚙️ CARACTERÍSTICA ESPECIAL - INDEPENDENCIA:
+═════════════════════════════════════════════════════════════════════════════════
+
+IMPORTANTE: Cada instrumento reinicia completamente cada vez que lo abres.
+
+Ejemplo de uso múltiple:
+- Abrirás la Rúbrica para el alumno "Juan" a las 8:00 am → Guardarás
+- Abrirás la Rúbrica de nuevo a las 10:00 am para "María" → Estará VACÍA
+  (No recordará a Juan ni sus datos)
+- Esto evita errores de mezcla de datos
+
+Ventaja: Es imposible olvidar limpiar entre usos o mezclar datos de alumnos
+
+═════════════════════════════════════════════════════════════════════════════════
+📂 ESTRUCTURA DE ARCHIVOS:
+═════════════════════════════════════════════════════════════════════════════════
+
+instrumentos/
+├── index.html                    ← INICIA AQUÍ (panel de control)
+├── rubrica_evaluacion.html       ← Instrumento 1
+├── ficha_observacion.html        ← Instrumento 2
+├── registro_calificaciones.html  ← Instrumento 3
+└── LEEME.txt                     ← Este archivo
+
+═════════════════════════════════════════════════════════════════════════════════
+💡 CONSEJOS DE USO:
+═════════════════════════════════════════════════════════════════════════════════
+
+1. Usa el INDEX: Es la forma más ordenada de acceder a todo
+2. Personaliza primero: Edita una vez los criterios que usarás siempre
+3. Guarda regularmente: No esperes a terminar, guarda en pasos intermedios
+4. Nombra claros JSONs: Incluye fecha y alumno en el nombre descargado
+5. Copia-pega: Puedes reutilizar datos de un instrumento a otro
+6. Edición en grupo: El botón EDITAR cambia TODO el instrumento a la vez
+
+═════════════════════════════════════════════════════════════════════════════════
+❓ PREGUNTAS FRECUENTES:
+═════════════════════════════════════════════════════════════════════════════════
+
+P: ¿Los datos se guardan automáticamente?
+R: No. Debes hacer clic en GUARDAR. Te descargará un JSON que tú controlas.
+
+P: ¿Qué pasa si cierro sin guardar?
+R: Perderás los datos. Siempre haz clic en GUARDAR primero.
+
+P: ¿Puedo usar el mismo instrumento dos veces en el mismo día?
+R: Sí, y no interfieren uno con otro. Cada apertura es independiente.
+
+P: ¿Cómo edito TODO el instrumento a la vez?
+R: Con el botón "✏️ EDITAR" puedes cambiar encabezados, criterios y escalas.
+
+P: ¿Los JSONs son compatibles con Excel?
+R: Sí. Puedes abrirlos en Excel, convertirlos a CSV, o importarlos en bases de datos.
+
+═════════════════════════════════════════════════════════════════════════════════
+
+¿Dudas o problemas? Los instrumentos están diseñados para ser intuitivos.
+Si necesitas cambios, personalización adicional o integración con tu BD anterior,
+avísame y ajustamos lo que sea necesario.
+
+¡Éxito con tu nuevo sistema! 🎓
+═════════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,95 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║              EDUGEST v3 - COMANDOS PARA EJECUTAR INMEDIATAMENTE          ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════
+
+PASO 1️⃣  - ABRE TERMINAL
+────────────────────────
+
+Presiona: Cmd + Space
+Escribe: Terminal
+Presiona: Enter
+
+
+PASO 2️⃣  - COPIA ESTE COMANDO Y PÉGALO EN TERMINAL
+────────────────────────────────────────────────────
+
+cd ~/Downloads/Sistemita/Sistemita_Nuevo && npm install && npm run dev
+
+
+LISTO. Eso es todo.
+
+Espera a que instale las dependencias (2-5 minutos)
+Luego abre en navegador: http://localhost:3000
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+CREDENCIALES PARA ACCEDER:
+
+[ADMIN]
+  user: admin@escuela.edu
+  pass: admin123
+
+[DIRECTOR]
+  user: director@escuela.edu
+  pass: director123
+
+[PROFESOR]
+  user: profesor@escuela.edu
+  pass: prof123
+
+[ESTUDIANTE]
+  user: estudiante@escuela.edu
+  pass: est123
+
+═══════════════════════════════════════════════════════════════════════════
+
+QUÉ VAS A VER:
+
+✓ Pantallas ultra modernas con diseño futurista
+✓ Colores neon (cyan, magenta, lime, blue)
+✓ Efectos de glassmorphism y glow
+✓ Tablas y gráficos oscuros y legibles
+✓ Animaciones suaves en todo
+✓ Contraste WCAG AAA (texto muy visible)
+
+═══════════════════════════════════════════════════════════════════════════
+
+SI NO FUNCIONA:
+
+1. Asegúrate que Node.js esté instalado:
+   node --version
+   npm --version
+
+2. Si dice "no encontrado", descarga en:
+   https://nodejs.org (LTS)
+
+3. Si sigue sin funcionar, intenta:
+   rm -rf ~/Downloads/Sistemita/Sistemita_Nuevo/node_modules
+   cd ~/Downloads/Sistemita/Sistemita_Nuevo
+   npm install
+   npm run dev
+
+═══════════════════════════════════════════════════════════════════════════
+
+PARA DETENER EL SERVIDOR:
+
+En la terminal donde está ejecutando:
+Presiona: Ctrl + C
+
+═══════════════════════════════════════════════════════════════════════════
+
+¡LISTO! 🚀
+
+Simplemente:
+1. Abre Terminal
+2. Pega el comando
+3. Espera a que instale
+4. Abre http://localhost:3000
+5. Prueba con cualquier credencial
+
+═══════════════════════════════════════════════════════════════════════════

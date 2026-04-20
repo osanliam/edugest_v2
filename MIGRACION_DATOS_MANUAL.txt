@@ -1,0 +1,205 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    EXTRACCIÓN Y MIGRACIÓN DE DATOS                        ║
+║                     De EduGest a Sistemita_Nuevo                          ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+📌 SITUACIÓN ACTUAL:
+═════════════════════════════════════════════════════════════════════════════
+
+El sistema EduGest anterior guarda los datos en localStorage del navegador
+con estas claves principales:
+
+├─ v5_us          → Usuarios (estudiantes, maestros, admin)
+├─ v5_diag_claves → Evaluación diagnóstica
+├─ v5_exam_claves → Exámenes
+├─ v5_bim_units   → Unidades por bimestre
+└─ v5_instr_avg   → Configuración de instrumentos
+
+Los datos NO están en archivos HTML exportados, están en la memoria del
+navegador donde se usó EduGest.
+
+═════════════════════════════════════════════════════════════════════════════
+
+🔧 OPCIÓN 1: EXTRACCIÓN AUTOMÁTICA (Recomendada)
+═════════════════════════════════════════════════════════════════════════════
+
+PASOS:
+
+1. Abre EduGest en tu navegador:
+   file:///Users/osmer/Downloads/Sistemita/EduGest.html
+
+2. Inicia sesión como ADMIN (usuario administrativo)
+
+3. Abre la Consola del Navegador:
+   macOS: Cmd + Option + J
+   Windows: Ctrl + Shift + J
+
+4. Copia TODO este código:
+
+════════════════════════════════════════════════════════════════════════════
+
+const extraerDatosEduGest = async () => {
+    const datosExtraidos = {
+        estudiantes: [],
+        maestros: [],
+        materias: [],
+        periodos: [],
+        notas: [],
+        competencias: [],
+        timestamp: new Date().toISOString(),
+        fuente: 'EduGest_Export'
+    };
+
+    // Extraer usuarios (estudiantes + maestros)
+    try {
+        const usuariosKey = localStorage.getItem('v5_us');
+        if (usuariosKey) {
+            const usuarios = JSON.parse(usuariosKey);
+            if (Array.isArray(usuarios)) {
+                datosExtraidos.maestros = usuarios.filter(u =>
+                    ['teacher','admin','director','subdirector'].includes(u.role)
+                );
+                datosExtraidos.estudiantes = usuarios.filter(u => u.role === 'student');
+            }
+        }
+    } catch(e) { console.log('Error extrayendo usuarios:', e); }
+
+    // Extraer todas las claves de localStorage
+    const todasLasClaves = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        try {
+            const valor = localStorage.getItem(key);
+            todasLasClaves[key] = valor.substring(0, 200); // Primeros 200 caracteres
+        } catch(e) {}
+    }
+
+    datosExtraidos.localStorage_disponibles = Object.keys(todasLasClaves);
+    datosExtraidos.muestra_datos = todasLasClaves;
+
+    // Descargar como JSON
+    const json = JSON.stringify(datosExtraidos, null, 2);
+    const blob = new Blob([json], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `edugest_datos_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    console.log('✅ Datos extraídos y descargados');
+    console.log('Estudiantes encontrados:', datosExtraidos.estudiantes.length);
+    console.log('Maestros encontrados:', datosExtraidos.maestros.length);
+    return datosExtraidos;
+};
+
+extraerDatosEduGest();
+
+════════════════════════════════════════════════════════════════════════════
+
+5. Pega el código en la consola y presiona ENTER
+
+6. Se descargará un archivo JSON: `edugest_datos_[número].json`
+
+7. Guarda este archivo en: /Users/osmer/Downloads/Sistemita_Nuevo/datos_extraidos.json
+
+═════════════════════════════════════════════════════════════════════════════
+
+🔧 OPCIÓN 2: EXPORTAR MANUALMENTE DESDE LA INTERFAZ
+═════════════════════════════════════════════════════════════════════════════
+
+Si EduGest tiene un botón de EXPORTAR:
+
+1. En EduGest, busca botón "Exportar" o "Export"
+2. Selecciona "Exportar Usuarios"
+3. Selecciona "Exportar Calificaciones"
+4. Selecciona "Exportar Configuración"
+5. Guarda los archivos JSON en: /Users/osmer/Downloads/Sistemita_Nuevo/
+
+═════════════════════════════════════════════════════════════════════════════
+
+✅ DESPUÉS DE EXTRAER LOS DATOS:
+═════════════════════════════════════════════════════════════════════════════
+
+Una vez que tengas el archivo JSON con los datos:
+
+1. Copia la ruta del archivo extraído
+
+2. Abre Sistemita_Nuevo en tu navegador:
+   file:///Users/osmer/Downloads/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html
+
+3. Avisame y creo un SCRIPT DE MIGRACIÓN que:
+   ├─ Lea el JSON de EduGest
+   ├─ Convierta estudiantes al formato nuevo
+   ├─ Convierta maestros al formato nuevo
+   ├─ Copie TODAS las notas con mapeo de competencias
+   ├─ Preserve la estructura MINEDU
+   └─ Exporte todo listo para usar en Sistemita_Nuevo
+
+═════════════════════════════════════════════════════════════════════════════
+
+📋 ESTRUCTURA DE DATOS ESPERADOS:
+═════════════════════════════════════════════════════════════════════════════
+
+ESTUDIANTES (del JSON extraído):
+{
+  "id": "s123",
+  "name": "Juan Pérez",
+  "email": "juan@escuela.edu.pe",
+  "dni": "12345678",
+  "grado": "5to A",
+  "seccion": "A",
+  "role": "student",
+  "active": true
+}
+
+MAESTROS (del JSON extraído):
+{
+  "id": "t456",
+  "name": "María García",
+  "email": "maria@escuela.edu.pe",
+  "dni": "87654321",
+  "role": "teacher",
+  "subjects": ["Comunicación", "Literatura"],
+  "active": true
+}
+
+NOTAS (del JSON extraído):
+{
+  "studentId": "s123",
+  "teacherId": "t456",
+  "competencia": "Lee textos diversos",
+  "periodo": "Bimestre I",
+  "calificativo": "A",
+  "fecha": "2026-04-15",
+  "instrumento": "Rúbrica"
+}
+
+═════════════════════════════════════════════════════════════════════════════
+
+⚠️ IMPORTANTE:
+═════════════════════════════════════════════════════════════════════════════
+
+Los datos en localStorage son LOCALES al navegador.
+Si cierras el navegador o limpias cache, los datos pueden perderse.
+
+POR ESO ES URGENTE hacer la extracción AHORA MISMO.
+
+═════════════════════════════════════════════════════════════════════════════
+
+🚀 PRÓXIMOS PASOS:
+═════════════════════════════════════════════════════════════════════════════
+
+1. Ejecuta el código de extracción en EduGest (consola)
+2. Descarga el JSON
+3. Guarda en /Users/osmer/Downloads/Sistemita_Nuevo/
+4. Avísame y crearé el CONVERSOR automático
+5. Los datos migraran a Sistemita_Nuevo con toda su información
+
+═════════════════════════════════════════════════════════════════════════════
+
+¿Listo? Ejecuta el código de extracción ahora mismo.
+
+═════════════════════════════════════════════════════════════════════════════

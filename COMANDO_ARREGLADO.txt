@@ -1,0 +1,40 @@
+════════════════════════════════════════════════════════════════════════════════
+                    ✅ DOCKERFILE ARREGLADO
+════════════════════════════════════════════════════════════════════════════════
+
+El error fue: Dockerfile buscaba carpeta "src/" pero los archivos están en raíz.
+
+ARREGLO: Actualizamos Dockerfile para copiar archivos correctos
+
+════════════════════════════════════════════════════════════════════════════════
+                    INTENTA DE NUEVO (mismo comando)
+════════════════════════════════════════════════════════════════════════════════
+
+En tu terminal:
+
+  ./START_DOCKER.sh
+
+Ahora debería funcionar.
+
+ESPERA: 2-5 minutos
+
+RESULTADO ESPERADO:
+  ════════════════════════════════════════════════════════════════
+    ✓ SISTEMITA CORRIENDO
+  ════════════════════════════════════════════════════════════════
+
+    → Abre navegador: http://localhost:3000
+
+
+════════════════════════════════════════════════════════════════════════════════
+                    Si aún hay error:
+════════════════════════════════════════════════════════════════════════════════
+
+Ejecuta primero:
+  docker-compose down -v
+  docker system prune -a
+
+Luego:
+  ./START_DOCKER.sh
+
+════════════════════════════════════════════════════════════════════════════════

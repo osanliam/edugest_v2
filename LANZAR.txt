@@ -1,0 +1,56 @@
+════════════════════════════════════════════════════════════
+ 🚀 SISTEMITA NUEVO - INSTRUCCIONES DE DESPLIEGUE
+════════════════════════════════════════════════════════════
+
+UBICACIÓN: /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo
+
+════════════════════════════════════════════════════════════
+OPCIÓN 1: DOCKER (Recomendado)
+════════════════════════════════════════════════════════════
+
+1. Abre Docker Desktop en tu Mac
+
+2. En terminal:
+   cd /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo
+   docker-compose up --build
+
+3. Espera a que compile (1-3 minutos)
+
+4. Abre en navegador:
+   http://localhost:5173/
+
+════════════════════════════════════════════════════════════
+OPCIÓN 2: SIN DOCKER (Python/Node)
+════════════════════════════════════════════════════════════
+
+Si tienes Node.js instalado:
+   cd /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo
+   npm install
+   npm run dev
+
+Si tienes Python:
+   cd /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo
+   python3 -m http.server 3000
+
+Luego abre: http://localhost:3000/
+
+════════════════════════════════════════════════════════════
+DATOS CARGADOS
+════════════════════════════════════════════════════════════
+
+✅ 1249 Estudiantes
+✅ 12 Maestros
+✅ 6997 Notas
+✅ 13 Módulos/Instrumentos Pedagógicos
+
+Todos importados desde backup del 19 de abril 2026
+
+════════════════════════════════════════════════════════════
+PARA DETENER
+
+Ctrl + C en terminal
+
+════════════════════════════════════════════════════════════
+MÁS INFORMACIÓN
+
+Ver: DESPLEGAR_DOCKER.md

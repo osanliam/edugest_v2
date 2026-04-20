@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Datos EduGest → Sistemita_Nuevo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); padding: 30px; }
+        h1 { color: #333; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .section { margin: 25px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea; }
+        .section h2 { color: #333; margin-bottom: 15px; font-size: 16px; }
+        .input-group { display: flex; gap: 10px; margin: 10px 0; }
+        input[type="file"] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
+        button { padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        button:hover { background: #5568d3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 15px 0; }
+        .stat-box { background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd; text-align: center; }
+        .stat-number { font-size: 24px; font-weight: bold; color: #667eea; }
+        .stat-label { font-size: 12px; color: #666; margin-top: 5px; }
+        .progress-bar { width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { height: 100%; background: #667eea; width: 0%; transition: width 0.3s; }
+        textarea { width: 100%; height: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 12px; resize: vertical; }
+        .message { padding: 12px; border-radius: 6px; margin: 10px 0; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .button-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0; }
+        .highlight { background: #fff9e6; padding: 10px; border-radius: 6px; margin: 10px 0; }
+        code { background: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Conversor EduGest → Sistemita_Nuevo</h1>
+        <p class="subtitle">Paso 2 de 3: Convierte tus datos al formato nuevo</p>
+
+        <div class="section">
+            <h2>📂 Paso 1: Carga el archivo JSON extraído</h2>
+            <div class="input-group">
+                <input type="file" id="fileInput" accept=".json">
+                <button onclick="cargarArchivo()">📂 Cargar Archivo</button>
+            </div>
+            <div id="loadMessage"></div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Estadísticas del archivo</h2>
+            <div class="stats">
+                <div class="stat-box"><div class="stat-number" id="estudiantesCount">0</div><div class="stat-label">Estudiantes</div></div>
+                <div class="stat-box"><div class="stat-number" id="maestrosCount">0</div><div class="stat-label">Maestros</div></div>
+                <div class="stat-box"><div class="stat-number" id="notasCount">0</div><div class="stat-label">Notas</div></div>
+            </div>
+            <div id="statsMessage"></div>
+        </div>
+
+        <div class="section">
+            <h2>👁️ Vista previa de datos</h2>
+            <textarea id="dataPreview" readonly></textarea>
+        </div>
+
+        <div class="section">
+            <h2>⚙️ Paso 2: Convierte los datos</h2>
+            <div class="highlight">ℹ️ Se convertirán estudiantes, maestros y notas al formato MINEDU (C/B/A/AD)</div>
+            <div class="button-group">
+                <button onclick="convertirDatos()" id="convertBtn" disabled>⚙️ Convertir Datos</button>
+                <button onclick="limpiar()">🗑️ Limpiar</button>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="progressBar"></div></div>
+            <div id="convertMessage"></div>
+        </div>
+
+        <div class="section">
+            <h2>✅ Resultado de conversión</h2>
+            <textarea id="resultado" readonly></textarea>
+            <div class="button-group">
+                <button onclick="descargarJSON()" id="downloadBtn" disabled>⬇️ Descargar JSON</button>
+                <button onclick="copiarResultado()" id="copyBtn" disabled>📋 Copiar</button>
+            </div>
+        </div>
+
+        <div class="section" style="border-left-color: #28a745;">
+            <h2>🚀 Paso 3: Importa en Sistemita</h2>
+            <div class="highlight">1. Descarga JSON (arriba) 👆<br>2. Abre registro_calificaciones_v2.html<br>3. Importa datos en consola (F12)</div>
+        </div>
+    </div>
+
+    <script>
+        let datosOriginales = null, datosCnvertidos = null;
+
+        function cargarArchivo() {
+            const archivo = document.getElementById('fileInput').files[0];
+            if (!archivo) { mostrarMensaje('loadMessage', 'Selecciona un archivo', 'error'); return; }
+            const lector = new FileReader();
+            lector.onload = (e) => {
+                try {
+                    datosOriginales = JSON.parse(e.target.result);
+                    actualizarEstadisticas();
+                    mostrarPreview();
+                    document.getElementById('convertBtn').disabled = false;
+                    mostrarMensaje('loadMessage', '✅ Archivo cargado', 'success');
+                } catch (err) {
+                    mostrarMensaje('loadMessage', '❌ Error JSON: ' + err.message, 'error');
+                }
+            };
+            lector.readAsText(archivo);
+        }
+
+        function actualizarEstadisticas() {
+            const est = (datosOriginales.estudiantes || []).length;
+            const mae = (datosOriginales.maestros || []).length;
+            const not = (datosOriginales.notas || []).length;
+            document.getElementById('estudiantesCount').textContent = est;
+            document.getElementById('maestrosCount').textContent = mae;
+            document.getElementById('notasCount').textContent = not;
+            document.getElementById('statsMessage').innerHTML = `<div class="message info">📊 Total: <strong>${est + mae + not}</strong> registros</div>`;
+        }
+
+        function mostrarPreview() {
+            const preview = {
+                timestamp: datosOriginales.timestamp,
+                estudiantes: (datosOriginales.estudiantes || []).slice(0, 2),
+                maestros: (datosOriginales.maestros || []).slice(0, 2)
+            };
+            document.getElementById('dataPreview').value = JSON.stringify(preview, null, 2);
+        }
+
+        function convertirDatos() {
+            if (!datosOriginales) { mostrarMensaje('convertMessage', 'Carga archivo primero', 'error'); return; }
+            try {
+                document.getElementById('convertBtn').disabled = true;
+                mostrarProgreso(10);
+
+                const estudiantesConvertidos = (datosOriginales.estudiantes || []).map(e => ({
+                    id: e.id || 's_' + Date.now(),
+                    nombre: e.name || e.nombre || 'Sin nombre',
+                    email: e.email || '',
+                    dni: e.dni || '',
+                    grado: e.grado || e.grade || '',
+                    activo: e.active !== false
+                }));
+                mostrarProgreso(30);
+
+                const maestrosConvertidos = (datosOriginales.maestros || []).map(m => ({
+                    id: m.id || 't_' + Date.now(),
+                    nombre: m.name || m.nombre || 'Sin nombre',
+                    email: m.email || '',
+                    dni: m.dni || '',
+                    especialidad: m.subjects?.join(', ') || 'Comunicación',
+                    rol: m.role || 'teacher'
+                }));
+                mostrarProgreso(50);
+
+                const mapeo = {'C': 'C', 'En Inicio': 'C', 'B': 'B', 'En Proceso': 'B', 'A': 'A', 'Esperado': 'A', 'AD': 'AD', 'Destacado': 'AD'};
+                const notasConvertidas = (datosOriginales.notas || []).map(n => ({
+                    estudianteId: n.studentId || n.estudianteId || '',
+                    maestroId: n.teacherId || n.maestroId || '',
+                    competencia: n.competencia || 'Sin especificar',
+                    periodo: n.periodo || 'Bimestre I',
+                    calificativo: mapeo[n.calificativo] || n.calificativo || 'C',
+                    fecha: n.fecha || new Date().toISOString(),
+                    instrumento: n.instrumento || 'Rúbrica'
+                }));
+                mostrarProgreso(80);
+
+                datosCnvertidos = {
+                    version: 'Sistemita_Nuevo_v2.0',
+                    timestamp: new Date().toISOString(),
+                    resumen: { totalEstudiantes: estudiantesConvertidos.length, totalMaestros: maestrosConvertidos.length, totalNotas: notasConvertidas.length },
+                    estudiantes: estudiantesConvertidos,
+                    maestros: maestrosConvertidos,
+                    notas: notasConvertidas
+                };
+
+                mostrarProgreso(100);
+                document.getElementById('resultado').value = JSON.stringify(datosCnvertidos, null, 2);
+                document.getElementById('downloadBtn').disabled = false;
+                document.getElementById('copyBtn').disabled = false;
+                mostrarMensaje('convertMessage', '✅ Conversión: ' + estudiantesConvertidos.length + ' est, ' + maestrosConvertidos.length + ' mae, ' + notasConvertidas.length + ' not', 'success');
+                setTimeout(() => mostrarProgreso(0), 1000);
+            } catch (err) {
+                mostrarMensaje('convertMessage', '❌ Error: ' + err.message, 'error');
+                document.getElementById('convertBtn').disabled = false;
+            }
+        }
+
+        function mostrarProgreso(p) { document.getElementById('progressBar').style.width = p + '%'; }
+
+        function descargarJSON() {
+            if (!datosCnvertidos) { mostrarMensaje('convertMessage', 'Convierte primero', 'error'); return; }
+            const json = JSON.stringify(datosCnvertidos, null, 2);
+            const blob = new Blob([json], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'sistemita_datos_' + Date.now() + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function copiarResultado() {
+            if (!datosCnvertidos) { mostrarMensaje('convertMessage', 'Convierte primero', 'error'); return; }
+            document.getElementById('resultado').select();
+            document.execCommand('copy');
+            mostrarMensaje('convertMessage', '✅ Copiado', 'success');
+        }
+
+        function limpiar() {
+            datosOriginales = null;
+            datosCnvertidos = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('dataPreview').value = '';
+            document.getElementById('resultado').value = '';
+            document.getElementById('estudiantesCount').textContent = '0';
+            document.getElementById('maestrosCount').textContent = '0';
+            document.getElementById('notasCount').textContent = '0';
+            document.getElementById('convertBtn').disabled = true;
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('copyBtn').disabled = true;
+            mostrarProgreso(0);
+            document.getElementById('loadMessage').innerHTML = '';
+            document.getElementById('statsMessage').innerHTML = '';
+            document.getElementById('convertMessage').innerHTML = '';
+        }
+
+        function mostrarMensaje(id, texto, tipo) {
+            document.getElementById(id).innerHTML = '<div class="message ' + tipo + '">' + texto + '</div>';
+        }
+    </script>
+</body>
+</html>

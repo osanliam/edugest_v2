@@ -1,0 +1,116 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    INSTRUCCIONES RÁPIDAS DE INICIO                        ║
+║                      SISTEMA MINEDU v2 - COMPLETO                         ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+OPCIÓN 1: Abrir directamente en el navegador
+═════════════════════════════════════════════════════════════════════════════
+
+Copia este texto en tu navegador (Chrome, Firefox, Safari):
+
+file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html
+
+
+OPCIÓN 2: Crear acceso directo (macOS)
+═════════════════════════════════════════════════════════════════════════════
+
+1. Abre Terminal
+2. Copia y pega esto:
+
+cat > ~/Desktop/Abrir_Sistema.sh << 'EOF'
+#!/bin/bash
+open "file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html"
+EOF
+
+3. Presiona Enter
+4. Ahora en Terminal:
+
+chmod +x ~/Desktop/Abrir_Sistema.sh
+
+5. Listo. Desde ahora puedes hacer doble clic en el archivo "Abrir_Sistema.sh"
+   en tu Desktop para abrir el sistema.
+
+
+OPCIÓN 3: Terminal directa
+═════════════════════════════════════════════════════════════════════════════
+
+Abre Terminal y copia:
+
+open "file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html"
+
+═════════════════════════════════════════════════════════════════════════════
+
+¿QUÉ ESPERAR?
+═════════════════════════════════════════════════════════════════════════════
+
+1. Se abre tu navegador predeterminado
+2. Ves: REGISTRO DE CALIFICACIONES con 3 campos (Estudiante, Período, Grado)
+3. Debajo hay 3 bloques grandes (Competencias)
+4. Cada competencia tiene:
+   ├─ 5 criteria (C/B/A/AD)
+   ├─ Dropdown de 8 instrumentos
+   └─ Botón "Usar Instrumento"
+
+═════════════════════════════════════════════════════════════════════════════
+
+PROBLEMAS COMUNES:
+═════════════════════════════════════════════════════════════════════════════
+
+❌ "No se puede acceder a este sitio"
+✓ Solución: Verifica que la ruta sea exacta (sin espacios extras)
+            Copia-pega desde este archivo para evitar errores
+
+❌ "Página en blanco"
+✓ Solución: Recarga con Cmd+R (macOS) o Ctrl+R (Windows)
+
+❌ "No se ve calculos.js"
+✓ Solución: El archivo existe en la misma carpeta
+            Actualiza el navegador (Cmd+Shift+R macOS, Ctrl+Shift+R Windows)
+
+═════════════════════════════════════════════════════════════════════════════
+
+PRIMEROS PASOS DESPUÉS DE ABRIR:
+═════════════════════════════════════════════════════════════════════════════
+
+1. Escribe nombre del estudiante
+2. Escribe período (ej: Bimestre I)
+3. Escribe grado (ej: 5to A)
+4. Para cada competencia, ELIGE:
+
+   A) Completa los 5 criterios directamente, O
+   B) Selecciona un instrumento y clic "Usar Instrumento"
+
+5. Clic [💾 Guardar] cuando termines
+6. Se descarga archivo JSON con todo registrado
+
+═════════════════════════════════════════════════════════════════════════════
+
+INSTRUMENTOS DISPONIBLES:
+═════════════════════════════════════════════════════════════════════════════
+
+✅ Rúbrica de Evaluación
+✅ Lista de Cotejo
+✅ Portafolio de Evidencias
+✅ Registro Anecdótico
+✅ Escala Valorativa
+✅ Ficha de Observación
+✅ Evaluación Diagnóstica
+✅ Ficha de Análisis Literario
+
+═════════════════════════════════════════════════════════════════════════════
+
+¿NECESITAS AYUDA?
+═════════════════════════════════════════════════════════════════════════════
+
+Lee: INSTRUMENTOS_COMPLETOS.txt (en la misma carpeta)
+     → Documentación detallada del sistema
+
+Lee: SISTEMA_NUEVO.txt (en la misma carpeta)
+     → Información técnica y arquitectura
+
+═════════════════════════════════════════════════════════════════════════════
+
+¡Listo! El sistema está completamente funcional.
+Abre registro_calificaciones_v2.html y ¡comienza a evaluar!
+
+═════════════════════════════════════════════════════════════════════════════

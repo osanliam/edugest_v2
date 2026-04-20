@@ -1,0 +1,128 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║              🚀 SISTEMA NUEVO LISTO PARA USAR - ACCESO RÁPIDO             ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+✅ TODO ESTÁ LISTO PARA PROBAR AHORA MISMO
+
+═════════════════════════════════════════════════════════════════════════════
+
+📌 INSTRUCCIÓN PRINCIPAL:
+
+Copia esta URL en tu navegador:
+
+file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html
+
+═════════════════════════════════════════════════════════════════════════════
+
+🎯 QUÉ VERÁS:
+
+1. Un REGISTRO de Calificaciones con:
+   - Campo para nombre del estudiante
+   - 3 COMPETENCIAS principales
+   - Cada competencia tiene 5 CRITERIOS
+
+2. Para CADA COMPETENCIA puedes:
+   ✓ Marcar directamente los criterios (C/B/A/AD)
+   ✓ O seleccionar un instrumento (Rúbrica, Lista, etc.)
+   ✓ El instrumento se abre como MODAL flotante
+   ✓ Completas y al guardar, retorna la nota automática
+
+3. CÁLCULO AUTOMÁTICO:
+   ✓ 5 en A = Calificativo A (100%)
+   ✓ 4+ en A, 1+ en AD = Calificativo AD (>100%)
+   ✓ Etc. (sigue la lógica MINEDU)
+
+4. GUARDAR TODO:
+   ✓ Descargas JSON con todos los datos
+   ✓ Listo para análisis o migración
+
+═════════════════════════════════════════════════════════════════════════════
+
+📋 ARCHIVOS CREADOS:
+
+/instrumentos/
+├── registro_calificaciones_v2.html   ← ABRE ESTO
+├── registro.js                       ← Lógica del registro
+├── calculos.js                       ← Cálculos MINEDU (automático)
+├── rubrica_criterios.html            ← Ejemplo: Rúbrica
+└── (7 instrumentos más por crear)
+
+Documentación:
+├── SISTEMA_NUEVO.txt                 ← Guía completa del sistema
+└── ACCESO_INMEDIATO.txt              ← Este archivo
+
+═════════════════════════════════════════════════════════════════════════════
+
+🔍 CÓMO PROBAR:
+
+1. Abre la URL arriba en tu navegador
+2. Completa:
+   - Nombre: Juan Pérez
+   - Período: Bimestre I
+   - Grado: 5to A
+
+3. En COMPETENCIA 1:
+   Opción A - Marca directamente:
+   - Criterio 1: Marca "A"
+   - Criterio 2: Marca "A"
+   - Criterio 3: Marca "A"
+   - Criterio 4: Marca "AD"
+   - Criterio 5: Marca "A"
+   
+   ➜ Verás que aparece "AD" y "120%" automáticamente
+
+   Opción B - Usa instrumento:
+   - Selecciona "Rúbrica de Evaluación"
+   - Clic "Usar Instrumento"
+   - Se abre modal flotante
+   - Marca lo mismo
+   - Clic "Guardar Respuesta"
+   - Se calcula y retorna
+
+4. Clic "Guardar" para descargar JSON
+
+═════════════════════════════════════════════════════════════════════════════
+
+⚡ CARACTERÍSTICAS REVOLUCIONARIAS:
+
+✓ LA RÚBRICA DOMINA: Si usas Rúbrica y otros instrumentos, la Rúbrica decide
+✓ MÚLTIPLES INSTRUMENTOS: Puedes aplicar varios a la misma competencia
+✓ AUTÓNOMO: Cada instrumento abre nuevo, sin memoria anterior
+✓ CÁLCULO MINEDU: Implementado correctamente (C/B/A/AD)
+✓ MODAL FLOTANTE: El instrumento abre como ventana flotante sobre el registro
+✓ EXPORTACIÓN: JSON con resumen + detalle completo
+
+═════════════════════════════════════════════════════════════════════════════
+
+📝 PRÓXIMAS ACCIONES:
+
+Después de que pruebes, se pueden crear:
+
+[ ] 7 instrumentos restantes:
+    - Lista de Cotejo
+    - Portafolio de Evidencias
+    - Registro Anecdótico
+    - Escala Valorativa
+    - Ficha de Observación
+    - Evaluación Diagnóstica
+    - Ficha de Análisis Literario
+
+[ ] Mejorar persistencia (guardar sin descargar)
+[ ] Dashboard con reportes
+[ ] Migración de datos del sistema anterior
+[ ] Base de datos de estudiantes
+
+═════════════════════════════════════════════════════════════════════════════
+
+🎓 ¿LISTO PARA PROBAR?
+
+1. Copia la URL:
+   file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html
+
+2. Pégala en tu navegador
+
+3. ¡Prueba!
+
+4. Cuéntame cómo funciona y qué cambios necesitas
+
+═════════════════════════════════════════════════════════════════════════════

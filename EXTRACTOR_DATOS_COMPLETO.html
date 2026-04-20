@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extractor Completo - Todos los Datos</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .section { margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea; }
+        .section h2 { color: #333; margin-bottom: 15px; font-size: 18px; }
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #666;
+        }
+        button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 10px 5px 10px 0;
+            transition: all 0.3s;
+        }
+        button:hover { background: #5568d3; transform: translateY(-2px); }
+        .highlight { background: #fff9e6; padding: 15px; border-radius: 6px; border-left: 4px solid #f39c12; margin: 15px 0; }
+        .success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; padding: 12px; border-radius: 6px; margin: 10px 0; }
+        .warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; padding: 12px; border-radius: 6px; margin: 10px 0; }
+        textarea { width: 100%; height: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 12px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Extractor Completo de Datos</h1>
+        <p class="subtitle">Extrae estudiantes, maestros, notas y TODO de EduGest</p>
+
+        <div class="section">
+            <h2>⚠️ El problema actual</h2>
+            <div class="warning">
+                <strong>Solo se extrajeron maestros (12)</strong><br>
+                Faltaron: Estudiantes y Notas<br>
+                <br>
+                Causa: El JSON extraído de EduGest estaba incompleto.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>✅ Solución: Código mejorado</h2>
+            <p style="color: #666; margin-bottom: 15px;">Este código extrae TODO lo que hay en localStorage de EduGest, incluyendo estudiantes y notas.</p>
+
+            <div class="code-block" id="codigoCompleto"></div>
+
+            <button onclick="copiarCodigo()" style="background: #28a745; font-size: 14px; padding: 12px 30px;">📋 Copiar Código Completo</button>
+        </div>
+
+        <div class="section">
+            <h2>📋 Instrucciones</h2>
+            <ol style="color: #666; line-height: 1.8; margin-left: 20px;">
+                <li><strong>Abre EduGest</strong> en navegador: <code style="background: #f0f0f0; padding: 2px 4px;">file:///Users/osmer/Downloads/Sistemita/EduGest.html</code></li>
+                <li><strong>Inicia sesión</strong> como ADMIN</li>
+                <li><strong>Abre consola</strong>: Mac (Cmd+Option+J) | Windows (Ctrl+Shift+J)</li>
+                <li><strong>Copia el código</strong> de arriba con el botón</li>
+                <li><strong>Pégalo en consola</strong> y presiona ENTER</li>
+                <li><strong>Se descargará</strong> un archivo JSON con TODO</li>
+                <li><strong>Guarda en</strong>: <code style="background: #f0f0f0; padding: 2px 4px;">/Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/</code></li>
+                <li><strong>Abre CONVERSOR</strong> y carga el JSON</li>
+                <li><strong>Descarga resultado convertido</strong></li>
+                <li><strong>Importa en registro_calificaciones_v2.html</strong></li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h2>📊 Qué extrae</h2>
+            <div class="success">
+                ✅ Estudiantes (nombre, email, dni, grado)<br>
+                ✅ Maestros (nombre, email, especialidad)<br>
+                ✅ Notas (calificativos, competencias, períodos)<br>
+                ✅ Materias/Competencias<br>
+                ✅ TODO lo que hay en localStorage
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>💡 Si aún falta algo</h2>
+            <p style="color: #666; margin-bottom: 10px;">Ejecuta este código en consola de EduGest para ver exactamente qué hay en localStorage:</p>
+            <div class="code-block">for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const size = localStorage.getItem(key).length;
+    console.log(`${key}: ${size} caracteres`);
+}</div>
+            <p style="color: #999; font-size: 12px; margin-top: 10px;">Esto te mostrará todas las claves y su tamaño.</p>
+        </div>
+    </div>
+
+    <script>
+        const codigoCompleto = `const extraerTodoDeEduGest = async () => {
+    console.log('🔄 Iniciando extracción completa...');
+
+    const datos = {
+        version: 'EduGest_Export_v2',
+        timestamp: new Date().toISOString(),
+        estudiantes: [],
+        maestros: [],
+        materias: [],
+        periodos: [],
+        notas: [],
+        competencias: [],
+        localStorage_keys: [],
+        localStorage_data: {}
+    };
+
+    // PASO 1: Extraer usuarios (estudiantes y maestros)
+    try {
+        console.log('📍 Extrayendo usuarios...');
+        const usuariosStr = localStorage.getItem('v5_us');
+        if (usuariosStr) {
+            const usuarios = JSON.parse(usuariosStr);
+            if (Array.isArray(usuarios)) {
+                datos.estudiantes = usuarios.filter(u => u.role === 'student');
+                datos.maestros = usuarios.filter(u =>
+                    ['teacher', 'admin', 'director', 'subdirector'].includes(u.role)
+                );
+                console.log('✅ Usuarios extraídos:', datos.estudiantes.length + ' est, ' + datos.maestros.length + ' mae');
+            }
+        }
+    } catch(e) {
+        console.log('⚠️ Error en usuarios:', e.message);
+    }
+
+    // PASO 2: Extraer calificaciones/notas
+    try {
+        console.log('📍 Extrayendo notas...');
+        const notasKeys = ['v5_grades', 'v5_notes', 'v5_calificaciones', 'grades', 'notas'];
+
+        for (const key of notasKeys) {
+            const value = localStorage.getItem(key);
+            if (value) {
+                try {
+                    const parsed = JSON.parse(value);
+                    if (Array.isArray(parsed)) {
+                        datos.notas = datos.notas.concat(parsed);
+                        console.log('✅ Notas encontradas en ' + key + ': ' + parsed.length);
+                    }
+                } catch(e) {}
+            }
+        }
+    } catch(e) {
+        console.log('⚠️ Error en notas:', e.message);
+    }
+
+    // PASO 3: Extraer materias/competencias
+    try {
+        console.log('📍 Extrayendo competencias...');
+        const compKeys = ['v5_subjects', 'v5_competencias', 'v5_materias', 'subjects', 'competencias'];
+
+        for (const key of compKeys) {
+            const value = localStorage.getItem(key);
+            if (value) {
+                try {
+                    const parsed = JSON.parse(value);
+                    if (Array.isArray(parsed)) {
+                        datos.competencias = datos.competencias.concat(parsed);
+                        console.log('✅ Competencias encontradas en ' + key + ': ' + parsed.length);
+                    }
+                } catch(e) {}
+            }
+        }
+    } catch(e) {
+        console.log('⚠️ Error en competencias:', e.message);
+    }
+
+    // PASO 4: Extraer TODAS las claves de localStorage
+    try {
+        console.log('📍 Extrayendo todas las claves de localStorage...');
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            datos.localStorage_keys.push(key);
+
+            try {
+                const valor = localStorage.getItem(key);
+                // Guardar solo primeros 5000 caracteres para evitar archivos muy grandes
+                datos.localStorage_data[key] = valor.substring(0, 5000);
+            } catch(e) {}
+        }
+        console.log('✅ localStorage keys:', datos.localStorage_keys.length);
+    } catch(e) {
+        console.log('⚠️ Error en localStorage:', e.message);
+    }
+
+    // PASO 5: Descargar archivo
+    try {
+        const json = JSON.stringify(datos, null, 2);
+        const blob = new Blob([json], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'edugest_completo_' + Date.now() + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        console.log('✅ EXTRACCIÓN COMPLETA');
+        console.log('📊 Resumen:');
+        console.log('   Estudiantes:', datos.estudiantes.length);
+        console.log('   Maestros:', datos.maestros.length);
+        console.log('   Notas:', datos.notas.length);
+        console.log('   Competencias:', datos.competencias.length);
+        console.log('   localStorage keys:', datos.localStorage_keys.length);
+        console.log('   Archivo:', 'edugest_completo_' + Date.now() + '.json');
+    } catch(e) {
+        console.error('❌ Error descargando:', e.message);
+    }
+};
+
+extraerTodoDeEduGest();`;
+
+        document.getElementById('codigoCompleto').textContent = codigoCompleto;
+
+        function copiarCodigo() {
+            const texto = document.getElementById('codigoCompleto').textContent;
+            const textarea = document.createElement('textarea');
+            textarea.value = texto;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('✅ Código copiado al portapapeles\n\nAhora pégalo en la consola de EduGest');
+        }
+    </script>
+</body>
+</html>

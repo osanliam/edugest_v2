@@ -1,0 +1,98 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   🚀 CÓMO ABRIR LOS INSTRUMENTOS                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Los instrumentos están listos para usar. Aquí hay 3 formas sencillas de abrirlos:
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📌 OPCIÓN 1: La Más Fácil (Recomendada)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Busca el archivo: ABRIR_INSTRUMENTOS.sh
+2. Haz doble clic en él
+3. ¡Listo! Se abrirá el panel en tu navegador
+
+   ✅ Automático ✅ Rápido ✅ Sin complicaciones
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📌 OPCIÓN 2: Abrir Directamente en Finder
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Abre Finder
+2. Navega a: /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/
+3. Busca: index.html
+4. Doble clic en index.html
+5. Se abrirá en tu navegador predeterminado
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📌 OPCIÓN 3: Con Terminal (Para Usuarios Avanzados)
+═══════════════════════════════════════════════════════════════════════════════
+
+Abre Terminal y ejecuta:
+
+  open /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/index.html
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✨ Lo Que Deberías Ver:
+═══════════════════════════════════════════════════════════════════════════════
+
+Cuando se abra, verás:
+
+  ✓ Un título "Centro de Instrumentos Pedagógicos"
+  ✓ Tres tarjetas de colores con los instrumentos:
+    - 📋 Rúbrica de Evaluación (morada)
+    - 👁️ Ficha de Observación (verde)
+    - 📊 Registro de Calificaciones (roja)
+  ✓ Botones "Abrir →" en cada tarjeta
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔧 Si Algo Sale Mal:
+═══════════════════════════════════════════════════════════════════════════════
+
+Problema: Se abre una página en blanco
+Solución: Actualiza la página (Cmd + R) o cierra y abre nuevamente
+
+Problema: Se abre en Google AI Studio
+Solución: Copia la URL de la barra de direcciones y ábrela en Chrome o Safari
+
+Problema: No puedes hacer doble clic en ABRIR_INSTRUMENTOS.sh
+Solución: Usa OPCIÓN 2 o OPCIÓN 3
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📍 Estructura de Archivos:
+═══════════════════════════════════════════════════════════════════════════════
+
+Sistemita_Nuevo/
+├── ABRIR_INSTRUMENTOS.sh      ← Doble clic aquí
+├── CÓMO_ABRIR.txt             ← Este archivo
+├── INICIO_AQUÍ.txt            ← Resumen rápido
+├── MANUAL_INSTRUMENTOS.docx   ← Guía profesional
+│
+└── instrumentos/
+    ├── index.html             ← El panel principal
+    ├── rubrica_evaluacion.html
+    ├── ficha_observacion.html
+    ├── registro_calificaciones.html
+    └── LEEME.txt
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💡 Una Vez Abierto:
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Verás el panel de inicio con tres tarjetas
+2. Haz clic en "Abrir →" para el instrumento que necesites
+3. Se abrirá en una ventana nueva
+4. ¡Ya puedes usar el instrumento!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+¿Listo? Comienza con OPCIÓN 1 👆
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,124 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         ✅ SOLUCIÓN RÁPIDA                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Si ves el error "ERR_CONNECTION_REFUSED", es porque el navegador está
+intentando conectar a internet. Los archivos HTML se deben abrir LOCALMENTE.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔧 SOLUCIÓN INMEDIATA:
+═══════════════════════════════════════════════════════════════════════════════
+
+Usa esta URL EXACTA en la barra de direcciones de tu navegador:
+
+file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/index.html
+
+PASOS:
+1. Abre tu navegador (Chrome, Safari, Firefox, etc.)
+2. Copia la URL de arriba
+3. Pega en la barra de direcciones
+4. Presiona ENTER
+5. ¡Debería funcionar!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📝 INSTRUCCIONES MÁS DETALLADAS:
+═══════════════════════════════════════════════════════════════════════════════
+
+OPCIÓN A - Con Safari (Recomendado para Mac):
+1. Abre Safari
+2. Presiona Cmd + L (para ir a la barra de direcciones)
+3. Pega: file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/index.html
+4. Presiona ENTER
+
+OPCIÓN B - Con Chrome:
+1. Abre Chrome
+2. Presiona Ctrl + L (o Cmd + L en Mac)
+3. Pega: file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/index.html
+4. Presiona ENTER
+
+OPCIÓN C - Con Finder (Más Visual):
+1. Abre Finder
+2. Ve a: /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/
+3. Busca: index.html
+4. Doble clic en index.html
+5. Se abrirá en tu navegador predeterminado
+
+OPCIÓN D - Terminal (Para Usuarios Avanzados):
+1. Abre Terminal
+2. Copia y pega esto:
+   open /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/index.html
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✨ LO QUE DEBERÍAS VER:
+═══════════════════════════════════════════════════════════════════════════════
+
+Cuando se cargue correctamente, verás:
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│        📚 Centro de Instrumentos Pedagógicos                           │
+│        Herramientas autónomas para evaluación y registro               │
+│                                                                         │
+│   ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
+│   │  📋 Rúbrica      │  │  👁️ Ficha de    │  │  📊 Registro de  │  │
+│   │                  │  │  Observación     │  │  Calificaciones  │  │
+│   │   [Abrir →]      │  │   [Abrir →]      │  │   [Abrir →]      │  │
+│   └──────────────────┘  └──────────────────┘  └──────────────────┘  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚨 SI AÚN NO FUNCIONA:
+═══════════════════════════════════════════════════════════════════════════════
+
+Problema: Sigue mostrando "ERR_CONNECTION_REFUSED"
+Solución:
+- Asegúrate que estés usando file:// (con file:// al inicio)
+- No uses http:// o https://
+- Verifica que la ruta sea exacta (respeta mayúsculas y minúsculas)
+
+Problema: Veo una página en blanco
+Solución:
+- Recarga la página (Cmd + R en Mac, F5 en Windows)
+- Borra cache del navegador
+- Intenta en otro navegador
+
+Problema: No puedo copiar/pegar la URL
+Solución:
+- Usa la OPCIÓN C (Finder) que es más visual
+- O usa la OPCIÓN D (Terminal)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💡 CONSEJO PRÁCTICO:
+═══════════════════════════════════════════════════════════════════════════════
+
+Para que sea MÁS FÁCIL, agrega un marcador en tu navegador:
+
+Chrome:
+1. Carga la página correctamente
+2. Presiona Cmd + D (en Mac) o Ctrl + D (Windows)
+3. Dale un nombre como "Instrumentos Pedagógicos"
+4. Guarda
+
+Safari:
+1. Carga la página correctamente
+2. Presiona Cmd + D
+3. Elige carpeta de favoritos
+4. Guarda
+
+Ahora puedes abrir los instrumentos desde tu barra de favoritos en cualquier momento.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⭐ LA URL QUE NECESITAS (Cópiala):
+
+file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/index.html
+
+═══════════════════════════════════════════════════════════════════════════════
+
+¿Listo? ¡Prueba ahora! 🚀

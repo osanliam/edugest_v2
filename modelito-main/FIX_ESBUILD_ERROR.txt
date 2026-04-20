@@ -1,0 +1,65 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                      FIX ESBUILD VERSION MISMATCH                          ║
+║                                                                            ║
+║              Error: Host version "0.25.12" != Binary "0.27.7"             ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════
+
+🔧 SOLUCIÓN RÁPIDA:
+
+En tu Terminal, ejecuta EN ORDEN:
+
+1. Ve a la carpeta:
+   cd ~/Downloads/Sistemita/Sistemita_Nuevo/modelito-main
+
+2. Limpia caché:
+   npm cache clean --force
+
+3. Elimina dependencias:
+   rm -rf node_modules package-lock.json
+
+4. Reinstala:
+   npm install
+
+5. Prueba:
+   npm run dev
+
+═══════════════════════════════════════════════════════════════════════════
+
+📋 COMANDO TODO JUNTO (copia y pega):
+
+cd ~/Downloads/Sistemita/Sistemita_Nuevo/modelito-main && rm -rf node_modules && npm cache clean --force && npm install && npm run dev
+
+═══════════════════════════════════════════════════════════════════════════
+
+✅ Si sigue fallando:
+
+1. Asegúrate que tienes Node.js 18+ instalado:
+   node --version
+
+2. Si Node es viejo, descarga de:
+   https://nodejs.org (LTS)
+
+3. Intenta nuevamente
+
+═══════════════════════════════════════════════════════════════════════════
+
+🎯 CUANDO FUNCIONE:
+
+Verás en Terminal:
+  ✓ VITE v6.2.0 ready in XXX ms
+  ✓ Local: http://localhost:3000/
+  ✓ Press h to show help
+
+Luego abre: http://localhost:3000
+
+═══════════════════════════════════════════════════════════════════════════
+
+❓ SI SIGUE CON ERRORES:
+
+Manda exactamente el error que ves y te lo arreglo al toque.
+
+═══════════════════════════════════════════════════════════════════════════

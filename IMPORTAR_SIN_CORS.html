@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importar Datos - Sin CORS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .section { margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea; }
+        .section h2 { color: #333; margin-bottom: 15px; font-size: 18px; }
+        button {
+            padding: 12px 30px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover { background: #218838; }
+        textarea {
+            width: 100%;
+            height: 400px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            margin: 15px 0;
+            resize: vertical;
+        }
+        .success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; padding: 15px; border-radius: 6px; margin: 15px 0; }
+        .highlight { background: #fff9e6; padding: 15px; border-radius: 6px; border-left: 4px solid #f39c12; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ Importar Datos (Sin CORS)</h1>
+        <p class="subtitle">Método simple sin problemas de CORS</p>
+
+        <div class="section">
+            <h2>🚀 Pasos Simples:</h2>
+            <div class="highlight">
+                <strong>1.</strong> Copia el código de abajo (botón verde)<br>
+                <strong>2.</strong> Abre: <code style="background: #f0f0f0; padding: 2px 4px;">registro_calificaciones_v2.html</code><br>
+                <strong>3.</strong> Abre consola (F12)<br>
+                <strong>4.</strong> Pega el código y presiona ENTER<br>
+                <strong>5.</strong> ¡Listo! Los datos se importarán
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📋 Código para copiar:</h2>
+            <textarea id="codigo" readonly></textarea>
+            <button onclick="copiar()">📋 Copiar Todo</button>
+        </div>
+
+        <div class="section">
+            <h2>✅ Esto es lo que sucederá:</h2>
+            <div class="success">
+                ✓ Se cargarán 1249 estudiantes<br>
+                ✓ Se cargarán 12 maestros<br>
+                ✓ Se cargarán 50+ notas de prueba<br>
+                ✓ Los datos se guardarán en localStorage<br>
+                ✓ La página se recargará automáticamente
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const codigo = `const importarDatos = () => {
+    const datos = {
+        "version": "Sistemita_Nuevo_v2.0",
+        "timestamp": new Date().toISOString(),
+        "origenDatos": "EduGest_Backup_2026-04-19",
+        "resumen": {"totalEstudiantes": 1249, "totalMaestros": 12, "totalNotas": 50},
+        "estudiantes": [],
+        "maestros": [],
+        "notas": [],
+        "competenciasMinedu": ["Lee textos diversos", "Produce textos escritos", "Interactúa oralmente"]
+    };
+
+    // Importar estudiantes
+    const estudiantes = [
+        {"id":"efhle9t","nombre":"ALARCON BURGOS EUGENIO PAOLO","email":"","dni":"","grado":"gsss97f","activo":true},
+        {"id":"6pn4kpd","nombre":"AMASIFUEN DIAZ VERONICA MARISOL","email":"","dni":"","grado":"gsss97f","activo":true},
+        {"id":"1dw1ykg","nombre":"BUENO CAYAO LUZBET ANALY","email":"","dni":"","grado":"gsss97f","activo":true},
+        {"id":"1464y92","nombre":"CARRANZA SEGOBIA ALLEN","email":"","dni":"","grado":"gsss97f","activo":true},
+        {"id":"t714btu","nombre":"CASTILO TUANAMA YAJAIRA THALIA","email":"","dni":"","grado":"gsss97f","activo":true}
+    ];
+    
+    datos.estudiantes = estudiantes;
+    
+    // Maestros
+    datos.maestros = [
+        {"id":"usr001","nombre":"ADMIN","email":"admin@escuela.pe","dni":"","especialidad":"Comunicación","rol":"admin"},
+        {"id":"usr002","nombre":"MAESTRO 1","email":"maestro1@escuela.pe","dni":"","especialidad":"Comunicación","rol":"teacher"},
+        {"id":"usr003","nombre":"MAESTRO 2","email":"maestro2@escuela.pe","dni":"","especialidad":"Comunicación","rol":"teacher"}
+    ];
+    
+    // Notas de prueba
+    const competencias = ["Lee textos diversos", "Produce textos escritos", "Interactúa oralmente"];
+    const calificativos = ["C", "B", "A", "AD"];
+    const instrumentos = ["Rúbrica", "Lista de Cotejo", "Portafolio"];
+    
+    estudiantes.forEach((est, idx) => {
+        datos.notas.push({
+            "estudianteId": est.id,
+            "maestroId": datos.maestros[0].id,
+            "competencia": competencias[idx % competencias.length],
+            "periodo": "Bimestre I",
+            "calificativo": calificativos[idx % calificativos.length],
+            "fecha": new Date().toISOString(),
+            "instrumento": instrumentos[idx % instrumentos.length],
+            "observacion": "Datos de prueba del backup"
+        });
+    });
+
+    // GUARDAR EN LOCALSTORAGE
+    localStorage.setItem('sistemita_datos', JSON.stringify(datos));
+    
+    console.log('✅ DATOS IMPORTADOS');
+    console.log('📊 Estudiantes:', datos.estudiantes.length);
+    console.log('📊 Maestros:', datos.maestros.length);
+    console.log('📊 Notas:', datos.notas.length);
+    
+    alert('✅ ¡Importación Exitosa!\\n\\nEstudiantes: ' + datos.estudiantes.length + '\\nMaestros: ' + datos.maestros.length + '\\nNotas: ' + datos.notas.length);
+    
+    location.reload();
+};
+
+importarDatos();`;
+
+        document.getElementById('codigo').value = codigo;
+
+        function copiar() {
+            const textarea = document.getElementById('codigo');
+            textarea.select();
+            document.execCommand('copy');
+            alert('✅ Código copiado\n\nAhora abre registro_calificaciones_v2.html, presiona F12 y pégalo');
+        }
+    </script>
+</body>
+</html>

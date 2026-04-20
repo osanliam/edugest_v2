@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Calificaciones</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-guardar {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-guardar:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-limpiar {
+            background: #FF9800;
+            color: white;
+        }
+
+        .btn-limpiar:hover {
+            background: #e68900;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+        }
+
+        .btn-editar {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-editar:hover {
+            background: #0b7dda;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+        }
+
+        .btn-cerrar {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-cerrar:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .form-section {
+            margin-bottom: 25px;
+        }
+
+        .form-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus,
+        input[type="date"]:focus,
+        input[type="number"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #e74c3c;
+            box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+        }
+
+        .grades-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            overflow-x: auto;
+            display: block;
+        }
+
+        .grades-table thead {
+            background: #e74c3c;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+
+        .grades-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            min-width: 100px;
+        }
+
+        .grades-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+            min-width: 100px;
+        }
+
+        .grades-table tbody tr:hover {
+            background: #f5f5f5;
+        }
+
+        .grades-table input[type="number"] {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .grades-table input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .add-row-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .add-row-btn:hover {
+            background: #c0392b;
+        }
+
+        .delete-row {
+            background: #f44336;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .delete-row:hover {
+            background: #da190b;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 12px;
+        }
+
+        .success-message {
+            display: none;
+            background: #4CAF50;
+            color: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-box {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .stat-box label {
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .stat-box .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2, .grid-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .stats {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Registro de Calificaciones</h1>
+            <p>Sistema de calificaciones independiente y seguro</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn-guardar" onclick="guardar()">💾 Guardar</button>
+            <button class="btn-limpiar" onclick="limpiar()">🗑️ Limpiar</button>
+            <button class="btn-editar" onclick="abrirEditar()">✏️ Editar</button>
+            <button class="btn-cerrar" onclick="cerrar()">❌ Cerrar</button>
+        </div>
+
+        <div class="content">
+            <div class="success-message" id="successMsg">✓ Datos guardados correctamente</div>
+
+            <div class="form-section">
+                <h3>Información General</h3>
+                <div class="grid-3">
+                    <div class="form-group">
+                        <label>Período/Bimestre</label>
+                        <input type="text" id="periodo" placeholder="Ej: Bimestre I">
+                    </div>
+                    <div class="form-group">
+                        <label>Área/Competencia</label>
+                        <input type="text" id="area" placeholder="Ej: Comunicación">
+                    </div>
+                    <div class="form-group">
+                        <label>Grado/Sección</label>
+                        <input type="text" id="grado" placeholder="Ej: 5to A">
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Docente</label>
+                        <input type="text" id="docente" placeholder="Nombre del docente">
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Registro</label>
+                        <input type="date" id="fecha">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Calificaciones de Estudiantes</h3>
+                <div style="overflow-x: auto;">
+                    <table class="grades-table">
+                        <thead>
+                            <tr>
+                                <th>Estudiante</th>
+                                <th>Actividad 1</th>
+                                <th>Actividad 2</th>
+                                <th>Actividad 3</th>
+                                <th>Promedio</th>
+                                <th>Observación</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gradesBody">
+                            <tr>
+                                <td><input type="text" placeholder="Nombre del estudiante" class="student-name"></td>
+                                <td><input type="number" class="grade" min="0" max="20"></td>
+                                <td><input type="number" class="grade" min="0" max="20"></td>
+                                <td><input type="number" class="grade" min="0" max="20"></td>
+                                <td><input type="number" class="average" readonly style="background: #f0f0f0;"></td>
+                                <td><input type="text" placeholder="Observación"></td>
+                                <td><button class="delete-row" onclick="eliminarFila(this)">Eliminar</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button class="add-row-btn" onclick="agregarFila()">+ Agregar Estudiante</button>
+            </div>
+
+            <div class="form-section">
+                <h3>Estadísticas</h3>
+                <div class="stats">
+                    <div class="stat-box">
+                        <label>Total Estudiantes</label>
+                        <div class="value" id="totalEstudiantes">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <label>Promedio General</label>
+                        <div class="value" id="promedioGeneral">0.0</div>
+                    </div>
+                    <div class="stat-box">
+                        <label>Calificación Mayor</label>
+                        <div class="value" id="calificacionMayor">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <label>Calificación Menor</label>
+                        <div class="value" id="calificacionMenor">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-group">
+                    <label>Observaciones Generales</label>
+                    <textarea id="observacionesGenerales" placeholder="Comentarios sobre el desempeño general del grupo..."></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editarModal">
+        <div class="modal-content">
+            <h2>Editar Registro</h2>
+            <div class="form-group">
+                <label>¿Qué deseas editar?</label>
+                <select id="editarOpcion">
+                    <option value="">-- Selecciona --</option>
+                    <option value="encabezados">Encabezados de actividades</option>
+                    <option value="escala">Escala de calificación (máximo)</option>
+                </select>
+            </div>
+            <div id="editarContenido" style="margin-top: 15px;"></div>
+            <div class="modal-buttons">
+                <button class="btn-guardar" onclick="guardarEdicion()">Guardar</button>
+                <button class="btn-cerrar" onclick="cerrarEditar()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function inicializar() {
+            const fecha = new Date().toISOString().split('T')[0];
+            document.getElementById('fecha').value = fecha;
+            actualizarEstadisticas();
+        }
+
+        function agregarFila() {
+            const tbody = document.getElementById('gradesBody');
+            const fila = document.createElement('tr');
+            fila.innerHTML = `
+                <td><input type="text" placeholder="Nombre del estudiante" class="student-name"></td>
+                <td><input type="number" class="grade" min="0" max="20"></td>
+                <td><input type="number" class="grade" min="0" max="20"></td>
+                <td><input type="number" class="grade" min="0" max="20"></td>
+                <td><input type="number" class="average" readonly style="background: #f0f0f0;"></td>
+                <td><input type="text" placeholder="Observación"></td>
+                <td><button class="delete-row" onclick="eliminarFila(this)">Eliminar</button></td>
+            `;
+            tbody.appendChild(fila);
+            agregarListenersGrades(fila);
+        }
+
+        function agregarListenersGrades(fila) {
+            const grades = fila.querySelectorAll('.grade');
+            grades.forEach(grade => {
+                grade.addEventListener('change', () => actualizarPromedio(fila));
+            });
+        }
+
+        function actualizarPromedio(fila) {
+            const grades = Array.from(fila.querySelectorAll('.grade')).map(g => parseFloat(g.value) || 0);
+            const average = grades.length > 0 ? (grades.reduce((a, b) => a + b, 0) / grades.length).toFixed(1) : 0;
+            fila.querySelector('.average').value = average;
+            actualizarEstadisticas();
+        }
+
+        function actualizarEstadisticas() {
+            const filas = document.querySelectorAll('#gradesBody tr');
+            const averages = [];
+
+            filas.forEach(fila => {
+                const grades = Array.from(fila.querySelectorAll('.grade')).map(g => parseFloat(g.value) || 0);
+                if (grades.some(g => g > 0)) {
+                    const avg = grades.reduce((a, b) => a + b, 0) / grades.length;
+                    averages.push(avg);
+                }
+            });
+
+            document.getElementById('totalEstudiantes').textContent = filas.length;
+            document.getElementById('promedioGeneral').textContent = averages.length > 0 ? (averages.reduce((a, b) => a + b, 0) / averages.length).toFixed(1) : '0.0';
+            document.getElementById('calificacionMayor').textContent = averages.length > 0 ? Math.max(...averages).toFixed(1) : '0';
+            document.getElementById('calificacionMenor').textContent = averages.length > 0 ? Math.min(...averages).toFixed(1) : '0';
+        }
+
+        function eliminarFila(btn) {
+            btn.closest('tr').remove();
+            actualizarEstadisticas();
+        }
+
+        function guardar() {
+            const estudiantes = [];
+            document.querySelectorAll('#gradesBody tr').forEach(fila => {
+                const nombre = fila.querySelector('.student-name').value;
+                const grades = Array.from(fila.querySelectorAll('.grade')).map(g => parseFloat(g.value) || 0);
+                const average = fila.querySelector('.average').value;
+                const observacion = fila.querySelector('input[placeholder="Observación"]').value;
+
+                estudiantes.push({
+                    nombre: nombre,
+                    actividades: grades,
+                    promedio: average,
+                    observacion: observacion
+                });
+            });
+
+            const datos = {
+                periodo: document.getElementById('periodo').value,
+                area: document.getElementById('area').value,
+                grado: document.getElementById('grado').value,
+                docente: document.getElementById('docente').value,
+                fecha: document.getElementById('fecha').value,
+                estudiantes: estudiantes,
+                observacionesGenerales: document.getElementById('observacionesGenerales').value
+            };
+
+            const json = JSON.stringify(datos, null, 2);
+            descargarJSON('registro_calificaciones.json', json);
+
+            const msg = document.getElementById('successMsg');
+            msg.classList.add('show');
+            setTimeout(() => msg.classList.remove('show'), 3000);
+        }
+
+        function limpiar() {
+            if (confirm('¿Estás seguro de que deseas limpiar todos los datos?')) {
+                document.getElementById('periodo').value = '';
+                document.getElementById('area').value = '';
+                document.getElementById('grado').value = '';
+                document.getElementById('docente').value = '';
+                document.getElementById('observacionesGenerales').value = '';
+                const tbody = document.getElementById('gradesBody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td><input type="text" placeholder="Nombre del estudiante" class="student-name"></td>
+                        <td><input type="number" class="grade" min="0" max="20"></td>
+                        <td><input type="number" class="grade" min="0" max="20"></td>
+                        <td><input type="number" class="grade" min="0" max="20"></td>
+                        <td><input type="number" class="average" readonly style="background: #f0f0f0;"></td>
+                        <td><input type="text" placeholder="Observación"></td>
+                        <td><button class="delete-row" onclick="eliminarFila(this)">Eliminar</button></td>
+                    </tr>
+                `;
+                inicializar();
+            }
+        }
+
+        function abrirEditar() {
+            document.getElementById('editarModal').classList.add('active');
+        }
+
+        function cerrarEditar() {
+            document.getElementById('editarModal').classList.remove('active');
+        }
+
+        function guardarEdicion() {
+            cerrarEditar();
+        }
+
+        function cerrar() {
+            if (confirm('¿Cerrar sin guardar?')) {
+                window.close();
+            }
+        }
+
+        function descargarJSON(nombre, contenido) {
+            const blob = new Blob([contenido], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        window.addEventListener('load', inicializar);
+        document.addEventListener('DOMContentLoaded', () => {
+            const filas = document.querySelectorAll('#gradesBody tr');
+            filas.forEach(fila => agregarListenersGrades(fila));
+        });
+    </script>
+</body>
+</html>

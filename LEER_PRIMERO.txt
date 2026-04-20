@@ -1,0 +1,24 @@
+IMPORTAR TODOS LOS DATOS AHORA
+
+DATOS A IMPORTAR:
+  ✓ 1249 Estudiantes
+  ✓ 12 Maestros
+  ✓ 6997 Notas
+
+PASOS RÁPIDOS:
+
+1. Abre en navegador:
+   file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html
+
+2. Presiona F12 (abre consola)
+
+3. Abre IMPORTAR_DIRECTO.html en otra pestaña:
+   file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/IMPORTAR_DIRECTO.html
+
+4. Haz clic en "Copiar Código"
+
+5. Vuelve a registro_calificaciones_v2.html
+
+6. En la consola pega (Ctrl+V o Cmd+V) y presiona ENTER
+
+✅ LISTO. Se importan automáticamente todos los datos sin errores CORS.

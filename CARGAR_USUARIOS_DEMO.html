@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargar Usuarios Demo - Sistemita</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            color: #1565c0;
+            line-height: 1.6;
+        }
+
+        .users-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-bottom: 25px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .user-card {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .user-card:hover {
+            background: #efefef;
+            border-color: #667eea;
+            transform: translateX(5px);
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .user-email {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .user-role {
+            display: inline-block;
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: #667eea;
+            color: white;
+            margin-top: 5px;
+        }
+
+        .user-role.teacher {
+            background: #4CAF50;
+        }
+
+        .user-role.student {
+            background: #FF9800;
+        }
+
+        .user-role.parent {
+            background: #9C27B0;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .status.success {
+            background: #c8e6c9;
+            color: #2e7d32;
+            border: 1px solid #81c784;
+            display: block;
+        }
+
+        .status.error {
+            background: #ffcdd2;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+            display: block;
+        }
+
+        .status.info {
+            background: #bbdefb;
+            color: #1565c0;
+            border: 1px solid #64b5f6;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Cargar Usuarios Demo</h1>
+        <p class="subtitle">Carga rápida de usuarios de prueba en tu navegador</p>
+
+        <div class="info-box">
+            <strong>ℹ️ Información:</strong><br>
+            Estos usuarios se almacenarán en localStorage de tu navegador.
+            Se perderán si limpias el almacenamiento del navegador.
+        </div>
+
+        <h3 style="color: #333; margin-bottom: 15px; font-size: 16px;">📋 Usuarios Disponibles:</h3>
+
+        <div class="users-grid" id="usersList"></div>
+
+        <div class="actions">
+            <button class="btn-primary" onclick="cargarUsuarios()">
+                ✅ Cargar Todos los Usuarios
+            </button>
+            <button class="btn-secondary" onclick="limpiarUsuarios()">
+                🗑️ Limpiar Todo
+            </button>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        const usuarios = [
+            {
+                id: "1",
+                nombre: "Administrador del Sistema",
+                email: "admin@sistemita.edu",
+                contraseña: "admin123",
+                rol: "admin",
+                activo: true,
+                creado: new Date().toISOString()
+            },
+            {
+                id: "2",
+                nombre: "Juan Pérez García",
+                email: "juan.perez@sistemita.edu",
+                contraseña: "teacher123",
+                rol: "teacher",
+                activo: true,
+                creado: new Date().toISOString()
+            },
+            {
+                id: "3",
+                nombre: "María López Rodríguez",
+                email: "maria.lopez@sistemita.edu",
+                contraseña: "teacher123",
+                rol: "teacher",
+                activo: true,
+                creado: new Date().toISOString()
+            },
+            {
+                id: "4",
+                nombre: "Carlos Mendez Flores",
+                email: "carlos.mendez@estudiantes.edu",
+                contraseña: "student123",
+                rol: "student",
+                activo: true,
+                creado: new Date().toISOString()
+            },
+            {
+                id: "5",
+                nombre: "Ana García Morales",
+                email: "ana.garcia@estudiantes.edu",
+                contraseña: "student123",
+                rol: "student",
+                activo: true,
+                creado: new Date().toISOString()
+            },
+            {
+                id: "6",
+                nombre: "Pedro Hernández López",
+                email: "pedro.hernandez@apoderados.edu",
+                contraseña: "parent123",
+                rol: "parent",
+                activo: true,
+                creado: new Date().toISOString()
+            }
+        ];
+
+        const roleLabels = {
+            admin: '👑 Administrador',
+            teacher: '👨‍🏫 Docente',
+            student: '👨‍🎓 Estudiante',
+            parent: '👨‍👩‍👧 Apoderado'
+        };
+
+        const roleClasses = {
+            admin: 'admin',
+            teacher: 'teacher',
+            student: 'student',
+            parent: 'parent'
+        };
+
+        function mostrarUsuarios() {
+            const lista = document.getElementById('usersList');
+            lista.innerHTML = usuarios.map(user => `
+                <div class="user-card">
+                    <div class="user-name">${user.nombre}</div>
+                    <div class="user-email">📧 ${user.email}</div>
+                    <div class="user-email">🔑 ${user.contraseña}</div>
+                    <div class="user-role ${roleClasses[user.rol]}">${roleLabels[user.rol]}</div>
+                </div>
+            `).join('');
+        }
+
+        function cargarUsuarios() {
+            try {
+                localStorage.setItem('sistema_usuarios', JSON.stringify(usuarios));
+                mostrarStatus('✅ Usuarios cargados exitosamente!', 'success');
+
+                setTimeout(() => {
+                    mostrarStatus('🔄 Redirigiéndote al login...', 'info');
+                    setTimeout(() => {
+                        window.location.href = 'http://localhost:3001/';
+                    }, 2000);
+                }, 1500);
+            } catch (error) {
+                mostrarStatus('❌ Error al cargar: ' + error.message, 'error');
+            }
+        }
+
+        function limpiarUsuarios() {
+            if (confirm('⚠️ ¿Eliminar todos los usuarios del navegador?')) {
+                try {
+                    localStorage.removeItem('sistema_usuarios');
+                    mostrarStatus('🗑️ Usuarios eliminados correctamente', 'info');
+                } catch (error) {
+                    mostrarStatus('❌ Error al limpiar: ' + error.message, 'error');
+                }
+            }
+        }
+
+        function mostrarStatus(mensaje, tipo) {
+            const status = document.getElementById('status');
+            status.textContent = mensaje;
+            status.className = 'status ' + tipo;
+        }
+
+        // Mostrar usuarios al cargar
+        mostrarUsuarios();
+
+        // Verificar si ya hay usuarios
+        const usuariosExistentes = localStorage.getItem('sistema_usuarios');
+        if (usuariosExistentes) {
+            mostrarStatus('ℹ️ Ya hay usuarios cargados en tu navegador. Puedes cargar nuevos (sobreescribirá los existentes).', 'info');
+        }
+    </script>
+</body>
+</html>

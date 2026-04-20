@@ -1,0 +1,261 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║        SISTEMA COMPLETO DE REGISTRO DE CALIFICACIONES - MINEDU            ║
+║                    VERSION 2.0 - LISTA PARA USAR                          ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+📌 CAMBIOS REVOLUCIONARIOS EN ESTA VERSIÓN:
+═════════════════════════════════════════════════════════════════════════════
+
+✅ EL REGISTRO ES EL CENTRO
+   - Abre primero el Registro de Calificaciones
+   - Allí seleccionas instrumentos por competencia
+   - Los instrumentos se abren como MODALES (ventanas flotantes)
+
+✅ MÚLTIPLES INSTRUMENTOS POR COMPETENCIA
+   - Puedes aplicar Rúbrica, Lista de Cotejo, Ficha, etc. a la MISMA competencia
+   - La Rúbrica domina (siempre decide el calificativo)
+   - Los demás instrumentos complementan (máximo A)
+
+✅ LÓGICA DE CÁLCULO MINEDU IMPLEMENTADA
+   - 5 criterios por instrumento: C (Inicio), B (Proceso), A (Esperado), AD (Destacado)
+   - Si todos están en A = Calificativo A (100%)
+   - Si hay 1+ en AD y el resto en A = Calificativo AD (>100%)
+   - Si hay máximo 3 en A = Calificativo B (99-55%)
+   - Si hay 2 o menos en A = Calificativo C (<55%)
+
+✅ AUTONOMÍA TOTAL
+   - Cada instrumento abre NUEVO, sin memoria anterior
+   - Cada estudiante empieza con formulario limpio
+   - Imposible contaminar datos entre usos
+
+✅ EXPORTACIÓN COMPLETA
+   - JSON con resumen + detalle de todo
+   - Preparado para migración de datos
+
+═════════════════════════════════════════════════════════════════════════════
+
+📁 ARCHIVOS CREADOS:
+═════════════════════════════════════════════════════════════════════════════
+
+/instrumentos/
+├── 📄 registro_calificaciones_v2.html    ← ABRE ESTO (Registro Principal)
+├── 📄 rubrica_criterios.html              ← Ejemplo de instrumento
+├── 📄 registro.js                         ← Lógica del Registro
+├── 📄 calculos.js                         ← Cálculos MINEDU (compartido)
+├── 📄 index.html                          ← Panel antiguo (mantener para referencia)
+└── [Otros archivos]
+
+═════════════════════════════════════════════════════════════════════════════
+
+🚀 CÓMO USAR:
+═════════════════════════════════════════════════════════════════════════════
+
+1. Abre en tu navegador:
+   file:///Users/osmer/Downloads/Sistemita/Sistemita_Nuevo/instrumentos/registro_calificaciones_v2.html
+
+2. Verás el Registro con 3 Competencias:
+   - Lee textos diversos
+   - Produce textos escritos
+   - Interactúa oralmente
+
+3. PARA CADA COMPETENCIA:
+
+   a) Completa los 5 criterios (C/B/A/AD) directamente
+   b) O usa un instrumento:
+      - Selecciona instrumento en el dropdown
+      - Haz clic "Usar Instrumento"
+      - Se abre MODAL con ese instrumento
+      - Completa y guarda
+      - Automáticamente calcula y retorna al Registro
+
+4. GUARDAR TODO:
+   - Clic en [💾 Guardar]
+   - Descarga JSON completo
+   - Incluye: estudiante, competencias, instrumentos, respuestas, cálculos
+
+═════════════════════════════════════════════════════════════════════════════
+
+🔧 ESTRUCTURA DEL FLUJO:
+═════════════════════════════════════════════════════════════════════════════
+
+REGISTRO PRINCIPAL
+       │
+       ├─ Competencia 1 ┐
+       │                ├─ [5 Criterios Directos]
+       │                ├─ [Rúbrica] ──┐
+       │                ├─ [Lista Cotejo] ──┐ ┐
+       │                ├─ [Portafolio] ──┐ ├─ MODALES (Instrumentos)
+       │                ├─ [Registro Anecdótico] ──┐ ├─ Abren flotantes
+       │                └─ [Ficha Observación] ──┐ ┘ ┘
+       │
+       ├─ Competencia 2 ┐
+       │                └─ [Igual estructura]
+       │
+       └─ Competencia 3 ┐
+                        └─ [Igual estructura]
+
+═════════════════════════════════════════════════════════════════════════════
+
+📊 EJEMPLO DE USO REAL:
+═════════════════════════════════════════════════════════════════════════════
+
+Estudiante: Juan Pérez
+Período: Bimestre I
+
+COMPETENCIA 1: Lee textos diversos
+
+Opción A - Completa directamente:
+  Criterio 1: ○ C ○ B ● A ○ AD
+  Criterio 2: ○ C ○ B ● A ○ AD
+  Criterio 3: ○ C ○ B ● A ○ AD
+  Criterio 4: ○ C ○ B ○ A ● AD
+  Criterio 5: ○ C ○ B ● A ○ AD
+
+  Resultado: 4 en A, 1 en AD = CALIFICATIVO AD ✓
+
+Opción B - Usa Rúbrica como instrumento:
+  - Selecciona "Rúbrica de Evaluación" en dropdown
+  - Clic "Usar Instrumento"
+  - Se abre modal con los 5 criterios
+  - Completa: C/B/A/AD para cada uno
+  - Guarda
+  - Sistema calcula automáticamente
+  - Modal cierra
+  - Registro muestra: "AD (Rúbrica)" ✓
+
+Puedes agregar más instrumentos a la misma competencia:
+  - Agrega "Lista de Cotejo"
+  - Se abre modal con lista
+  - Completa
+  - Guarda
+  - Registro ahora muestra:
+    - Rúbrica: AD
+    - Lista de Cotejo: A
+    - Calificativo Final: AD (domina la Rúbrica)
+
+═════════════════════════════════════════════════════════════════════════════
+
+🔄 PRÓXIMOS PASOS (Tareas Pendientes):
+═════════════════════════════════════════════════════════════════════════════
+
+[ ] Crear los 7 instrumentos restantes como modales:
+    ├─ Lista de Cotejo
+    ├─ Portafolio de Evidencias
+    ├─ Registro Anecdótico
+    ├─ Escala Valorativa
+    ├─ Ficha de Observación
+    ├─ Evaluación Diagnóstica (solo para unidad diagnóstica)
+    └─ Ficha de Análisis Literario
+
+[ ] Integrar los instrumentos en el Registro
+    ├─ Conectar cada selector con su modal
+    ├─ Pasar datos del Registro al instrumento
+    └─ Retornar cálculo al Registro
+
+[ ] Mejorar la persistencia de datos
+    ├─ LocalStorage para no perder datos
+    ├─ Historial de evaluaciones
+    └─ Base de datos simple
+
+[ ] Migración de datos del sistema anterior
+    ├─ Script de conversión de Excel → JSON
+    ├─ Importación de estudiantes
+    └─ Importación de evaluaciones previas
+
+═════════════════════════════════════════════════════════════════════════════
+
+⚙️ CÓMO FUNCIONAN LOS CÁLCULOS (calculos.js):
+═════════════════════════════════════════════════════════════════════════════
+
+La clase CalculosMINEDU tiene 4 métodos principales:
+
+1. calcularCalificativo(respuestas)
+   - Recibe: array de ['C', 'B', 'A', 'AD', 'A']
+   - Retorna: {calificativo: 'A', porcentaje: 100, detalles: {...}}
+
+2. calcularNotaCompetencia(instrumentos)
+   - Recibe: array de instrumentos con sus resultados
+   - LA RÚBRICA SIEMPRE DOMINA
+   - Los demás máximo llegan a A (100%)
+   - Retorna: calificativo final de la competencia
+
+3. determinarCalificativoPorPorcentaje(porcentaje)
+   - Convierte % a letra (AD/A/B/C)
+
+4. calcularPorcentaje(contar)
+   - Cálculo interno: AD=125%, A=100%, B=75%, C=50%
+
+LÓGICA DETALLADA:
+
+Si todas las respuestas son:
+├─ 5 en A = A (100%) ✓
+├─ 4 en A, 1 en AD = AD (>100%) ✓
+├─ 3 en A, 2 en B = B (99-55%) ✓
+├─ 2 en A, 3 en C = C (<55%) ✓
+└─ [cualquier otra combinación] → se calcula por porcentaje
+
+═════════════════════════════════════════════════════════════════════════════
+
+💾 ESTRUCTURA DEL JSON GUARDADO:
+═════════════════════════════════════════════════════════════════════════════
+
+{
+  "estudiante": "Juan Pérez",
+  "periodo": "Bimestre I",
+  "grado": "5to A",
+  "competencias": {
+    "comp1": {
+      "nombre": "Lee textos diversos",
+      "criterios": ["Criterio 1", ...],
+      "respuestas": ["C", "B", "A", "AD", "A"],
+      "instrumentos": [
+        {
+          "tipo": "Rúbrica",
+          "respuestas": ["A", "A", "A", "AD", "A"],
+          "resultado": {
+            "calificativo": "AD",
+            "porcentaje": 120,
+            "detalles": { "C": 0, "B": 0, "A": 4, "AD": 1 }
+          }
+        }
+      ],
+      "calificativo": "AD",
+      "porcentaje": 120
+    }
+  }
+}
+
+═════════════════════════════════════════════════════════════════════════════
+
+✅ CHECKLIST ACTUAL:
+═════════════════════════════════════════════════════════════════════════════
+
+[✓] Registro de Calificaciones v2 - LISTO
+[✓] Lógica de cálculos MINEDU - IMPLEMENTADA
+[✓] Rúbrica como ejemplo de instrumento - FUNCIONAL
+[✓] Autonomía de instrumentos - GARANTIZADA
+[✓] Modales flotantes - LISTA LA ESTRUCTURA
+[✓] Exportación JSON - IMPLEMENTADA
+[✓] 5 criterios por instrumento - FUNCIONANDO
+[✓] Dominio de Rúbrica sobre otros - IMPLEMENTADO
+
+[ ] Crear 7 instrumentos restantes
+[ ] Integración completa en Registro
+[ ] Tests de cálculo
+[ ] Documentación de usuario final
+
+═════════════════════════════════════════════════════════════════════════════
+
+🎓 ¿QUÉ SIGUE?
+
+Dime si necesitas:
+
+1. Crear el resto de los 7 instrumentos
+2. Mejorar el Registro con funcionalidades adicionales
+3. Crear la migración de datos desde tu sistema anterior
+4. Agregar un Dashboard con reportes
+5. Otra cosa
+
+¡El sistema está listo para empezar a usar! 🚀
+
+═════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ficha de Análisis Literario</title>
+    <script src="calculos.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-guardar { background: #4CAF50; color: white; }
+        .btn-guardar:hover { background: #45a049; }
+        .btn-limpiar { background: #FF9800; color: white; }
+        .btn-limpiar:hover { background: #e68900; }
+        .btn-cerrar { background: #f44336; color: white; }
+        .btn-cerrar:hover { background: #da190b; }
+
+        .content { padding: 30px; }
+
+        .form-section {
+            margin-bottom: 25px;
+        }
+
+        .form-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+            border-bottom: 2px solid #8e2de2;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="text"], input[type="date"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #8e2de2;
+            box-shadow: 0 0 0 3px rgba(142, 45, 226, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .analisis-row {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+
+        .analisis-nombre {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .analisis-guia {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: white;
+            border-left: 3px solid #8e2de2;
+            border-radius: 3px;
+        }
+
+        .opciones {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .opciones label {
+            display: flex;
+            align-items: center;
+            margin: 0;
+            font-weight: normal;
+            font-size: 13px;
+        }
+
+        .opciones input[type="radio"] {
+            margin-right: 6px;
+            cursor: pointer;
+            width: auto;
+        }
+
+        .resultado-section {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        .resultado-section h3 {
+            border: none;
+            margin-bottom: 15px;
+        }
+
+        .resultado-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .resultado-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+
+        .resultado-item strong {
+            display: block;
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .resultado-item .valor {
+            font-size: 24px;
+            font-weight: bold;
+            color: #8e2de2;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .controls { flex-direction: column; }
+            button { width: 100%; }
+            .resultado-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Ficha de Análisis Literario</h1>
+            <p>Evaluación de comprensión y análisis de textos literarios</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn-guardar" onclick="guardar()">💾 Guardar</button>
+            <button class="btn-limpiar" onclick="limpiar()">🗑️ Limpiar</button>
+            <button class="btn-cerrar" onclick="cerrar()">❌ Cerrar</button>
+        </div>
+
+        <div class="content">
+            <div class="form-section">
+                <h3>Información General</h3>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Estudiante</label>
+                        <input type="text" id="estudiante" placeholder="Nombre">
+                    </div>
+                    <div class="form-group">
+                        <label>Texto Analizado</label>
+                        <input type="text" id="texto" placeholder="Título y autor">
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="fecha">
+                    </div>
+                    <div class="form-group">
+                        <label>Docente</label>
+                        <input type="text" id="docente" placeholder="Nombre">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>5 Aspectos del Análisis Literario</h3>
+                <p style="color: #666; font-size: 13px; margin-bottom: 15px;">
+                    Evalúa cada aspecto según los niveles: C (Inicio) | B (Proceso) | A (Logro) | AD (Destacado)
+                </p>
+
+                <div id="analisis-container">
+                    <!-- Se genera dinámicamente -->
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-group">
+                    <label>Análisis Crítico del Estudiante</label>
+                    <textarea id="analisis" placeholder="Registro del análisis realizado por el estudiante"></textarea>
+                </div>
+            </div>
+
+            <div class="resultado-section">
+                <h3>Resultado del Análisis</h3>
+                <div class="resultado-grid">
+                    <div class="resultado-item">
+                        <strong>Calificativo</strong>
+                        <div class="valor" id="resultado-calif">--</div>
+                    </div>
+                    <div class="resultado-item">
+                        <strong>% Logro</strong>
+                        <div class="valor" id="resultado-pct">0%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const aspectos_literarios = [
+            { nombre: 'Comprensión del texto', guia: 'Entiende el contenido y el mensaje central' },
+            { nombre: 'Análisis de personajes', guia: 'Identifica y analiza características de los personajes' },
+            { nombre: 'Identificación de recursos', guia: 'Reconoce figuras literarias y recursos estilísticos' },
+            { nombre: 'Contexto e interpretación', guia: 'Relaciona el texto con el contexto y elabora interpretaciones' },
+            { nombre: 'Crítica y reflexión', guia: 'Emite juicios críticos y reflexiona sobre el significado' }
+        ];
+
+        window.addEventListener('load', () => {
+            const fecha = new Date().toISOString().split('T')[0];
+            document.getElementById('fecha').value = fecha;
+            generarAspectos();
+        });
+
+        function generarAspectos() {
+            const container = document.getElementById('analisis-container');
+            container.innerHTML = '';
+
+            for (let i = 0; i < 5; i++) {
+                const div = document.createElement('div');
+                div.className = 'analisis-row';
+                div.innerHTML = `
+                    <div class="analisis-nombre">${aspectos_literarios[i].nombre}</div>
+                    <div class="analisis-guia">${aspectos_literarios[i].guia}</div>
+                    <div class="opciones">
+                        <label>
+                            <input type="radio" name="aspecto${i}" value="C"
+                                   onchange="calcularResultado()">
+                            C
+                        </label>
+                        <label>
+                            <input type="radio" name="aspecto${i}" value="B"
+                                   onchange="calcularResultado()">
+                            B
+                        </label>
+                        <label>
+                            <input type="radio" name="aspecto${i}" value="A"
+                                   onchange="calcularResultado()">
+                            A
+                        </label>
+                        <label>
+                            <input type="radio" name="aspecto${i}" value="AD"
+                                   onchange="calcularResultado()">
+                            AD
+                        </label>
+                    </div>
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        function calcularResultado() {
+            const respuestas = [];
+            for (let i = 0; i < 5; i++) {
+                const valor = document.querySelector(`input[name="aspecto${i}"]:checked`);
+                if (valor) {
+                    respuestas.push(valor.value);
+                }
+            }
+
+            if (respuestas.length === 0) {
+                document.getElementById('resultado-calif').textContent = '--';
+                document.getElementById('resultado-pct').textContent = '0%';
+                return;
+            }
+
+            const resultado = CalculosMINEDU.calcularCalificativo(respuestas);
+            document.getElementById('resultado-calif').textContent = resultado.calificativo;
+            document.getElementById('resultado-pct').textContent = resultado.porcentaje + '%';
+        }
+
+        function guardar() {
+            const respuestas = [];
+            for (let i = 0; i < 5; i++) {
+                const valor = document.querySelector(`input[name="aspecto${i}"]:checked`);
+                respuestas.push(valor ? valor.value : null);
+            }
+
+            const datos = {
+                estudiante: document.getElementById('estudiante').value,
+                texto: document.getElementById('texto').value,
+                fecha: document.getElementById('fecha').value,
+                docente: document.getElementById('docente').value,
+                respuestas: respuestas,
+                analisis: document.getElementById('analisis').value,
+                resultado: {
+                    calificativo: document.getElementById('resultado-calif').textContent,
+                    porcentaje: parseInt(document.getElementById('resultado-pct').textContent)
+                }
+            };
+
+            const json = JSON.stringify(datos, null, 2);
+            descargarJSON('ficha_analisis_literario.json', json);
+            alert('✓ Análisis literario guardado');
+        }
+
+        function limpiar() {
+            if (confirm('¿Limpiar todos los datos?')) {
+                document.getElementById('estudiante').value = '';
+                document.getElementById('texto').value = '';
+                document.getElementById('docente').value = '';
+                document.getElementById('analisis').value = '';
+                generarAspectos();
+                document.getElementById('resultado-calif').textContent = '--';
+                document.getElementById('resultado-pct').textContent = '0%';
+            }
+        }
+
+        function cerrar() {
+            if (confirm('¿Cerrar sin guardar?')) {
+                window.close();
+            }
+        }
+
+        function descargarJSON(nombre, contenido) {
+            const blob = new Blob([contenido], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

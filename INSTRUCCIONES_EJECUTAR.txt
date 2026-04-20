@@ -1,0 +1,170 @@
+════════════════════════════════════════════════════════════════════════════════
+                    🚀 INSTRUCCIONES PARA EJECUTAR SISTEMITA
+════════════════════════════════════════════════════════════════════════════════
+
+REQUISITOS PREVIOS:
+  ✓ Docker Desktop instalado
+  ✓ Terminal abierta
+
+════════════════════════════════════════════════════════════════════════════════
+                            PASO 1: ABRIR TERMINAL
+════════════════════════════════════════════════════════════════════════════════
+
+Abre Terminal (o iTerm) en tu Mac
+
+Ejecuta:
+  cd /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo
+
+Verifica que estás en la carpeta correcta:
+  pwd
+
+(Deberías ver: /Users/osmer/Downloads/Sistemita/Sistemita_Nuevo)
+
+════════════════════════════════════════════════════════════════════════════════
+                        PASO 2: EJECUTAR EL SCRIPT
+════════════════════════════════════════════════════════════════════════════════
+
+En la terminal, ejecuta:
+  chmod +x START_DOCKER.sh
+  ./START_DOCKER.sh
+
+Esto va a:
+  ✓ Verificar Docker está instalado
+  ✓ Construir imagen Docker
+  ✓ Iniciar contenedores
+  ✓ Esperar a que esté listo
+
+DURARÁ: 2-5 minutos (primera vez)
+
+════════════════════════════════════════════════════════════════════════════════
+                          PASO 3: ESPERAR EL MENSAJE
+════════════════════════════════════════════════════════════════════════════════
+
+Cuando veas esto:
+  ════════════════════════════════════════════════════════════════
+    ✓ SISTEMITA CORRIENDO
+  ════════════════════════════════════════════════════════════════
+
+    → Abre navegador: http://localhost:3000
+
+SIGNIFICA: ¡ÉXITO! Tu app está corriendo.
+
+════════════════════════════════════════════════════════════════════════════════
+                          PASO 4: ACCEDER A LA APP
+════════════════════════════════════════════════════════════════════════════════
+
+1. Abre tu navegador (Chrome, Safari, Firefox)
+
+2. Ve a: http://localhost:3000
+
+3. Verás:
+   - LoginScreen (pantalla azul futurista)
+   - Input: usuario/contraseña
+   - Botón: LOGIN
+
+4. Login:
+   - Usuario: demo (o cualquier cosa)
+   - Password: demo (o cualquier cosa)
+   - Click LOGIN
+
+5. Verás:
+   - Dashboard con gráficos
+   - Botones abajo: Dash, Chat, Hub, HUD
+
+════════════════════════════════════════════════════════════════════════════════
+                        PASO 5: EXPLORAR LA APP
+════════════════════════════════════════════════════════════════════════════════
+
+DASHBOARD (Gráficos)
+  → Click en "Dash"
+  → Verás 4 gráficos interactivos
+  → Métricas académicas
+  → Cards con información
+
+CHAT CON IA
+  → Click en "Chat"
+  → Verás interfaz de chat
+  → Escribe: "Hola"
+  → IA Gemini responde automáticamente
+  → Prueba: "¿Cuál es el derivado de x^2?"
+
+STUDENT HUD
+  → Click en "HUD"
+  → Panel de estudiante
+  → Calificaciones
+  → Tareas pendientes
+  → Próximas evaluaciones
+
+════════════════════════════════════════════════════════════════════════════════
+                       PASO 6: DETENER (cuando quieras)
+════════════════════════════════════════════════════════════════════════════════
+
+En la terminal, presiona:
+  Ctrl + C
+
+O en otra terminal:
+  docker-compose down
+
+Sistema se detiene.
+Tu Mac vuelve a normal.
+
+════════════════════════════════════════════════════════════════════════════════
+                         COMANDOS ÚTILES
+════════════════════════════════════════════════════════════════════════════════
+
+Ver logs (qué está pasando):
+  docker-compose logs -f
+
+Reiniciar:
+  docker-compose restart
+
+Ver estado:
+  docker ps
+
+Limpiar todo:
+  docker-compose down -v
+
+════════════════════════════════════════════════════════════════════════════════
+                    ¿QUÉ SI ALGO FALLA?
+════════════════════════════════════════════════════════════════════════════════
+
+Error: "Docker no está instalado"
+  → Descarga Docker Desktop: https://www.docker.com/products/docker-desktop
+  → Instala
+  → Intenta de nuevo
+
+Error: "Permission denied"
+  → Ejecuta: chmod +x START_DOCKER.sh
+  → Intenta de nuevo
+
+Error: "Port 3000 already in use"
+  → Otro proceso usa puerto 3000
+  → Ejecuta: docker-compose down
+  → Intenta de nuevo
+
+Error: "Build failed"
+  → docker-compose down -v
+  → docker system prune -a
+  → ./START_DOCKER.sh
+
+App no responde en navegador:
+  → Espera 10 segundos más
+  → Recarga página (Cmd + R)
+  → Ver logs: docker-compose logs
+
+════════════════════════════════════════════════════════════════════════════════
+                        ¡LISTO! 🎉
+════════════════════════════════════════════════════════════════════════════════
+
+Tu app Sistemita está corriendo en Docker.
+Sin tu Mac prendida después (cuando hagas deploy a internet).
+Con tu data después (cuando me des ubicación de HTMLs).
+
+PRÓXIMO PASO:
+  1. Ejecuta ./START_DOCKER.sh
+  2. Accede a http://localhost:3000
+  3. Explora la app
+  4. Confirm que funciona
+  5. Dame ubicación de tus HTMLs para migrar data
+
+════════════════════════════════════════════════════════════════════════════════

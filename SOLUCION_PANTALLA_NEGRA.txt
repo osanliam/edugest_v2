@@ -1,0 +1,168 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              SOLUCIÓN: Pantalla negra en http://localhost:3002/              ║
+║                                                                              ║
+║  El servidor no está iniciando correctamente por problemas de permisos      ║
+║  en node_modules. Aquí hay varias soluciones:                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+⚡ SOLUCIÓN RÁPIDA (SIN EJECUTAR SERVIDOR):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Aun sin que el servidor esté ejecutándose, puedes:
+
+1. Abre en tu navegador:
+   file:///Users/osmer/Downloads/Sistemita_Nuevo/CARGAR_USUARIOS_DEMO.html
+
+2. Haz clic en "✅ Cargar Todos los Usuarios"
+
+3. Los usuarios se guardarán en tu navegador
+   (localStorage del navegador)
+
+4. Ahora cuando ejecutes el servidor, podrás loguear
+
+
+🔧 SOLUCIÓN 1: Limpiar con permisos (Terminal):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+cd /Users/osmer/Downloads/Sistemita_Nuevo
+
+# Cambiar permisos
+chmod -R u+w node_modules 2>/dev/null || true
+
+# Iniciar servidor
+npm run dev
+
+Luego abre: http://localhost:3002/
+
+
+🔧 SOLUCIÓN 2: Reinstalar node_modules (Terminal):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+cd /Users/osmer/Downloads/Sistemita_Nuevo
+
+# Backup de package-lock.json
+cp package-lock.json package-lock.json.bak
+
+# Eliminar node_modules y lock
+rm -rf node_modules package-lock.json
+
+# Reinstalar limpio
+npm install
+
+# Iniciar servidor
+npm run dev
+
+Luego abre: http://localhost:3002/
+
+
+🔧 SOLUCIÓN 3: Usar puerto alternativo (Si 3002 está ocupado):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Edita: vite.config.ts
+
+Cambia línea 20:
+  DE: port: 3002,
+  A:  port: 3003,
+
+Luego:
+  npm run dev
+
+Abre: http://localhost:3003/
+
+
+🔧 SOLUCIÓN 4: Usar Docker (Si tienes Docker instalado):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+docker-compose up
+
+(Si el docker-compose.yml está configurado)
+
+
+🔧 SOLUCIÓN 5: Build estático y servir:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+cd /Users/osmer/Downloads/Sistemita_Nuevo
+
+# Build de producción
+npm run build
+
+# Servir con http-server (si lo tienes)
+npm install -g http-server
+http-server dist -p 3002
+
+Luego abre: http://localhost:3002/
+
+
+✅ SOLUCIÓN 6: Usar archivos HTML directamente (Sin servidor):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Simplemente abre en navegador:
+
+file:///Users/osmer/Downloads/Sistemita_Nuevo/CARGAR_USUARIOS_DEMO.html
+
+✅ Funciona 100% sin necesidad de npm run dev
+✅ Puedes cargar usuarios
+✅ Puedes probar la lógica de localStorage
+⚠️ Limitación: Solo la página HTML, no el sistema completo
+
+
+¿CUÁL ELEGIR?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SIN EXPERIENCIA CON TERMINAL:
+  → Solución 6: Abre CARGAR_USUARIOS_DEMO.html directamente
+
+CON EXPERIENCIA CON TERMINAL:
+  → Solución 1: chmod -R u+w && npm run dev (más rápido)
+  → Si falla: Solución 2: Reinstalar node_modules (más seguro)
+
+SI TIENES ERRORES DE PUERTO:
+  → Solución 3: Cambiar puerto en vite.config.ts
+
+SI TIENES DOCKER:
+  → Solución 4: Usar docker-compose up
+
+
+🎯 FLUJO RECOMENDADO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PASO 1: Abre HTML directamente (SIN servidor)
+  └─ file:///Users/osmer/Downloads/Sistemita_Nuevo/CARGAR_USUARIOS_DEMO.html
+  └─ Carga usuarios en localStorage
+
+PASO 2: Intenta Solución 1 (Permisos + npm run dev)
+  └─ Si funciona → Perfecto, usa http://localhost:3002/
+  └─ Si falla → Intenta Solución 2
+
+PASO 3: Si Solución 1 falla, intenta Solución 2 (Reinstalar)
+  └─ Elimina node_modules y package-lock.json
+  └─ npm install (limpio)
+  └─ npm run dev
+
+
+⚠️ PROBLEMA TÉCNICO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+El error que estás viendo es:
+  EPERM: operation not permitted, unlink '.../.vite/deps/chunk-*.js'
+
+Causa: Permisos de lectura en archivos de caché de Vite
+
+Soluciones probadas:
+✅ Solución 1 (chmod): Rápida y generalmente funciona
+✅ Solución 2 (reinstalar): Más lenta pero siempre funciona
+✅ Solución 6 (HTML directo): Funciona sin npm
+
+
+SIGUIENTE PASO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👉 Intenta PRIMERO: Solución 6 (archivo HTML)
+   file:///Users/osmer/Downloads/Sistemita_Nuevo/CARGAR_USUARIOS_DEMO.html
+
+👉 Si quieres el servidor: Intenta Solución 1 (chmod)
+
+👉 Si necesitas ayuda: Copia el error exacto que ves
+
+
+Version: 2026-04-19

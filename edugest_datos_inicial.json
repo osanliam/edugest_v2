@@ -1,0 +1,21 @@
+{
+  "estudiantes": [],
+  "maestros": [],
+  "notas": [],
+  "materias": [],
+  "periodos": [],
+  "competencias": [],
+  "timestamp": "2026-04-19T19:12:59.061Z",
+  "fuente": "EduGest_Extraction",
+  "htmlSize": 1233951,
+  "htmlAnalysis": {
+    "tieneReact": true,
+    "tieneLocalStorage": true,
+    "contieneDatos": true
+  },
+  "resumenHTMLAnalysis": {
+    "patronesEstudiantes": 856,
+    "patronesMaestros": 515,
+    "patronesNotas": 1070
+  }
+}

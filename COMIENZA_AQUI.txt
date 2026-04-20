@@ -1,0 +1,198 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          🎯 COMIENZA AQUÍ 🎯                                 ║
+║                      GUÍA RÁPIDA PARA INICIAR SESIÓN                         ║
+║                                                                              ║
+║  Sistemita_Nuevo - Sistema de Gestión Educativa Integral                    ║
+║  (Actualizado: 2026-04-19)                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+⚡ OPCIÓN MÁS RÁPIDA (3 pasos):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ ABRE ESTE ARCHIVO EN TU NAVEGADOR:
+
+   CARGAR_USUARIOS_DEMO.html
+
+   ➜ Simplemente haz doble clic en el archivo
+   ➜ O copia y pega en tu navegador:
+     file:///Users/osmer/Downloads/Sistemita_Nuevo/CARGAR_USUARIOS_DEMO.html
+
+2️⃣ HAZA CLIC EN:
+
+   "✅ Cargar Todos los Usuarios"
+
+   ➜ Se guardarán 6 usuarios de prueba
+   ➜ Se abrirá el sistema automáticamente
+
+3️⃣ INICIA SESIÓN CON:
+
+   📧 Email: admin@sistemita.edu
+   🔑 Contraseña: admin123
+
+   ✅ ¡LISTO! Ya estás dentro del sistema
+
+
+📋 OTROS USUARIOS DE PRUEBA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Prueba estos usuarios para ver diferentes perspectivas:
+
+👨‍🏫 DOCENTE:
+   📧 juan.perez@sistemita.edu
+   🔑 teacher123
+
+👨‍🎓 ESTUDIANTE:
+   📧 carlos.mendez@estudiantes.edu
+   🔑 student123
+
+👨‍👩‍👧 APODERADO (Papá/Mamá):
+   📧 pedro.hernandez@apoderados.edu
+   🔑 parent123
+
+
+🎯 QUÉ PUEDES HACER CON CADA ROL:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👑 ADMINISTRADOR:
+   • Panel Admin - Control total del sistema
+   • Gestionar Usuarios - Crear, editar, eliminar usuarios
+   • Ver todos los módulos
+   • Acceso a Docentes, Estudiantes, etc.
+
+👨‍🏫 DOCENTE:
+   • Aula Virtual - Clases en línea
+   • Calificaciones - Registrar notas de estudiantes
+   • Horario - Ver horario de clases
+   • Asistencia - Pasar lista
+
+👨‍🎓 ESTUDIANTE:
+   • Dashboard - Ver mi desempeño
+   • Calificaciones - Ver mis notas
+   • Horario - Ver mi horario
+   • Asistencia - Ver mi asistencia
+   • Normas - Ver normas de convivencia
+
+👨‍👩‍👧 APODERADO:
+   • Dashboard del Estudiante - Ver desempeño del hijo
+   • Mensajes - Comunicarse con docentes
+   • Informes - Ver reportes académicos
+
+
+🆕 NUEVA FUNCIONALIDAD: GESTIONAR USUARIOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Si estás logueado como ADMIN, accede así:
+
+Menú Lateral → SISTEMA → Gestionar Usuarios
+
+Allí podrás:
+✅ CREAR nuevos usuarios (Docentes, Estudiantes, Apoderados)
+✅ EDITAR usuarios (Cambiar nombre, email, contraseña, rol)
+✅ ELIMINAR usuarios (Con confirmación)
+✅ BUSCAR usuarios (Por nombre o email)
+✅ VER contraseñas (Toggle mostrar/ocultar)
+✅ VER ESTADÍSTICAS (Total de usuarios por rol)
+
+Los usuarios creados aparecerán inmediatamente en el LOGIN.
+No hay duplicación ni conflictos. ¡Funciona perfecto!
+
+
+⚙️ SI NECESITAS EJECUTAR MANUALMENTE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+En Terminal/CMD:
+
+   cd /Users/osmer/Downloads/Sistemita_Nuevo
+   npm install
+   npm run dev
+
+Luego abre en tu navegador:
+   http://localhost:3001/
+
+
+📖 DOCUMENTACIÓN COMPLETA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Si necesitas más información, abre estos archivos:
+
+📄 ESTADO_ACTUAL.txt
+   ↳ Resumen completo del estado del sistema
+
+📄 INSTRUCCIONES_EJECUCION.md
+   ↳ Cómo ejecutar, troubleshooting, FAQ
+
+📄 README_USUARIOS.md
+   ↳ Guía completa de gestión de usuarios
+
+📄 CAMBIOS_REALIZADOS.md
+   ↳ Detalles técnicos de lo que se implementó
+
+📄 ejecutar.sh
+   ↳ Script automático (bash ejecutar.sh)
+
+
+🆘 ¿QUÉ PASA SI ALGO SALE MAL?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROBLEMA: "No puedo acceder a Gestionar Usuarios"
+SOLUCIÓN: Asegúrate de estar logueado como ADMIN (admin@sistemita.edu)
+
+PROBLEMA: "Usuarios desaparecieron"
+SOLUCIÓN: Abre CARGAR_USUARIOS_DEMO.html nuevamente y carga los usuarios
+
+PROBLEMA: "Olvidé la contraseña de admin"
+SOLUCIÓN: Abre CARGAR_USUARIOS_DEMO.html y carga nuevamente
+
+PROBLEMA: "Puerto 3001 ocupado"
+SOLUCIÓN: Cambia el puerto en vite.config.ts a 3002 o 3003
+
+
+✨ CARACTERÍSTICAS DEL SISTEMA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Autenticación integrada desde localStorage
+✅ Sin duplicación de usuarios
+✅ Sin conflictos de roles
+✅ Acceso basado en roles (RBAC)
+✅ Diseño ultra-moderno y responsivo
+✅ Animaciones suaves
+✅ Validaciones automáticas
+✅ Mensajes de éxito/error claros
+✅ Búsqueda en tiempo real
+✅ Estadísticas en vivo
+✅ Almacenamiento persistente
+
+
+🎓 PRÓXIMAS MEJORAS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+En desarrollo:
+⏳ Excel-like Calificaciones (3 competencias × 9 instrumentos)
+⏳ Panel de asignación maestro-curso
+⏳ Cálculo automático de notas
+⏳ Backend API + Base de datos
+⏳ Encriptación de contraseñas
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║  🎉 ¡LISTO PARA USAR!                                                       ║
+║                                                                              ║
+║  1. Abre: CARGAR_USUARIOS_DEMO.html                                         ║
+║  2. Haz clic en "✅ Cargar Todos los Usuarios"                              ║
+║  3. Serás redirigido al login automáticamente                               ║
+║  4. Inicia sesión con: admin@sistemita.edu / admin123                       ║
+║  5. ¡A disfrutar! 🚀                                                        ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+¿Preguntas?
+Revisa los archivos .md para documentación completa.
+
+Usuario: osmer
+Email: osanliam@gmail.com
+Sistema: Sistemita_Nuevo
+Ruta: /Users/osmer/Downloads/Sistemita_Nuevo/
+
+Última actualización: 2026-04-19 18:30 UTC
+Estado: ✅ COMPLETAMENTE FUNCIONAL
