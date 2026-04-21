@@ -1,18 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from "motion/react";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
 import { User as UserType } from '../types';
-import api from '../utils/api';
+import { mockLogin } from '../utils/mockAuth';
 
-interface UsuarioLocal {
-  id: string;
-  nombre: string;
-  email: string;
-  contraseña: string;
-  rol: 'admin' | 'teacher' | 'parent' | 'student';
-  activo: boolean;
-  creado: string;
+// En producción (Vercel) usa la API real; en local usa mock
+async function loginRequest(email: string, password: string) {
+  if (import.meta.env.PROD) {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Credenciales inválidas');
+    }
+    return res.json();
+  }
+  // Desarrollo local → mock
+  return mockLogin(email, password);
 }
+
+// Cuentas de demo fijas (sin depender de localStorage ni API externa)
+const DEMO_ACCOUNTS = [
+  { id: 'user-admin', name: 'Administrador del Sistema', email: 'admin@manuelfidencio.edu.pe',       password: 'admin123',    role: '👑 ADMIN',          rol: 'admin' as const },
+  { id: 'user-001',   name: 'Dr. Fernando López',        email: 'director@escuela.edu',    password: 'director123', role: '🏛️ Director',       rol: 'director' as const },
+  { id: 'user-002',   name: 'Mg. María García',          email: 'subdirector@escuela.edu', password: 'sub123',      role: '📋 Subdirector',    rol: 'subdirector' as const },
+  { id: 'user-003',   name: 'Lic. Juan Pérez',           email: 'profesor@escuela.edu',    password: 'prof123',     role: '👨‍🏫 Docente',      rol: 'teacher' as const },
+  { id: 'user-004',   name: 'Carlos Mendez',             email: 'estudiante@escuela.edu',  password: 'est123',      role: '👨‍🎓 Estudiante',   rol: 'student' as const },
+  { id: 'user-005',   name: 'Pedro Mendez',              email: 'apoderado@escuela.edu',   password: 'apod123',     role: '👨‍👩‍👧 Apoderado', rol: 'parent' as const },
+];
 
 interface LoginScreenProps {
   onLogin: (user: UserType) => void;
@@ -24,39 +42,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [demoAccounts, setDemoAccounts] = useState<any[]>([]);
-
-  // Cargar usuarios del localStorage al iniciar
-  useEffect(() => {
-    const stored = localStorage.getItem('sistema_usuarios');
-    if (stored) {
-      try {
-        const usuarios: UsuarioLocal[] = JSON.parse(stored);
-        // Convertir usuarios locales a formato demo para mostrar
-        const demoList = usuarios.slice(0, 6).map((u: UsuarioLocal) => ({
-          email: u.email,
-          password: u.contraseña,
-          name: u.nombre,
-          role: getRoleLabel(u.rol),
-          id: u.id,
-          rol: u.rol
-        }));
-        setDemoAccounts(demoList);
-      } catch (e) {
-        console.warn('Error cargando usuarios:', e);
-      }
-    }
-  }, []);
-
-  const getRoleLabel = (rol: string): string => {
-    const roleMap: Record<string, string> = {
-      admin: '👑 ADMIN',
-      teacher: '👨‍🏫 Docente',
-      parent: '👨‍👩‍👧 Apoderado',
-      student: '👨‍🎓 Estudiante'
-    };
-    return roleMap[rol] || rol;
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,47 +49,18 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     setIsLoading(true);
 
     try {
-      // Usar URL relativa - mismo host y puerto
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: usuario, password })
-      });
+      const data = await loginRequest(usuario, password);
+      localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-
-        const user: UserType = {
-          id: data.user.id,
-          name: data.user.name,
-          email: data.user.email,
-          role: data.user.role as any,
-          schoolId: '1',
-        };
-        onLogin(user);
-        return;
-      }
-
-      // Fallback a localStorage si API no responde
-      const stored = localStorage.getItem('sistema_usuarios');
-      if (stored) {
-        const usuarios: UsuarioLocal[] = JSON.parse(stored);
-        const usuarioEncontrado = usuarios.find(u => u.email === usuario && u.contraseña === password && u.activo);
-
-        if (usuarioEncontrado) {
-          const user: UserType = {
-            id: usuarioEncontrado.id,
-            name: usuarioEncontrado.nombre,
-            email: usuarioEncontrado.email,
-            role: usuarioEncontrado.rol as any,
-            schoolId: '1',
-          };
-          onLogin(user);
-          return;
-        }
-      }
+      const user: UserType = {
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role as any,
+        schoolId: data.user.school_id,
+      };
+      onLogin(user);
     } catch (err) {
       setError('Usuario o contraseña incorrectos');
     } finally {
@@ -112,12 +68,10 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     }
   };
 
-  const handleDemoLogin = async (account: any) => {
+  const handleDemoLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
     setError('');
     setIsLoading(true);
-
     try {
-      // Usar credenciales directas del usuario
       const user: UserType = {
         id: account.id,
         name: account.name,
@@ -125,9 +79,10 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         role: account.rol as any,
         schoolId: '1',
       };
+      localStorage.setItem('user', JSON.stringify(user));
       onLogin(user);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error en autenticación');
+      setError('Error al iniciar sesión de demo');
     } finally {
       setIsLoading(false);
     }
@@ -237,13 +192,13 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
             {/* Demo Accounts */}
             <div className="mt-6 space-y-2">
-              {demoAccounts.map((account: any) => (
+              {DEMO_ACCOUNTS.map((account) => (
                 <motion.button
                   key={account.email}
                   onClick={() => handleDemoLogin(account)}
                   whileHover={{ scale: 1.02 }}
                   className={`w-full text-left p-3 rounded-lg border transition-all ${
-                    account.role === '👑 ADMIN'
+                    account.rol === 'admin'
                       ? 'border-red-600 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40'
                       : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
                   }`}
@@ -254,7 +209,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                       <p className="text-xs text-slate-500 dark:text-slate-400">{account.email}</p>
                     </div>
                     <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                      account.role === '👑 ADMIN'
+                      account.rol === 'admin'
                         ? 'bg-red-600 text-white'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                     }`}>

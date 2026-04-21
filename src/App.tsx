@@ -30,6 +30,8 @@ import CalificativosScreen from './screens/CalificativosScreen';
 import AdminUsersScreen from './screens/AdminUsersScreen';
 import GradesScreenAPI from './screens/GradesScreenAPI';
 import CalificacionesProModerno from './screens/CalificacionesProModerno';
+import DocentesScreen from './screens/DocentesScreen';
+import AlumnosScreen from './screens/AlumnosScreen';
 import MainLayoutModern from './components/MainLayoutModern';
 
 type UserRole = 'admin' | 'director' | 'subdirector' | 'teacher' | 'student' | 'parent';
@@ -45,7 +47,8 @@ interface User {
 type ScreenType = 'login' | 'panel-admin' | 'inicio' | 'inicio-modern' | 'aula-virtual' | 'mensajes' | 'informes' |
                  'panel-director' | 'panel-subdirector' | 'comunidad' | 'profesores' |
                  'estudiantes' | 'dashboard-estudiante' | 'calificaciones' | 'horario' |
-                 'asistencia' | 'normas-convivencia' | 'gestionar-usuarios';
+                 'asistencia' | 'normas-convivencia' | 'gestionar-usuarios' |
+                 'gestion-docentes' | 'gestion-alumnos';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -106,15 +109,16 @@ export default function App() {
     const roleAccess: Record<UserRole, ScreenType[]> = {
       admin: [
         'panel-admin', 'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
-        'panel-director', 'panel-subdirector', 'profesores', 'estudiantes', 'calificaciones', 'gestionar-usuarios'
+        'panel-director', 'panel-subdirector', 'profesores', 'estudiantes', 'calificaciones',
+        'gestionar-usuarios', 'gestion-docentes', 'gestion-alumnos'
       ],
       director: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
-        'panel-director', 'profesores', 'estudiantes'
+        'panel-director', 'profesores', 'estudiantes', 'gestion-docentes', 'gestion-alumnos'
       ],
       subdirector: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
-        'panel-subdirector', 'panel-director', 'profesores', 'estudiantes'
+        'panel-subdirector', 'panel-director', 'profesores', 'estudiantes', 'gestion-docentes', 'gestion-alumnos'
       ],
       teacher: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
@@ -172,6 +176,8 @@ export default function App() {
       {currentScreen === 'dashboard-estudiante' && <StudentDashboard user={user} />}
       {currentScreen === 'calificaciones' && <CalificacionesProModerno />}
       {currentScreen === 'gestionar-usuarios' && <AdminUsersScreen />}
+      {currentScreen === 'gestion-docentes' && <DocentesScreen />}
+      {currentScreen === 'gestion-alumnos' && <AlumnosScreen />}
           {currentScreen === 'horario' && <ScheduleScreenModern user={user} />}
           {currentScreen === 'asistencia' && <AttendanceScreenModern user={user} />}
           {currentScreen === 'normas-convivencia' && <ConductRulesScreen user={user} />}

@@ -5,7 +5,7 @@ const mockUsers = [
   {
     id: 'user-admin',
     name: 'Administrador del Sistema',
-    email: 'admin@escuela.edu',
+    email: 'admin@manuelfidencio.edu.pe',
     password: 'admin123',
     role: 'admin' as const,
     school_id: 'school-001'
@@ -85,7 +85,7 @@ export async function mockGetStudents() {
     data: [
       { id: 'st-1', name: 'Carlos Mendez', email: 'carlos@escuela.edu', enrollment_number: 'EST-001', grade_level: '3°A', section: 'A' },
       { id: 'st-2', name: 'María García', email: 'maria@escuela.edu', enrollment_number: 'EST-002', grade_level: '3°A', section: 'A' },
-      { id: 'st-3', name: 'Juan Pérez', email: 'juan@escuela.edu', enrollment_number: 'EST-003', grade_level: '3°B', section: 'B' },
+      { id: 'st-3', name: 'Juan Pérez', email: 'juan@manuelfidencio.edu.pe', enrollment_number: 'EST-003', grade_level: '3°B', section: 'B' },
     ]
   };
 }

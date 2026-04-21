@@ -21,7 +21,7 @@ export default function GradesScreenAPI() {
         return;
       }
 
-      const res = await fetch(`http://localhost:3005/api/grades/${user.id}`, {
+      const res = await fetch(`/api/grades/${user.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 

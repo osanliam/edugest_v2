@@ -19,7 +19,7 @@ interface Student {
 
 const students: Student[] = [
   { id: '1', name: 'María García', grade: '3°A', email: 'maria@escuela.edu', average: 8.5, attendance: 95, status: 'active' },
-  { id: '2', name: 'Juan López', grade: '3°A', email: 'juan@escuela.edu', average: 7.8, attendance: 90, status: 'active' },
+  { id: '2', name: 'Juan López', grade: '3°A', email: 'juan@manuelfidencio.edu.pe', average: 7.8, attendance: 90, status: 'active' },
   { id: '3', name: 'Carlos Rodríguez', grade: '3°B', email: 'carlos@escuela.edu', average: 8.2, attendance: 92, status: 'active' },
   { id: '4', name: 'Ana Martínez', grade: '3°B', email: 'ana@escuela.edu', average: 9.0, attendance: 98, status: 'active' },
   { id: '5', name: 'Pedro Silva', grade: '3°C', email: 'pedro@escuela.edu', average: 7.1, attendance: 85, status: 'active' },

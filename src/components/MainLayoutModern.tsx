@@ -30,8 +30,8 @@ const allNavigationItems = [
   // ADMINISTRACIÓN
   { id: 'panel-director', label: 'Panel Director', icon: <Building2 className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector'], category: 'Administración' },
   { id: 'panel-subdirector', label: 'Panel Subdirector', icon: <Users className="w-5 h-5" />, roles: ['admin', 'subdirector'], category: 'Administración' },
-  { id: 'profesores', label: 'Profesores', icon: <Users className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector'], category: 'Administración' },
-  { id: 'estudiantes', label: 'Estudiantes', icon: <Users2 className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector'], category: 'Administración' },
+  { id: 'gestion-docentes', label: 'Docentes', icon: <Users className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector'], category: 'Administración' },
+  { id: 'gestion-alumnos', label: 'Alumnos', icon: <Users2 className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector'], category: 'Administración' },
 
   // ACADÉMICO
   { id: 'dashboard-estudiante', label: 'Mi Desempeño', icon: <Flame className="w-5 h-5" />, roles: ['student', 'parent'], category: 'Académico' },
