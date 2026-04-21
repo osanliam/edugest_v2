@@ -21,18 +21,15 @@ const CARGOS = [
   'Docente de Arte', 'Docente de Inglés', 'Psicólogo(a)', 'Otro'
 ];
 
-function getToken() { return localStorage.getItem('auth_token') || ''; }
-
-async function apiCall(path: string, method = 'GET', body?: object) {
-  const res = await fetch(path, {
-    method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error');
-  return data;
+// ── Persistencia local (sin backend) ─────────────────────────────────────────
+const LS_DOCENTES = 'ie_docentes';
+function lsCargar(): Docente[] {
+  try { return JSON.parse(localStorage.getItem(LS_DOCENTES) || '[]'); } catch { return []; }
 }
+function lsGuardar(lista: Docente[]) {
+  localStorage.setItem(LS_DOCENTES, JSON.stringify(lista));
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function FormField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -68,13 +65,10 @@ export default function DocentesScreen() {
 
   useEffect(() => { cargar(); }, []);
 
-  const cargar = async () => {
+  const cargar = () => {
     setCargando(true);
-    try {
-      const data = await apiCall('/api/docentes');
-      setDocentes(data || []);
-    } catch { mostrar('err', 'No se pudo cargar docentes'); }
-    finally { setCargando(false); }
+    setDocentes(lsCargar());
+    setCargando(false);
   };
 
   const mostrar = (tipo: 'ok' | 'err', texto: string) => {
@@ -82,34 +76,40 @@ export default function DocentesScreen() {
     setTimeout(() => setMsg(null), 3500);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.apellidos_nombres || !form.dni || !form.genero || !form.fecha_nacimiento)
       return mostrar('err', 'Completa los campos obligatorios');
     setGuardando(true);
-    try {
-      if (editando) {
-        await apiCall(`/api/docentes?id=${editando.id}`, 'PUT', form);
-        mostrar('ok', 'Docente actualizado');
-      } else {
-        await apiCall('/api/docentes', 'POST', form);
-        mostrar('ok', 'Docente registrado');
+    const lista = lsCargar();
+    if (editando) {
+      const actualizada = lista.map(d => d.id === editando.id ? { ...form, id: editando.id } : d);
+      lsGuardar(actualizada);
+      setDocentes(actualizada);
+      mostrar('ok', 'Docente actualizado');
+    } else {
+      if (lista.some(d => d.dni === form.dni)) {
+        setGuardando(false);
+        return mostrar('err', 'Ya existe un docente con ese DNI');
       }
-      setShowForm(false); setEditando(null); setForm(emptyForm);
-      await cargar();
-    } catch (e: any) { mostrar('err', e.message); }
-    finally { setGuardando(false); }
+      const nuevo = { ...form, id: 'doc-' + Date.now() };
+      const nueva = [...lista, nuevo];
+      lsGuardar(nueva);
+      setDocentes(nueva);
+      mostrar('ok', 'Docente registrado');
+    }
+    setShowForm(false); setEditando(null); setForm(emptyForm);
+    setGuardando(false);
   };
 
-  const handleEliminar = async (id: string) => {
+  const handleEliminar = (id: string) => {
     if (!confirm('¿Eliminar este docente?')) return;
     setEliminando(id);
-    try {
-      await apiCall(`/api/docentes?id=${id}`, 'DELETE');
-      mostrar('ok', 'Docente eliminado');
-      await cargar();
-    } catch (e: any) { mostrar('err', e.message); }
-    finally { setEliminando(null); }
+    const nueva = lsCargar().filter(d => d.id !== id);
+    lsGuardar(nueva);
+    setDocentes(nueva);
+    mostrar('ok', 'Docente eliminado');
+    setEliminando(null);
   };
 
   // ── Importación ───────────────────────────────────────────────────
@@ -170,18 +170,21 @@ export default function DocentesScreen() {
     } catch { mostrar('err', 'Error leyendo el archivo Excel'); }
   };
 
-  const handleImportar = async () => {
+  const handleImportar = () => {
     setImportando(true);
+    const lista = lsCargar();
     let ok = 0, err = 0;
+    const nuevos = [...lista];
     for (const r of importRows) {
-      try {
-        await apiCall('/api/docentes', 'POST', r);
-        ok++;
-      } catch { err++; }
+      if (!r.apellidos_nombres || !r.dni) { err++; continue; }
+      if (nuevos.some(d => d.dni === r.dni)) { err++; continue; }
+      nuevos.push({ ...emptyForm, ...r, id: 'doc-' + Date.now() + ok });
+      ok++;
     }
+    lsGuardar(nuevos);
+    setDocentes(nuevos);
     setImportResult({ ok, err });
     setImportando(false);
-    await cargar();
   };
 
   const descargarPlantilla = async () => {
