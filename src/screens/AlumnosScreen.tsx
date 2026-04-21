@@ -19,7 +19,6 @@ interface Alumno {
   seccion: string;
   madre?: Apoderado;
   padre?: Apoderado;
-  // campos planos que vienen de la API con JOIN
   madre_nombres?: string;
   madre_dni?: string;
   madre_celular?: string;
@@ -31,18 +30,14 @@ interface Alumno {
 const GRADOS = ['1°', '2°', '3°', '4°', '5°'];
 const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F'];
 const SEXOS = ['Masculino', 'Femenino'];
+const LS_KEY = 'ie_alumnos';
 
-function getToken() { return localStorage.getItem('auth_token') || ''; }
-
-async function apiCall(path: string, method = 'GET', body?: object) {
-  const res = await fetch(path, {
-    method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error');
-  return data;
+// ── localStorage helpers ──────────────────────────────────────────────────────
+function lsCargar(): Alumno[] {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; }
+}
+function lsGuardar(data: Alumno[]) {
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
 }
 
 function calcularEdad(fecha: string): number {
@@ -111,12 +106,22 @@ export default function AlumnosScreen() {
 
   useEffect(() => { cargar(); }, []);
 
-  const cargar = async () => {
+  const cargar = () => {
     setCargando(true);
     try {
-      const data = await apiCall('/api/alumnos');
-      setAlumnos(data || []);
-    } catch { mostrar('err', 'No se pudo cargar alumnos'); }
+      const data = lsCargar();
+      // normalizar: copiar campos planos desde madre/padre anidados si existen
+      const normalizado = data.map((a: any) => ({
+        ...a,
+        madre_nombres: a.madre_nombres || a.madre?.apellidos_nombres || '',
+        madre_dni:     a.madre_dni     || a.madre?.dni || '',
+        madre_celular: a.madre_celular || a.madre?.celular || '',
+        padre_nombres: a.padre_nombres || a.padre?.apellidos_nombres || '',
+        padre_dni:     a.padre_dni     || a.padre?.dni || '',
+        padre_celular: a.padre_celular || a.padre?.celular || '',
+      }));
+      setAlumnos(normalizado);
+    } catch { mostrar('err', 'Error al cargar alumnos'); }
     finally { setCargando(false); }
   };
 
@@ -124,33 +129,65 @@ export default function AlumnosScreen() {
     setMsg({ tipo, texto }); setTimeout(() => setMsg(null), 3500);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.apellidos_nombres || !form.dni || !form.fecha_nacimiento || !form.sexo || !form.grado || !form.seccion)
       return mostrar('err', 'Completa los campos obligatorios del alumno');
     setGuardando(true);
     try {
-      const payload = { ...form, edad: calcularEdad(form.fecha_nacimiento) };
+      const todos = lsCargar();
+      const edad = calcularEdad(form.fecha_nacimiento);
+      const madre = form.madre || emptyApod;
+      const padre = form.padre || emptyApod;
+
       if (editando) {
-        await apiCall(`/api/alumnos?id=${editando.id}`, 'PUT', payload);
+        const idx = todos.findIndex(a => a.id === editando.id);
+        if (idx >= 0) {
+          todos[idx] = {
+            ...form, edad,
+            madre, padre,
+            madre_nombres: madre.apellidos_nombres,
+            madre_dni: madre.dni,
+            madre_celular: madre.celular,
+            padre_nombres: padre.apellidos_nombres,
+            padre_dni: padre.dni,
+            padre_celular: padre.celular,
+          };
+        }
+        lsGuardar(todos);
         mostrar('ok', 'Alumno actualizado');
       } else {
-        await apiCall('/api/alumnos', 'POST', payload);
+        // verificar DNI duplicado
+        if (todos.some(a => a.dni === form.dni))
+          return mostrar('err', `DNI ${form.dni} ya está registrado`);
+        const nuevo: Alumno = {
+          ...form, edad, id: 'al-' + Date.now(),
+          madre, padre,
+          madre_nombres: madre.apellidos_nombres,
+          madre_dni: madre.dni,
+          madre_celular: madre.celular,
+          padre_nombres: padre.apellidos_nombres,
+          padre_dni: padre.dni,
+          padre_celular: padre.celular,
+        };
+        todos.push(nuevo);
+        lsGuardar(todos);
         mostrar('ok', 'Alumno registrado');
       }
       setShowForm(false); setEditando(null); setForm(emptyForm);
-      await cargar();
+      cargar();
     } catch (e: any) { mostrar('err', e.message); }
     finally { setGuardando(false); }
   };
 
-  const handleEliminar = async (id: string) => {
+  const handleEliminar = (id: string) => {
     if (!confirm('¿Eliminar este alumno?')) return;
     setEliminando(id);
     try {
-      await apiCall(`/api/alumnos?id=${id}`, 'DELETE');
+      const todos = lsCargar().filter(a => a.id !== id);
+      lsGuardar(todos);
       mostrar('ok', 'Alumno eliminado');
-      await cargar();
+      cargar();
     } catch (e: any) { mostrar('err', e.message); }
     finally { setEliminando(null); }
   };
@@ -176,10 +213,8 @@ export default function AlumnosScreen() {
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      // Leer todo como arrays — tu Excel tiene headers en fila 1 directamente
       const allRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-      // Buscar fila de headers
       let hIdx = 0;
       for (let i = 0; i < Math.min(allRows.length, 5); i++) {
         const r = allRows[i];
@@ -218,7 +253,6 @@ export default function AlumnosScreen() {
         return gradoMap[up] || String(g).trim();
       };
 
-      // Sección viene como "3E" → quitar el número del inicio → "E"
       const normalSeccion = (s: any): string => {
         if (!s) return '';
         return String(s).trim().replace(/^\d+/, '') || String(s).trim();
@@ -248,18 +282,44 @@ export default function AlumnosScreen() {
     } catch { mostrar('err', 'Error leyendo el archivo Excel'); }
   };
 
-  const handleImportar = async () => {
+  const handleImportar = () => {
     setImportando(true);
     let ok = 0, err = 0;
+    const todos = lsCargar();
+    const dnisExistentes = new Set(todos.map(a => a.dni));
+
     for (const r of importRows) {
       try {
-        await apiCall('/api/alumnos', 'POST', { ...r, edad: calcularEdad(r.fecha_nacimiento) });
+        if (!r.dni || !r.apellidos_nombres) { err++; continue; }
+        if (dnisExistentes.has(r.dni)) { err++; continue; }
+        const madre = r.madre || emptyApod;
+        const padre = r.padre || emptyApod;
+        const nuevo: Alumno = {
+          id: 'al-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          apellidos_nombres: r.apellidos_nombres,
+          dni: r.dni,
+          fecha_nacimiento: r.fecha_nacimiento || '',
+          edad: calcularEdad(r.fecha_nacimiento),
+          sexo: r.sexo || '',
+          grado: r.grado || '',
+          seccion: r.seccion || '',
+          madre, padre,
+          madre_nombres: madre.apellidos_nombres,
+          madre_dni: madre.dni,
+          madre_celular: madre.celular,
+          padre_nombres: padre.apellidos_nombres,
+          padre_dni: padre.dni,
+          padre_celular: padre.celular,
+        };
+        todos.push(nuevo);
+        dnisExistentes.add(r.dni);
         ok++;
       } catch { err++; }
     }
+    lsGuardar(todos);
     setImportResult({ ok, err });
     setImportando(false);
-    await cargar();
+    cargar();
   };
 
   const descargarPlantilla = async () => {
@@ -272,13 +332,13 @@ export default function AlumnosScreen() {
         'FECHA DE NACIMIENTO': '2010-05-12',
         'SEXO': 'Masculino',
         'GRADO': '3°',
-        'SECCION': 'A',
+        'SECCI': 'A',
         'NOMBRES DE LA MADRE': 'FLORES RÍOS, Ana María',
         'DNI MADRE': '41234567',
-        'CELULAR MADRE': '987654321',
+        'CELULAR DE LA MADRE': '987654321',
         'NOMBRES DEL PADRE': 'MENDEZ TORRES, Pedro Luis',
         'DNI PADRE': '40123456',
-        'CELULAR PADRE': '976543210',
+        'CELULAR DEL PADRE': '976543210',
       },
       {
         'APELLIDOS Y NOMBRES': 'GARCÍA LÓPEZ, Lucía Fernanda',
@@ -286,13 +346,13 @@ export default function AlumnosScreen() {
         'FECHA DE NACIMIENTO': '2011-08-20',
         'SEXO': 'Femenino',
         'GRADO': '2°',
-        'SECCION': 'B',
+        'SECCI': 'B',
         'NOMBRES DE LA MADRE': 'LÓPEZ VEGA, Carmen Rosa',
         'DNI MADRE': '43456789',
-        'CELULAR MADRE': '965432109',
+        'CELULAR DE LA MADRE': '965432109',
         'NOMBRES DEL PADRE': 'GARCÍA PINTO, José Manuel',
         'DNI PADRE': '42345678',
-        'CELULAR PADRE': '954321098',
+        'CELULAR DEL PADRE': '954321098',
       },
     ];
     const ws = XLSX.utils.json_to_sheet(data);
@@ -371,7 +431,7 @@ export default function AlumnosScreen() {
                     <p className="text-white text-xl font-bold">Importación completada</p>
                     <div className="flex justify-center gap-8">
                       <div><div className="text-3xl font-black text-green-400">{importResult.ok}</div><div className="text-slate-400 text-sm">registrados</div></div>
-                      <div><div className="text-3xl font-black text-red-400">{importResult.err}</div><div className="text-slate-400 text-sm">errores</div></div>
+                      <div><div className="text-3xl font-black text-red-400">{importResult.err}</div><div className="text-slate-400 text-sm">errores (DNI duplicado)</div></div>
                     </div>
                     <button onClick={() => { setShowImport(false); setImportRows([]); setImportResult(null); }}
                       className="mt-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold">Cerrar</button>
@@ -417,84 +477,79 @@ export default function AlumnosScreen() {
         </AnimatePresence>
 
         {/* Formulario */}
-        <AnimatePresence>
-          {showForm && (
-            <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="bg-slate-800 border border-green-500/30 rounded-xl p-6 space-y-5">
-              <h2 className="text-lg font-bold text-white">{editando ? '✏️ Editar Alumno' : '➕ Nuevo Alumno'}</h2>
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Datos del alumno */}
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Datos del Alumno</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="sm:col-span-2 lg:col-span-2">
-                      <label className="block text-xs text-slate-400 mb-1">Apellidos y Nombres <span className="text-red-400">*</span></label>
-                      <input type="text" value={form.apellidos_nombres}
-                        onChange={e => setForm({ ...form, apellidos_nombres: e.target.value })}
-                        placeholder="MENDEZ FLORES, Carlos Alberto" className={inputCls} />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">DNI <span className="text-red-400">*</span></label>
-                      <input type="text" maxLength={8} value={form.dni}
-                        onChange={e => setForm({ ...form, dni: e.target.value.replace(/\D/g, '') })}
-                        placeholder="75123456" className={inputCls} />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Fecha de Nacimiento <span className="text-red-400">*</span></label>
-                      <input type="date" value={form.fecha_nacimiento}
-                        onChange={e => setForm({ ...form, fecha_nacimiento: e.target.value })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Edad</label>
-                      <input type="text" readOnly value={form.fecha_nacimiento ? calcularEdad(form.fecha_nacimiento) + ' años' : '—'}
-                        className={inputCls + ' opacity-60 cursor-not-allowed'} />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Sexo <span className="text-red-400">*</span></label>
-                      <select value={form.sexo} onChange={e => setForm({ ...form, sexo: e.target.value })} className={inputCls}>
-                        <option value="">Seleccionar...</option>
-                        {SEXOS.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Grado <span className="text-red-400">*</span></label>
-                      <select value={form.grado} onChange={e => setForm({ ...form, grado: e.target.value })} className={inputCls}>
-                        <option value="">Seleccionar...</option>
-                        {GRADOS.map(g => <option key={g} value={g}>{g}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Sección <span className="text-red-400">*</span></label>
-                      <select value={form.seccion} onChange={e => setForm({ ...form, seccion: e.target.value })} className={inputCls}>
-                        <option value="">Seleccionar...</option>
-                        {SECCIONES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
+        {showForm && (
+          <div className="bg-slate-800 border border-green-500/30 rounded-xl p-6 space-y-5">
+            <h2 className="text-lg font-bold text-white">{editando ? '✏️ Editar Alumno' : '➕ Nuevo Alumno'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Datos del Alumno</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2 lg:col-span-2">
+                    <label className="block text-xs text-slate-400 mb-1">Apellidos y Nombres <span className="text-red-400">*</span></label>
+                    <input type="text" value={form.apellidos_nombres}
+                      onChange={e => setForm({ ...form, apellidos_nombres: e.target.value })}
+                      placeholder="MENDEZ FLORES, Carlos Alberto" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">DNI <span className="text-red-400">*</span></label>
+                    <input type="text" maxLength={8} value={form.dni}
+                      onChange={e => setForm({ ...form, dni: e.target.value.replace(/\D/g, '') })}
+                      placeholder="75123456" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Fecha de Nacimiento <span className="text-red-400">*</span></label>
+                    <input type="date" value={form.fecha_nacimiento}
+                      onChange={e => setForm({ ...form, fecha_nacimiento: e.target.value })} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Edad</label>
+                    <input type="text" readOnly value={form.fecha_nacimiento ? calcularEdad(form.fecha_nacimiento) + ' años' : '—'}
+                      className={inputCls + ' opacity-60 cursor-not-allowed'} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Sexo <span className="text-red-400">*</span></label>
+                    <select value={form.sexo} onChange={e => setForm({ ...form, sexo: e.target.value })} className={inputCls}>
+                      <option value="">Seleccionar...</option>
+                      {SEXOS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Grado <span className="text-red-400">*</span></label>
+                    <select value={form.grado} onChange={e => setForm({ ...form, grado: e.target.value })} className={inputCls}>
+                      <option value="">Seleccionar...</option>
+                      {GRADOS.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Sección <span className="text-red-400">*</span></label>
+                    <select value={form.seccion} onChange={e => setForm({ ...form, seccion: e.target.value })} className={inputCls}>
+                      <option value="">Seleccionar...</option>
+                      {SECCIONES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
                   </div>
                 </div>
+              </div>
 
-                {/* Apoderados */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <ApoderadoForm label="👩 Datos de la Madre"
-                    data={form.madre || emptyApod}
-                    onChange={madre => setForm({ ...form, madre })} />
-                  <ApoderadoForm label="👨 Datos del Padre"
-                    data={form.padre || emptyApod}
-                    onChange={padre => setForm({ ...form, padre })} />
-                </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <ApoderadoForm label="👩 Datos de la Madre"
+                  data={form.madre || emptyApod}
+                  onChange={madre => setForm({ ...form, madre })} />
+                <ApoderadoForm label="👨 Datos del Padre"
+                  data={form.padre || emptyApod}
+                  onChange={padre => setForm({ ...form, padre })} />
+              </div>
 
-                <div className="flex gap-3 pt-2">
-                  <button type="submit" disabled={guardando}
-                    className="flex-1 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
-                    {guardando ? <><RefreshCw size={14} className="animate-spin" />Guardando...</> : `✓ ${editando ? 'Actualizar' : 'Registrar'} Alumno`}
-                  </button>
-                  <button type="button" onClick={() => { setShowForm(false); setEditando(null); }}
-                    className="px-6 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 text-sm">Cancelar</button>
-                </div>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={guardando}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
+                  {guardando ? <><RefreshCw size={14} className="animate-spin" />Guardando...</> : `✓ ${editando ? 'Actualizar' : 'Registrar'} Alumno`}
+                </button>
+                <button type="button" onClick={() => { setShowForm(false); setEditando(null); }}
+                  className="px-6 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 text-sm">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Filtros + Búsqueda */}
         <div className="flex gap-3 flex-wrap">
@@ -572,12 +627,11 @@ export default function AlumnosScreen() {
                   </div>
                 </div>
 
-                {/* Detalle expandido: apoderados */}
+                {/* Detalle expandido */}
                 <AnimatePresence>
                   {expandido === a.id && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                       className="border-t border-slate-700/50 px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      {/* Madre */}
                       <div className="space-y-1">
                         <p className="text-slate-500 font-medium uppercase tracking-wide">👩 Madre</p>
                         {a.madre_nombres ? (
@@ -592,7 +646,6 @@ export default function AlumnosScreen() {
                           </>
                         ) : <p className="text-slate-600">No registrada</p>}
                       </div>
-                      {/* Padre */}
                       <div className="space-y-1">
                         <p className="text-slate-500 font-medium uppercase tracking-wide">👨 Padre</p>
                         {a.padre_nombres ? (
@@ -607,7 +660,6 @@ export default function AlumnosScreen() {
                           </>
                         ) : <p className="text-slate-600">No registrado</p>}
                       </div>
-                      {/* Datos adicionales */}
                       <div className="sm:col-span-2 border-t border-slate-700/50 pt-3 grid grid-cols-3 gap-3">
                         <div><p className="text-slate-500">F. Nacimiento</p><p className="text-white">{a.fecha_nacimiento}</p></div>
                         <div><p className="text-slate-500">Edad</p><p className="text-white">{a.edad} años</p></div>
