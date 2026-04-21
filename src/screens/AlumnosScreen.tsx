@@ -104,13 +104,15 @@ export default function AlumnosScreen() {
   const [importResult, setImportResult] = useState<{ ok: number; err: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { cargar(); }, []);
+  const mostrar = (tipo: 'ok' | 'err', texto: string) => {
+    setMsg({ tipo, texto }); setTimeout(() => setMsg(null), 3500);
+  };
 
   const cargar = () => {
     setCargando(true);
     try {
       const data = lsCargar();
-      // normalizar: copiar campos planos desde madre/padre anidados si existen
+      // normalizar campos planos desde objetos madre/padre anidados
       const normalizado = data.map((a: any) => ({
         ...a,
         madre_nombres: a.madre_nombres || a.madre?.apellidos_nombres || '',
@@ -125,9 +127,7 @@ export default function AlumnosScreen() {
     finally { setCargando(false); }
   };
 
-  const mostrar = (tipo: 'ok' | 'err', texto: string) => {
-    setMsg({ tipo, texto }); setTimeout(() => setMsg(null), 3500);
-  };
+  useEffect(() => { cargar(); }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

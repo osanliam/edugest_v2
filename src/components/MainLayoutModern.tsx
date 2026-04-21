@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Menu, X, LogOut, Moon, Sun, Bell, User, BarChart3, Users,
   BookOpen, MessageSquare, Home, Settings, Building2, Users2,
-  Flame, Clock, CheckSquare, BookMarked, Shield, ChevronDown
+  Flame, Clock, CheckSquare, BookMarked, Shield, ChevronDown, GraduationCap, Cog
 } from 'lucide-react';
 import { User as UserType } from '../types';
 
@@ -19,6 +19,7 @@ const allNavigationItems = [
   // SISTEMA (Solo Admin)
   { id: 'panel-admin', label: 'Panel Admin', icon: <Shield className="w-5 h-5" />, roles: ['admin'], category: 'Sistema' },
   { id: 'gestionar-usuarios', label: 'Gestionar Usuarios', icon: <Users className="w-5 h-5" />, roles: ['admin'], category: 'Sistema' },
+  { id: 'configuracion', label: 'Configuración', icon: <Cog className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector'], category: 'Sistema' },
 
   // NAVEGACIÓN GENERAL (Todos)
   { id: 'inicio', label: 'Inicio', icon: <Home className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector', 'teacher', 'student', 'parent'], category: 'Principal' },
@@ -35,6 +36,7 @@ const allNavigationItems = [
 
   // ACADÉMICO
   { id: 'dashboard-estudiante', label: 'Mi Desempeño', icon: <Flame className="w-5 h-5" />, roles: ['student', 'parent'], category: 'Académico' },
+  { id: 'calificativos', label: 'Calificativos', icon: <GraduationCap className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector', 'teacher'], category: 'Académico' },
   { id: 'calificaciones', label: 'Calificaciones', icon: <BookMarked className="w-5 h-5" />, roles: ['teacher', 'student'], category: 'Académico' },
   { id: 'horario', label: 'Horario', icon: <Clock className="w-5 h-5" />, roles: ['teacher', 'student'], category: 'Académico' },
   { id: 'asistencia', label: 'Asistencia', icon: <CheckSquare className="w-5 h-5" />, roles: ['teacher', 'student'], category: 'Académico' },
