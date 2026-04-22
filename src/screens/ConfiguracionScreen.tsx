@@ -177,8 +177,19 @@ function InstrumentosSection() {
   };
 
   const TIPOS = [
-    { v: 'instrumento', l: 'Instrumento de evaluación' },
     { v: 'examen', l: 'Examen' },
+    { v: 'lista-cotejo', l: 'Lista de Cotejo' },
+    { v: 'ficha-observacion', l: 'Ficha de Observación' },
+    { v: 'rubrica', l: 'Rúbrica' },
+    { v: 'portafolio-evidencias', l: 'Portafolio de Evidencias' },
+    { v: 'registro-anecdotico', l: 'Registro Anecdótico' },
+    { v: 'escala-valoracion', l: 'Escala de Valoración' },
+  ];
+  const COLUMNAS = [
+    { v: '2', l: '2 columnas' },
+    { v: '3', l: '3 columnas' },
+    { v: '4', l: '4 columnas' },
+    { v: '5', l: '5 columnas' },
   ];
   const CAL = [
     { v: 'ABC', l: 'C / B / A (sin AD manual)' },

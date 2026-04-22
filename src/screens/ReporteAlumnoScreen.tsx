@@ -52,9 +52,14 @@ const CAL_LABEL: Record<string, string> = {
   C: 'En Inicio', B: 'En Proceso', A: 'Logro Esperado', AD: 'Logro Destacado',
 };
 
+const GRADOS = ['1', '2', '3', '4', '5', '6'];
+const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
 export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [busqueda, setBusqueda] = useState('');
+  const [gradoFiltro, setGradoFiltro] = useState('todos');
+  const [seccionFiltro, setSeccionFiltro] = useState('todas');
   const [alumnoSelec, setAlumnoSelec] = useState<Alumno | null>(null);
   const [calificaciones, setCalificaciones] = useState<any[]>([]);
   const [asistencia, setAsistencia] = useState<any[]>([]);
@@ -67,16 +72,21 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
     setColumnas(lsGet<any[]>('cal_columnas', []));
   }, []);
 
-  const buscarAlumno = () => {
-    if (!busqueda.trim()) return [];
-    const b = busqueda.toLowerCase();
-    return alumnos.filter(a => 
-      (a.apellidos_nombres || a.nombre || '').toLowerCase().includes(b) ||
-      (a.dni || '').includes(b)
-    ).slice(0, 5);
+  const filtrarAlumnos = () => {
+    let result = [...alumnos];
+    if (gradoFiltro !== 'todos') result = result.filter(a => a.grado === gradoFiltro);
+    if (seccionFiltro !== 'todas') result = result.filter(a => a.seccion === seccionFiltro);
+    if (busqueda.trim()) {
+      const b = busqueda.toLowerCase();
+      result = result.filter(a => 
+        (a.apellidos_nombres || a.nombre || '').toLowerCase().includes(b) ||
+        (a.dni || '').includes(b)
+      );
+    }
+    return result.slice(0, 10);
   };
 
-  const resultados = buscarAlumno();
+  const resultados = filtrarAlumnos();
 
   const getCalPorAlumno = (alumnoId: string) => {
     return calificaciones.filter(c => c.alumnoId === alumnoId);
@@ -139,7 +149,7 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
         </div>
       </motion.div>
 
-      {/* Buscador */}
+      {/* Filtros */}
       {!alumnoSelec && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -150,13 +160,32 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
             <Search className="w-5 h-5 text-purple-400" />
             <h2 className="text-white font-bold">Buscar Alumno</h2>
           </div>
-          <input
-            type="text"
-            placeholder="Ingrese nombre o DNI del alumno..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-          />
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <select
+              value={gradoFiltro}
+              onChange={(e) => setGradoFiltro(e.target.value)}
+              className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
+            >
+              <option value="todos">Todos los grados</option>
+              {GRADOS.map(g => <option key={g} value={g}>{g}º Grado</option>)}
+            </select>
+            <select
+              value={seccionFiltro}
+              onChange={(e) => setSeccionFiltro(e.target.value)}
+              className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
+            >
+              <option value="todas">Todas las secciones</option>
+              {SECCIONES.map(s => <option key={s} value={s}>Sección {s}</option>)}
+            </select>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o DNI..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-500"
+            />
+          </div>
           
           {resultados.length > 0 && (
             <div className="mt-4 space-y-2">
