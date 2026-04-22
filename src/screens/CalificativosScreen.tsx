@@ -398,88 +398,153 @@ function PopupInstrumento({ alumno, columna, calActual, onGuardar, onCerrar }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pop-up RÚBRICA  — puede llegar a AD manual
+// Pop-up RÚBRICA con estructura C/B/A/AD
 // ─────────────────────────────────────────────────────────────────────────────
-function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
-  alumno: Alumno; columna: Columna; calActual?: Calificativo;
-  onGuardar: (c: Calificativo) => void; onCerrar: () => void;
-}) {
-  const [marcados, setMarcados] = useState<boolean[]>(() =>
-    calActual?.marcados ?? Array(columna.totalItems).fill(false)
-  );
-  const [esAD, setEsAD] = useState(calActual?.esAD ?? false);
+interface ItemRubrica {
+  criterio: string;
+  respuestas: string[];
+}
 
-  const toggle = (i: number) => { const n = [...marcados]; n[i] = !n[i]; setMarcados(n); if (esAD) setEsAD(false); };
-  const ok  = marcados.filter(Boolean).length;
-  const pct = columna.totalItems > 0 ? Math.round(ok / columna.totalItems * 100) : 0;
-  const calAuto  = calcularEscala('rubrica', pct);
-  // AD: solo si esAD y calAuto === 'A' (todos logrados = 100%)
+function PopupRubrica({ aluno, coluna, calAtual, onSalvar, onFechar }: {
+  aluno: Alumno; coluna: Columna; calAtual?: Calificativo;
+  onSalvar: (c: Calificativo) => void; onFechar: () => void;
+}) {
+  const inicialItems = (): ItemRubrica[] => {
+    if (calAtual?.items?.length) return calAtual.items;
+    return Array(coluna.totalItems).fill(null).map((_, i) => ({
+      criterio: `Criterio ${i + 1}`,
+      respuestas: ['', '', '', '']
+    }));
+  };
+  
+  const [items, setItems] = useState<ItemRubrica[]>(inicialItems);
+  const [esAD, setEsAD] = useState(calAtual?.esAD ?? false);
+  const colsLabel = ['C', 'B', 'A', 'AD'];
+
+  const marcar = (i: number, colIdx: number, valor: string) => {
+    const n = [...items];
+    n[i].respuestas[colIdx] = n[i].respuestas[colIdx] === valor ? '' : valor;
+    setItems(n);
+  };
+
+  const calcularCal = (): 'C' | 'B' | 'A' | 'AD' => {
+    let suma = 0, count = 0;
+    items.forEach(item => {
+      const adIdx = item.respuestas.indexOf('AD');
+      const aIdx = item.respuestas.indexOf('A');
+      const bIdx = item.respuestas.indexOf('B');
+      const cIdx = item.respuestas.indexOf('C');
+      if (adIdx >= 0) { suma += 4; count++; }
+      else if (aIdx >= 0) { suma += 3; count++; }
+      else if (bIdx >= 0) { suma += 2; count++; }
+      else if (cIdx >= 0) { suma += 1; count++; }
+    });
+    if (count === 0) return 'C';
+    const prom = Math.round(suma / count);
+    const labels: Record<number, string> = { 1: 'C', 2: 'B', 3: 'A', 4: 'AD' };
+    return labels[Math.min(4, Math.max(1, prom))] as 'C' | 'B' | 'A' | 'AD';
+  };
+  
+  const calAuto = calcularCal();
   const calFinal: 'C'|'B'|'A'|'AD' = esAD && calAuto === 'A' ? 'AD' : calAuto;
-  const nomAlumno = alumno.apellidos_nombres || alumno.nombre || '—';
+  const nomAlumno = aluno.apellidos_nombres || aluno.nombre || '—';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-slate-800 border border-purple-500/30 rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onFechar}>
+      <div className="bg-slate-800 border border-purple-500/30 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 
-        {/* Header con datos del alumno SIEMPRE visibles */}
-        <div className="px-6 py-4 border-b border-slate-700 bg-slate-700/40 rounded-t-2xl">
+        <div className="px-6 py-4 border-b border-slate-700 bg-slate-700/40 rounded-t-2xl sticky top-0 z-10">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-white font-black text-base">{nomAlumno}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
+              <p className="text-slate-400 text-xs mt-0.5">{(aluno as any).grado}° "{(aluno as any).seccion}"</p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="px-2 py-1 bg-purple-500/20 border border-purple-500/40 text-purple-300 rounded-lg text-xs font-bold">📐 {columna.nombre}</span>
-                <span className="text-xs text-slate-500">Rúbrica · {columna.totalItems} criterios</span>
-                <span className="text-xs text-blue-400 font-semibold">Puede llegar a AD ⭐</span>
+                <span className="px-2 py-1 bg-purple-500/20 border border-purple-500/40 text-purple-300 rounded-lg text-xs font-bold">📐 {coluna.nombre}</span>
+                <span className="text-xs text-slate-500">Rúbrica · {items.length} criterios</span>
+                {calAuto === 'A' && <span className="text-xs text-blue-400 font-semibold">⭐ Puede AD</span>}
               </div>
             </div>
-            <button onClick={onCerrar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 flex-shrink-0"><X size={18}/></button>
+            <button onClick={onFechar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 flex-shrink-0"><X size={18}/></button>
           </div>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
-          <div className="flex items-center gap-3 text-xs text-slate-400">
-            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-green-500 inline-block"></span>Logrado</span>
-            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-slate-600 inline-block"></span>No logrado</span>
-            <span className="ml-auto font-semibold text-white">{ok}/{columna.totalItems} = {pct}%</span>
+        <div className="px-6 py-4 space-y-3">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-600">
+                  <th className="text-left py-2 px-2 text-slate-400">#</th>
+                  <th className="text-left py-2 px-2 text-slate-400 min-w-[200px]">Criterio</th>
+                  <th className="text-center py-2 px-2 text-red-400">C (Inicio)</th>
+                  <th className="text-center py-2 px-2 text-yellow-400">B (Proceso)</th>
+                  <th className="text-center py-2 px-2 text-green-400">A (Logro)</th>
+                  <th className="text-center py-2 px-2 text-blue-400">AD (Destacado)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, i) => (
+                  <tr key={i} className="border-b border-slate-700/40">
+                    <td className="py-2 px-2 text-slate-500">{i + 1}</td>
+                    <td className="py-2 px-2">
+                      <input 
+                        type="text" 
+                        value={item.criterio}
+                        onChange={(e) => {
+                          const n = [...items];
+                          n[i].criterio = e.target.value;
+                          setItems(n);
+                        }}
+                        className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs"
+                      />
+                    </td>
+                    {item.respuestas.map((resp, j) => (
+                      <td key={j} className="text-center py-2 px-1">
+                        <button
+                          onClick={() => marcar(i, j, colsLabel[j])}
+                          className={`w-10 h-8 rounded font-bold text-xs transition-all ${
+                            resp === colsLabel[j] 
+                              ? CAL_BG[colsLabel[j]].replace('25', '50').replace('text-', 'text-white bg-')
+                              : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'
+                          }`}
+                        >
+                          {colsLabel[j]}
+                        </button>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))' }}>
-            {marcados.map((m, i) => (
-              <button key={i} onClick={() => toggle(i)}
-                className={`h-12 rounded-xl font-bold text-sm transition-all border-2 ${m ? 'bg-green-500 border-green-400 text-white shadow-lg shadow-green-500/20' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'}`}>
-                {i + 1}
-              </button>
-            ))}
-          </div>
+          
+          <button 
+            onClick={() => setItems([...items, { criterio: `Criterio ${items.length + 1}`, respuestas: ['', '', '', ''] }])}
+            className="text-xs text-purple-400 hover:underline"
+          >
+            + Agregar criterio
+          </button>
+        </div>
 
-          <div className="flex items-center gap-4 bg-slate-700/50 rounded-xl p-4">
-            <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[calFinal]}`}>{calFinal}</div>
-            <div className="flex-1">
-              <p className="text-white font-bold">{CAL_LABEL[calFinal]}</p>
-              <p className="text-slate-400 text-xs mt-0.5">100%=A · 99–55%=B · ≤54%=C</p>
-            </div>
-            {/* AD: solo disponible si todos los criterios están logrados (100%) */}
-            {calAuto === 'A' && (
-              <button onClick={() => setEsAD(v => !v)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${esAD ? 'bg-blue-500/30 border-blue-400 text-blue-200 shadow shadow-blue-500/20' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-blue-500 hover:text-blue-400'}`}>
-                ⭐ AD<br/><span className="text-xs font-normal opacity-70">Sobrepasa</span>
-              </button>
-            )}
+        <div className="px-6 py-4 border-t border-slate-700 flex items-center gap-4 bg-slate-700/50 sticky bottom-0">
+          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[calFinal]}`}>{calFinal}</div>
+          <div className="flex-1">
+            <p className="text-white font-bold">{CAL_LABEL[calFinal]}</p>
+            <p className="text-slate-400 text-xs mt-0.5">Promedio automático</p>
           </div>
-
           {calAuto === 'A' && (
-            <p className="text-xs text-blue-400/70 text-center">
-              ⭐ El alumno logró todos los criterios. Presiona "AD" si considera que sobrepasa el logro esperado.
-            </p>
+            <button onClick={() => setEsAD(v => !v)}
+              className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${esAD ? 'bg-blue-500/30 border-blue-400 text-blue-200' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-blue-500'}`}>
+              ⭐ AD
+            </button>
           )}
         </div>
 
         <div className="px-6 py-4 border-t border-slate-700 flex gap-3">
-          <button onClick={() => onGuardar({ alumnoId: (alumno as any).id, columnaId: columna.id, marcados, calificativo: calFinal, esAD, fecha: new Date().toISOString().split('T')[0] })}
+          <button onClick={() => onSalvar({ alunoId: (aluno as any).id, colunaId: coluna.id, marcados: items.map(i => i.respuestas), calificativo: calFinal, esAD, fecha: new Date().toISOString().split('T')[0] })}
             className="flex-1 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
             <Save size={15}/> Guardar
           </button>
-          <button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
+          <button onClick={onFechar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
         </div>
       </div>
     </div>
