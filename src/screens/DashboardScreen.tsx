@@ -100,17 +100,6 @@ export default function DashboardScreen({ user }: DashboardScreenProps) {
         </div>
       </motion.div>
 
-      {/* Error Message */}
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-200 text-sm"
-        >
-          ⚠️ {error}
-        </motion.div>
-      )}
-
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
