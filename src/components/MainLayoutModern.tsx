@@ -36,7 +36,6 @@ const allNavigationItems = [
 
   // ACADÉMICO
   { id: 'calificativos',      label: 'Calificativos', icon: <GraduationCap className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector', 'teacher'], category: 'Académico' },
-  { id: 'calificaciones',     label: 'Calificaciones',icon: <BookMarked className="w-5 h-5" />,    roles: ['teacher', 'student'],                         category: 'Académico' },
   { id: 'horario',            label: 'Horario',       icon: <Clock className="w-5 h-5" />,         roles: ['teacher', 'student'],                         category: 'Académico' },
   { id: 'asistencia',         label: 'Asistencia',    icon: <CheckSquare className="w-5 h-5" />,   roles: ['teacher', 'student'],                         category: 'Académico' },
   { id: 'dashboard-estudiante',label: 'Mi Desempeño', icon: <Flame className="w-5 h-5" />,        roles: ['student', 'parent'],                          category: 'Académico' },

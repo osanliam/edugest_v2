@@ -127,11 +127,11 @@ export default function App() {
       ],
       teacher: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
-        'calificaciones', 'horario', 'asistencia', 'calificativos'
+        'calificativos', 'horario', 'asistencia'
       ],
       student: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
-        'dashboard-estudiante', 'calificaciones', 'horario', 'asistencia',
+        'dashboard-estudiante', 'horario', 'asistencia',
         'normas-convivencia'
       ],
       parent: [

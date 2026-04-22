@@ -76,7 +76,7 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
   const resultados = buscarAlumno();
 
   const getCalPorAlumno = (alumnoId: string) => {
-    return calificaciones.filter(c => c.alumnoId === alumnusId);
+    return calificaciones.filter(c => c.alumnoId === alumnoId);
   };
 
   const getPromedioCompetencia = (alumnoId: string, compId: string) => {

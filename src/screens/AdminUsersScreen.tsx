@@ -465,10 +465,6 @@ export default function AdminUsersScreen() {
               <Upload size={14} /> Importar
               <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleArchivo} />
             </label>
-            <button onClick={() => { setEditando(null); setFormData({ nombre:'', email:'', contraseña:'', rol:'teacher' }); setError(''); setShowForm(!showForm); }}
-              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold rounded-lg text-sm hover:opacity-90">
-              <Plus size={16} /> Nuevo Usuario
-            </button>
           </div>
         </div>
       </div>

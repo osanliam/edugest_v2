@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
-import { Users, TrendingUp, AlertCircle, BarChart3, Clock, CheckCircle, XCircle, PieChart } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, TrendingUp, AlertCircle, BarChart3, Clock, CheckCircle, XCircle, PieChart, BookOpen, GraduationCap } from 'lucide-react';
 import FuturisticCard from '../components/FuturisticCard';
 import HologramText from '../components/HologramText';
 import DataGrid from '../components/DataGrid';
@@ -17,26 +18,70 @@ interface DirectorDashboardModernProps {
   user?: User;
 }
 
+const LS_ALUMNOS = 'ie_alumnos';
+const LS_DOCENTES = 'ie_docentes';
+const LS_CALIFICATIVOS = 'ie_calificativos_v2';
+const LS_ASISTENCIA = 'ie_asistencia';
+
+function lsGet<T>(key: string, def: T): T {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch { return def; }
+}
+
 export default function DirectorDashboardModern({ user }: DirectorDashboardModernProps) {
+  const [stats, setStats] = useState({
+    estudiantes: 0,
+    docentes: 0,
+    asistencia: 0,
+    calificaciones: 0,
+    grados: [] as string[],
+    secciones: [] as string[],
+  });
+
+  useEffect(() => {
+    const loadData = () => {
+      const alumnos = lsGet<any[]>(LS_ALUMNOS, []);
+      const docentes = lsGet<any[]>(LS_DOCENTES, []);
+      const calificaciones = lsGet<any[]>(LS_CALIFICATIVOS, []);
+      const asistencia = lsGet<any[]>(LS_ASISTENCIA, []);
+
+      const uniqueGrados = [...new Set(alumnos.map(a => a.grado).filter(Boolean))];
+      const uniqueSecciones = [...new Set(alumnos.map(a => a.seccion).filter(Boolean))];
+
+      const fechaHoy = new Date().toISOString().split('T')[0];
+      const asistenciaHoy = asistencia.filter(a => a.fecha === fechaHoy);
+      const presentes = asistenciaHoy.filter(a => a.estado === 'presente').length;
+      const asistenciaPct = asistenciaHoy.length > 0 ? Math.round((presentes / asistenciaHoy.length) * 100) : 0;
+
+      setStats({
+        estudiantes: alumnos.length,
+        docentes: docentes.length,
+        asistencia: asistenciaPct,
+        calificaciones: calificaciones.length,
+        grados: uniqueGrados,
+        secciones: uniqueSecciones,
+      });
+    };
+    loadData();
+  }, []);
+
   const performanceData = [
-    { month: 'Enero', attendance: 94, performance: 82 },
-    { month: 'Febrero', attendance: 96, performance: 85 },
-    { month: 'Marzo', attendance: 93, performance: 80 },
-    { month: 'Abril', attendance: 97, performance: 88 },
+    { month: 'C1', asistencia: stats.asistencia || 85, rendimiento: 80 },
+    { month: 'C2', asistencia: (stats.asistencia || 85) - 2, rendimiento: 82 },
+    { month: 'C3', asistencia: (stats.asistencia || 85) + 3, rendimiento: 78 },
+    { month: 'C4', asistencia: (stats.asistencia || 85), rendimiento: 85 },
   ];
 
   const departmentData = [
-    { name: 'Matemáticas', value: 28, fill: '#00d9ff' },
-    { name: 'Lenguaje', value: 24, fill: '#d946ef' },
-    { name: 'Ciencias', value: 22, fill: '#84cc16' },
-    { name: 'Historia', value: 18, fill: '#0ea5e9' },
+    { name: 'C1', value: Math.round(stats.calificaciones * 0.3) || 10, fill: '#00d9ff' },
+    { name: 'C2', value: Math.round(stats.calificaciones * 0.3) || 10, fill: '#d946ef' },
+    { name: 'C3', value: Math.round(stats.calificaciones * 0.4) || 15, fill: '#84cc16' },
   ];
 
   const staffStats = [
-    { label: 'Docentes Activos', value: '24', color: 'cyan' },
-    { label: 'Administrativos', value: '8', color: 'magenta' },
-    { label: 'Estudiantes Matriculados', value: '456', color: 'lime' },
-    { label: 'Tasa de Asistencia', value: '96.2%', color: 'blue' },
+    { label: 'Docentes', value: stats.docentes.toString(), color: 'cyan' },
+    { label: 'Estudiantes', value: stats.estudiantes.toString(), color: 'lime' },
+    { label: 'Asistencia Hoy', value: `${stats.asistencia}%`, color: 'blue' },
+    { label: 'Grados', value: stats.grados.length.toString(), color: 'magenta' },
   ];
 
   return (

@@ -1,17 +1,63 @@
 import { motion } from 'motion/react';
-import { Users, CheckCircle, AlertTriangle, TrendingUp, Calendar, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, CheckCircle, AlertTriangle, TrendingUp, Calendar, Clock, BookOpen } from 'lucide-react';
 import { User } from '../types';
 
 interface SubdirectorDashboardProps {
   user: User;
 }
 
+const LS_ALUMNOS = 'ie_alumnos';
+const LS_DOCENTES = 'ie_docentes';
+const LS_CALIFICATIVOS = 'ie_calificativos_v2';
+const LS_ASISTENCIA = 'ie_asistencia';
+
+function lsGet<T>(key: string, def: T): T {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch { return def; }
+}
+
 export default function SubdirectorDashboard({ user }: SubdirectorDashboardProps) {
-  const stats = [
-    { label: 'Estudiantes Activos', value: 250, icon: Users, color: 'neon-cyan' },
-    { label: 'Clases Hoy', value: 24, icon: Calendar, color: 'neon-magenta' },
-    { label: 'Asistencia Promedio', value: '94%', icon: CheckCircle, color: 'neon-lime' },
-    { label: 'Incidentes', value: 2, icon: AlertTriangle, color: 'neon-blue' },
+  const [stats, setStats] = useState({
+    estudiantes: 0,
+    docentes: 0,
+    asistencia: 0,
+    calificaciones: 0,
+    grados: [] as string[],
+    secciones: [] as string[],
+  });
+
+  useEffect(() => {
+    const loadData = () => {
+      const alumnos = lsGet<any[]>(LS_ALUMNOS, []);
+      const docentes = lsGet<any[]>(LS_DOCENTES, []);
+      const calificaciones = lsGet<any[]>(LS_CALIFICATIVOS, []);
+      const asistencia = lsGet<any[]>(LS_ASISTENCIA, []);
+
+      const uniqueGrados = [...new Set(alumnos.map(a => a.grado).filter(Boolean))];
+      const uniqueSecciones = [...new Set(alumnos.map(a => a.seccion).filter(Boolean))];
+
+      const fechaHoy = new Date().toISOString().split('T')[0];
+      const asistenciaHoy = asistencia.filter(a => a.fecha === fechaHoy);
+      const presentes = asistenciaHoy.filter(a => a.estado === 'presente').length;
+      const asistenciaPct = asistenciaHoy.length > 0 ? Math.round((presentes / asistenciaHoy.length) * 100) : 0;
+
+      setStats({
+        estudiantes: alumnos.length,
+        docentes: docentes.length,
+        asistencia: asistenciaPct,
+        calificaciones: calificaciones.length,
+        grados: uniqueGrados,
+        secciones: uniqueSecciones,
+      });
+    };
+    loadData();
+  }, []);
+
+  const statsCards = [
+    { label: 'Estudiantes', value: stats.estudiantes.toString(), icon: Users, color: 'neon-cyan' },
+    { label: 'Docentes', value: stats.docentes.toString(), icon: BookOpen, color: 'neon-magenta' },
+    { label: 'Asistencia Hoy', value: `${stats.asistencia}%`, icon: CheckCircle, color: 'neon-lime' },
+    { label: 'Secciones', value: stats.secciones.length.toString(), icon: Calendar, color: 'neon-blue' },
   ];
 
   return (
@@ -33,7 +79,7 @@ export default function SubdirectorDashboard({ user }: SubdirectorDashboardProps
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
+        {statsCards.map((stat, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 20 }}
