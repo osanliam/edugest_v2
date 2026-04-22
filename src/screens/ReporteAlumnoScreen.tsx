@@ -38,6 +38,9 @@ function lsGet<T>(key: string, def: T): T {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch { return def; }
 }
 
+const VALORES: Record<string, number> = { C: 1, B: 2, A: 3, AD: 4 };
+const CAL_LABELS: string[] = ['', 'C', 'B', 'A', 'AD'];
+
 const CAL_BG: Record<string, string> = {
   C: 'bg-red-500/25 text-red-300 border-red-500/50',
   B: 'bg-yellow-500/25 text-yellow-200 border-yellow-500/50',
@@ -217,7 +220,7 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
               </div>
               <p className="text-3xl font-bold text-white">
                 {stats.promedioC1 && stats.promedioC2 && stats.promedioC3 
-                  ? (['C','B','A','AD'].indexOf(stats.promedioC1) + ['C','B','A','AD'].indexOf(stats.promedioC2) + ['C','B','A','AD'].indexOf(stats.promedioC3)) / 3
+                  ? CAL_LABELS[Math.round((VALORES[stats.promedioC1] + VALORES[stats.promedioC2] + VALORES[stats.promedioC3]) / 3)]
                   : '—'}
               </p>
             </div>
