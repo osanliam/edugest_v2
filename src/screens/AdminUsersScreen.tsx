@@ -423,6 +423,47 @@ export default function AdminUsersScreen() {
     input.click();
   };
 
+  // Importar SOLO calificaciones nuevas (sin sobreescribir)
+  const importarSoloNotas = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          const datos = JSON.parse(ev.target?.result as string);
+          if (!datos.calificativos) {
+            alert('El archivo no contiene calificaciones'); return;
+          }
+          
+          // Leer calificaciones actuales
+          const califActuales = lsGet<any[]>('ie_calificativos_v2', []);
+          const nuevasCalif = JSON.parse(datos.calificativos);
+          
+          // Fusionar: agregar solo las que no existen
+          const actualesIds = new Set(califActuales.map(c => `${c.alumnoId}-${c.columnaId}-${c.fecha}`));
+          let agregadas = 0;
+          
+          nuevasCalif.forEach((cal: any) => {
+            const key = `${cal.alumnoId}-${cal.columnaId}-${cal.fecha}`;
+            if (!actualesIds.has(key)) {
+              califActuales.push(cal);
+              agregadas++;
+            }
+          });
+          
+          localStorage.setItem('ie_calificativos_v2', JSON.stringify(califActuales));
+          alert(`✅ Se agregaron ${agregadas} calificaciones nuevas\n📊 Total now: ${califActuales.length}`);
+        } catch { alert('Error al importar notas'); }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
   // Detectar si docente ya tiene usuario
   const usuariosMap = new Map(usuarios.map(u => [u.docenteId, u]));
 
@@ -453,7 +494,10 @@ export default function AdminUsersScreen() {
               <Download size={16} /> Respaldo
             </button>
             <button onClick={importarDatosCompletos} className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm">
-              <Upload size={16} /> Restaurar</button>
+              <Upload size={16} /> Restaurar
+            </button>
+            <button onClick={importarSoloNotas} className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-sm">
+              <Upload size={16} /> Solo Notas</button>
             <button onClick={descargarPlantilla} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
               <Upload size={16} /> Plantilla
             </button>
