@@ -31,7 +31,7 @@ interface RegistroAsistencia {
 }
 
 const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-const GRADOS = ['1', '2', '3', '4', '5', '6'];
+const GRADOS = ['1', '2', '3', '4', '5'];
 const LS_ASISTENCIA = 'ie_asistencia';
 
 function lsGet<T>(key: string, def: T): T {

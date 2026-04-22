@@ -52,7 +52,7 @@ const CAL_LABEL: Record<string, string> = {
   C: 'En Inicio', B: 'En Proceso', A: 'Logro Esperado', AD: 'Logro Destacado',
 };
 
-const GRADOS = ['1', '2', '3', '4', '5', '6'];
+const GRADOS = ['1', '2', '3', '4', '5'];
 const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {

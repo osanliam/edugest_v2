@@ -13,9 +13,11 @@ interface Bimestre {
 interface Instrumento {
   id: string;
   nombre: string;
-  tipo: 'instrumento' | 'examen';
+  tipo: 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica' | 'portafolio-evidencias' | 'registro-anecdotico' | 'escala-valoracion';
   calificativo: 'ABC' | 'AD_A_B_C';
   descripcion: string;
+  columnas?: number;
+  filas?: number;
 }
 
 interface Unidad {
@@ -200,7 +202,7 @@ function InstrumentosSection() {
     <div className={sectionCls}>
       <div className="flex items-center justify-between">
         <h2 className="text-white font-bold text-base flex items-center gap-2">📋 Instrumentos de Evaluación</h2>
-        <button onClick={() => setForm({ id:'', nombre:'', tipo:'instrumento', calificativo:'AD_A_B_C', descripcion:'' })}
+        <button onClick={() => setForm({ id:'', nombre:'', tipo:'examen', calificativo:'ABC', descripcion:'', columnas: 2, filas: 5 })}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold">
           <Plus size={13} /> Agregar
         </button>
@@ -225,6 +227,18 @@ function InstrumentosSection() {
               <label className="block text-xs text-slate-400 mb-1">Escala de calificativos</label>
               <select value={form.calificativo} onChange={e => setForm({...form, calificativo: e.target.value as any})} className={inputCls}>
                 {CAL.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Filas (indicadores)</label>
+              <select value={form.filas?.toString() || '5'} onChange={(e) => setForm({...form, filas: parseInt(e.target.value) })} className={inputCls}>
+                {COLUMNAS.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Columnas (opciones)</label>
+              <select value={form.columnas?.toString() || '2'} onChange={(e) => setForm({...form, columnas: parseInt(e.target.value) })} className={inputCls}>
+                {COLUMNAS.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
               </select>
             </div>
             <div className="sm:col-span-2">
