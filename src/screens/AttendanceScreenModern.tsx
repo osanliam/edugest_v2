@@ -5,6 +5,7 @@ import FuturisticCard from '../components/FuturisticCard';
 import HologramText from '../components/HologramText';
 import DataGrid from '../components/DataGrid';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { syncToTurso } from '../services/dataService';
 
 interface User {
   id: string;
@@ -71,7 +72,7 @@ export default function AttendanceScreenModern({ user }: AttendanceScreenModernP
     return reg?.estado || null;
   };
 
-  const marcarAsistencia = (alumnoId: string, estado: 'presente' | 'ausente' | 'tardanza') => {
+const marcarAsistencia = (alumnoId: string, estado: 'presente' | 'ausente' | 'tardanza') => {
     const newAsistencia = asistencia.filter(r => !(r.alumnoId === alumnoId && r.fecha === fechaActual));
     const nuevoRegistro: RegistroAsistencia = {
       id: `as-${Date.now()}-${alumnoId}`,
@@ -83,6 +84,7 @@ export default function AttendanceScreenModern({ user }: AttendanceScreenModernP
     const updated = [...newAsistencia, nuevoRegistro];
     setAsistencia(updated);
     lsSet(LS_ASISTENCIA, updated);
+    syncToTurso('asistencia', updated);
   };
 
   const stats = (() => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search } from 'lucide-react';
+import { syncToTurso } from '../services/dataService';
 
 // ── Competencias ──────────────────────────────────────────────────────────────
 const COMPETENCIAS = [
@@ -788,6 +789,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     const idx = todos.findIndex(c => c.alumnoId === cal.alumnoId && c.columnaId === cal.columnaId);
     if (idx >= 0) todos[idx] = cal; else todos.push(cal);
     lsSet(LS_CALS, todos);
+    syncToTurso('calificativos', todos);
     recargar();
     setPopup(null);
   };
@@ -797,6 +799,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     const idx = todas.findIndex(c => c.id === col.id);
     if (idx >= 0) todas[idx] = col; else todas.push(col);
     lsSet(LS_COLUMNAS, todas);
+    syncToTurso('columnas', todas);
     setColumnas(todas);
     setModalColumna(null);
   };
@@ -805,9 +808,11 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     if (!confirm('¿Eliminar esta columna y todos sus calificativos?')) return;
     const todas = columnas.filter(c => c.id !== id);
     lsSet(LS_COLUMNAS, todas);
+    syncToTurso('columnas', todas);
     setColumnas(todas);
     const cals = calificativos.filter(c => c.columnaId !== id);
     lsSet(LS_CALS, cals);
+    syncToTurso('calificativos', cals);
     setCalificativos(cals);
   };
 
