@@ -9,14 +9,17 @@ const COMPETENCIAS = [
 ];
 
 // ── Tipos de instrumento ──────────────────────────────────────────────────────
-type TipoInstrumento = 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica';
+type TipoInstrumento = 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica' | 'portafolio-evidencias' | 'registro-anecdotico' | 'escala-valoracion';
 
 const TIPO_CONFIG: Record<string, { label: string; icono: string; puedeAD: boolean }> = {
-  'examen':            { label: 'Examen',              icono: '📝', puedeAD: false },
-  'lista-cotejo':      { label: 'Lista de Cotejo',     icono: '☑️', puedeAD: false },
-  'ficha-observacion': { label: 'Ficha de Observación',icono: '🔍', puedeAD: false },
-  'rubrica':           { label: 'Rúbrica',              icono: '📐', puedeAD: true  },
-  'desconocido':       { label: 'Desconocido',         icono: '❓', puedeAD: false },
+  'examen':                 { label: 'Examen',                 icono: '📝', puedeAD: false },
+  'lista-cotejo':           { label: 'Lista de Cotejo',          icono: '☑️', puedeAD: false },
+  'ficha-observacion':      { label: 'Ficha de Observación',     icono: '🔍', puedeAD: false },
+  'rubrica':               { label: 'Rúbrica',               icono: '📐', puedeAD: true  },
+  'portafolio-evidencias':  { label: 'Portafolio Evidencias', icono: '📁', puedeAD: false },
+  'registro-anecdotico':   { label: 'Registro Anecdótico',  icono: '📋', puedeAD: false },
+  'escala-valoracion':    { label: 'Escala de Valoración',icono: '📊', puedeAD: false },
+  'desconocido':          { label: 'Desconocido',          icono: '❓', puedeAD: false },
 };
 
 function getTipoConfig(tipo: string) {
@@ -224,69 +227,166 @@ function PopupExamen({ alumno, columna, calActual, onGuardar, onCerrar }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pop-up INSTRUMENTO (lista cotejo / ficha observación)  — máximo A
+// Pop-up INSTRUMENTO (lista cotejo / ficha observación / portafolio / escala)  — máximo A
 // ─────────────────────────────────────────────────────────────────────────────
+interface ItemEditable {
+  indicador: string;
+  columnas: string[];
+  respuestas: string[];
+  observaciones: string;
+}
+
 function PopupInstrumento({ alumno, columna, calActual, onGuardar, onCerrar }: {
   alumno: Alumno; columna: Columna; calActual?: Calificativo;
   onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
   const cfg = TIPO_CONFIG[columna.tipo];
-  const [marcados, setMarcados] = useState<boolean[]>(() =>
-    calActual?.marcados ?? Array(columna.totalItems).fill(false)
-  );
+  
+  const inicialItems = (): ItemEditable[] => {
+    if (calActual?.items?.length) return calActual.items;
+    return Array(columna.totalItems).fill(null).map((_, i) => ({
+      indicador: `Indicador ${i + 1}`,
+      columnas: ['Sí', 'No'],
+      respuestas: Array(columna.totalItems).fill(''),
+      observaciones: ''
+    }));
+  };
+  
+  const [items, setItems] = useState<ItemEditable[]>(inicialItems);
+  const [mostrarTabla, setMostrarTabla] = useState(true);
 
-  const toggle = (i: number) => { const n = [...marcados]; n[i] = !n[i]; setMarcados(n); };
-  const ok  = marcados.filter(Boolean).length;
-  const pct = columna.totalItems > 0 ? Math.round(ok / columna.totalItems * 100) : 0;
-  const cal = calcularEscala(columna.tipo, pct);
-  const nomAlumno = alumno.apellidos_nombres || alumno.nombre || '—';
+  const marcar = (i: number, colIdx: number, valor: string) => {
+    const n = [...items];
+    n[i].respuestas[colIdx] = n[i].respuestas[colIdx] === valor ? '' : valor;
+    setItems(n);
+  };
+
+  const calcularCal = (): 'C' | 'B' | 'A' => {
+    let positivos = 0;
+    items.forEach(item => {
+      if (item.respuestas.includes('Sí') || item.respuestas.includes('Logrado') || item.respuestas.includes('Presentó') || item.respuestas.includes('Siempre') || item.respuestas.includes('Casi siempre')) positivos++;
+    });
+    const pct = items.length > 0 ? Math.round(positivos / items.length * 100) : 0;
+    return calcularEscala(columna.tipo, pct);
+  };
+  
+  const cal = calcularCal();
+  const nomAlumno = aluno.apellidos_nombres || aluno.nombre || '—';
+  
+  const getColumnas = () => {
+    switch (cfg.label) {
+      case 'Lista de Cotejo': return ['Sí', 'No'];
+      case 'Ficha de Observación': return ['Logrado', 'Parcial', 'No Logrado'];
+      case 'Portafolio Evidencias': return ['Presentó', 'No Presentó'];
+      case 'Escala de Valoración': return ['Siempre', 'Casi siempre', 'A veces', 'Rara vez', 'Nunca'];
+      default: return ['Sí', 'No'];
+    }
+  };
+  const colsLabel = getColumnas();
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-slate-800 border border-cyan-500/30 rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-slate-800 border border-cyan-500/30 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 
-        {/* Header con datos del alumno SIEMPRE visibles */}
-        <div className="px-6 py-4 border-b border-slate-700 bg-slate-700/40 rounded-t-2xl">
+        <div className="px-6 py-4 border-b border-slate-700 bg-slate-700/40 rounded-t-2xl sticky top-0 z-10">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-white font-black text-base">{nomAlumno}</p>
               <p className="text-slate-400 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <span className="px-2 py-1 bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 rounded-lg text-xs font-bold">{cfg.icono} {columna.nombre}</span>
-                <span className="text-xs text-slate-500">{cfg.label} · {columna.totalItems} criterios</span>
-                <span className="text-xs text-slate-500">Máximo: A</span>
+                <span className="text-xs text-slate-500">{cfg.label} · {items.length} indicadores</span>
+                <button onClick={() => setMostrarTabla(!mostrarTabla)} className="text-xs text-cyan-400 underline">
+                  {mostrarTabla ? 'Ocultar' : 'Mostrar'} tabla
+                </button>
               </div>
             </div>
             <button onClick={onCerrar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 flex-shrink-0"><X size={18}/></button>
           </div>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
-          <div className="flex items-center gap-3 text-xs text-slate-400">
-            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-green-500 inline-block"></span>Logrado</span>
-            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-slate-600 inline-block"></span>No logrado</span>
-            <span className="ml-auto font-semibold text-white">{ok}/{columna.totalItems} = {pct}%</span>
-          </div>
-          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))' }}>
-            {marcados.map((m, i) => (
-              <button key={i} onClick={() => toggle(i)}
-                className={`h-12 rounded-xl font-bold text-sm transition-all border-2 ${m ? 'bg-green-500 border-green-400 text-white shadow-lg shadow-green-500/20' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'}`}>
-                {i + 1}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-4 bg-slate-700/50 rounded-xl p-4">
-            <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[cal]}`}>{cal}</div>
-            <div className="flex-1">
-              <p className="text-white font-bold">{CAL_LABEL[cal]}</p>
-              <p className="text-slate-400 text-xs mt-0.5">100%=A · 99–55%=B · ≤54%=C</p>
-              <p className="text-slate-500 text-xs mt-0.5">Sin AD — máximo logro: A</p>
+        {mostrarTabla && (
+          <div className="px-6 py-4 space-y-3">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-600">
+                    <th className="text-left py-2 px-2 text-slate-400">#</th>
+                    <th className="text-left py-2 px-2 text-slate-400 min-w-[200px]">Indicador</th>
+                    {colsLabel.map((col, i) => (
+                      <th key={i} className="text-center py-2 px-2 text-slate-400">{col}</th>
+                    ))}
+                    <th className="text-left py-2 px-2 text-slate-400">Observación</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, i) => (
+                    <tr key={i} className="border-b border-slate-700/40">
+                      <td className="py-2 px-2 text-slate-500">{i + 1}</td>
+                      <td className="py-2 px-2">
+                        <input 
+                          type="text" 
+                          value={item.indicador}
+                          onChange={(e) => {
+                            const n = [...items];
+                            n[i].indicador = e.target.value;
+                            setItems(n);
+                          }}
+                          className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs"
+                        />
+                      </td>
+                      {item.respuestas.map((resp, j) => (
+                        <td key={j} className="text-center py-2 px-1">
+                          <button
+                            onClick={() => marcar(i, j, colsLabel[j])}
+                            className={`w-10 h-8 rounded font-bold text-xs transition-all ${
+                              resp === colsLabel[j] 
+                                ? 'bg-green-500 border-green-400 text-white' 
+                                : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'
+                            }`}
+                          >
+                            {colsLabel[j].charAt(0)}
+                          </button>
+                        </td>
+                      ))}
+                      <td className="py-2 px-2">
+                        <input 
+                          type="text" 
+                          placeholder="Observación..."
+                          value={item.observaciones || ''}
+                          onChange={(e) => {
+                            const n = [...items];
+                            n[i].observaciones = e.target.value;
+                            setItems(n);
+                          }}
+                          className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+            
+            <button 
+              onClick={() => setItems([...items, { indicador: `Indicador ${items.length + 1}`, columnas: colsLabel, respuestas: Array(colsLabel.length).fill(''), observaciones: '' }])}
+              className="text-xs text-cyan-400 hover:underline"
+            >
+              + Agregar indicador
+            </button>
+          </div>
+        )}
+
+        <div className="px-6 py-4 border-t border-slate-700 flex items-center gap-4 bg-slate-700/50 sticky bottom-0">
+          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[cal]}`}>{cal}</div>
+          <div className="flex-1">
+            <p className="text-white font-bold">{CAL_LABEL[cal]}</p>
+            <p className="text-slate-400 text-xs mt-0.5">100%=A · 99–55%=B · ≤54%=C</p>
           </div>
         </div>
 
         <div className="px-6 py-4 border-t border-slate-700 flex gap-3">
-          <button onClick={() => onGuardar({ alumnoId: (alumno as any).id, columnaId: columna.id, marcados, calificativo: cal, esAD: false, fecha: new Date().toISOString().split('T')[0] })}
+          <button onClick={() => onGuardar({ alumnoId: (alumno as any).id, columnaId: columna.id, marcados: items.map(i => i.respuestas), calificativo: cal, esAD: false, fecha: new Date().toISOString().split('T')[0] })}
             className="flex-1 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
             <Save size={15}/> Guardar
           </button>
