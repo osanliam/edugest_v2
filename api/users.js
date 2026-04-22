@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       // GET /api/users - Listar todos los usuarios
       const result = await query(
-        'SELECT id, nombre, email, rol, activo, creado FROM users ORDER BY creado DESC'
+        'SELECT id, nombre, email, rol, activo, docenteId, creado FROM users ORDER BY creado DESC'
       );
 
       return res.status(200).json(result.rows || []);
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       // POST /api/users - Crear nuevo usuario
-      const { nombre, email, contraseña, rol } = req.body;
+      const { nombre, email, contraseña, rol, docenteId } = req.body;
 
       if (!nombre || !email || !contraseña || !rol) {
         return res.status(400).json({ error: 'Faltan campos requeridos' });
@@ -51,8 +51,8 @@ export default async function handler(req, res) {
 
       try {
         await execute(
-          'INSERT INTO users (id, nombre, email, contraseña, rol, activo) VALUES (?, ?, ?, ?, ?, 1)',
-          [id, nombre, email, contraseña, rol]
+          'INSERT INTO users (id, nombre, email, contraseña, rol, activo, docenteId) VALUES (?, ?, ?, ?, ?, 1, ?)',
+          [id, nombre, email, contraseña, rol, docenteId || null]
         );
 
         return res.status(201).json({
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
     if (req.method === 'PUT') {
       // PUT /api/users/:id - Actualizar usuario
       const { id } = req.query;
-      const { nombre, email, contraseña, rol } = req.body;
+      const { nombre, email, contraseña, rol, activo, docenteId } = req.body;
 
       if (!id) {
         return res.status(400).json({ error: 'ID requerido' });
@@ -95,6 +95,14 @@ export default async function handler(req, res) {
       if (rol) {
         updates.push('rol = ?');
         values.push(rol);
+      }
+      if (activo !== undefined) {
+        updates.push('activo = ?');
+        values.push(activo ? 1 : 0);
+      }
+      if (docenteId !== undefined) {
+        updates.push('docenteId = ?');
+        values.push(docenteId);
       }
 
       if (updates.length === 0) {

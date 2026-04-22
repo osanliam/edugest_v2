@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Phone } from 'lucide-react';
+import { guardarAlumnos } from '../services/dataService';
 
 interface Apoderado {
   apellidos_nombres: string;
@@ -28,16 +29,58 @@ interface Alumno {
 }
 
 const GRADOS = ['1°', '2°', '3°', '4°', '5°'];
-const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F'];
+const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 const SEXOS = ['Masculino', 'Femenino'];
-const LS_KEY = 'ie_alumnos';
 
-// ── localStorage helpers ──────────────────────────────────────────────────────
+// ── API helper ────────────────────────────────────────────────────────────────
+function getToken() { return localStorage.getItem('auth_token') || ''; }
+
+async function api(path: string, method = 'GET', body?: object) {
+  // En desarrollo local → localStorage; en producción → API real
+  if (!import.meta.env.PROD) {
+    return localApi(path, method, body);
+  }
+  const res = await fetch(path, {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error');
+  return data;
+}
+
+// ── Fallback localStorage (desarrollo local) ──────────────────────────────────
+const LS_KEY = 'ie_alumnos';
 function lsCargar(): Alumno[] {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; }
 }
-function lsGuardar(data: Alumno[]) {
+function lsGuardar(data: Alumno[]) { 
   localStorage.setItem(LS_KEY, JSON.stringify(data));
+  guardarAlumnos(data); // Sincronizar con Turso
+}
+
+function localApi(path: string, method: string, body?: object): any {
+  const todos = lsCargar();
+  if (method === 'GET') return todos;
+  if (method === 'POST') {
+    const b = body as any;
+    if (todos.some(a => a.dni === b.dni)) throw new Error('DNI ya registrado');
+    const nuevo = { ...b, id: 'al-' + Date.now() };
+    lsGuardar([...todos, nuevo]);
+    return { ok: true, id: nuevo.id };
+  }
+  if (method === 'PUT') {
+    const id = path.split('id=')[1];
+    const idx = todos.findIndex(a => a.id === id);
+    if (idx >= 0) { todos[idx] = { ...todos[idx], ...(body as any) }; lsGuardar(todos); }
+    return { ok: true };
+  }
+  if (method === 'DELETE') {
+    const id = path.split('id=')[1];
+    lsGuardar(todos.filter(a => a.id !== id));
+    return { ok: true };
+  }
 }
 
 function calcularEdad(fecha: string): number {
@@ -108,12 +151,12 @@ export default function AlumnosScreen() {
     setMsg({ tipo, texto }); setTimeout(() => setMsg(null), 3500);
   };
 
-  const cargar = () => {
+  const cargar = async () => {
     setCargando(true);
     try {
-      const data = lsCargar();
-      // normalizar campos planos desde objetos madre/padre anidados
-      const normalizado = data.map((a: any) => ({
+      const data = await api('/api/alumnos');
+      const lista = Array.isArray(data) ? data : [];
+      setAlumnos(lista.map((a: any) => ({
         ...a,
         madre_nombres: a.madre_nombres || a.madre?.apellidos_nombres || '',
         madre_dni:     a.madre_dni     || a.madre?.dni || '',
@@ -121,73 +164,40 @@ export default function AlumnosScreen() {
         padre_nombres: a.padre_nombres || a.padre?.apellidos_nombres || '',
         padre_dni:     a.padre_dni     || a.padre?.dni || '',
         padre_celular: a.padre_celular || a.padre?.celular || '',
-      }));
-      setAlumnos(normalizado);
+      })));
     } catch { mostrar('err', 'Error al cargar alumnos'); }
     finally { setCargando(false); }
   };
 
   useEffect(() => { cargar(); }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.apellidos_nombres || !form.dni || !form.fecha_nacimiento || !form.sexo || !form.grado || !form.seccion)
-      return mostrar('err', 'Completa los campos obligatorios del alumno');
+      return mostrar('err', 'Completa los campos obligatorios');
     setGuardando(true);
     try {
-      const todos = lsCargar();
-      const edad = calcularEdad(form.fecha_nacimiento);
-      const madre = form.madre || emptyApod;
-      const padre = form.padre || emptyApod;
-
+      const payload = { ...form, edad: calcularEdad(form.fecha_nacimiento) };
       if (editando) {
-        const idx = todos.findIndex(a => a.id === editando.id);
-        if (idx >= 0) {
-          todos[idx] = {
-            ...form, edad,
-            madre, padre,
-            madre_nombres: madre.apellidos_nombres,
-            madre_dni: madre.dni,
-            madre_celular: madre.celular,
-            padre_nombres: padre.apellidos_nombres,
-            padre_dni: padre.dni,
-            padre_celular: padre.celular,
-          };
-        }
-        lsGuardar(todos);
+        await api(`/api/alumnos?id=${editando.id}`, 'PUT', payload);
         mostrar('ok', 'Alumno actualizado');
       } else {
-        // verificar DNI duplicado
-        if (todos.some(a => a.dni === form.dni))
-          return mostrar('err', `DNI ${form.dni} ya está registrado`);
-        const nuevo: Alumno = {
-          ...form, edad, id: 'al-' + Date.now(),
-          madre, padre,
-          madre_nombres: madre.apellidos_nombres,
-          madre_dni: madre.dni,
-          madre_celular: madre.celular,
-          padre_nombres: padre.apellidos_nombres,
-          padre_dni: padre.dni,
-          padre_celular: padre.celular,
-        };
-        todos.push(nuevo);
-        lsGuardar(todos);
+        await api('/api/alumnos', 'POST', payload);
         mostrar('ok', 'Alumno registrado');
       }
       setShowForm(false); setEditando(null); setForm(emptyForm);
-      cargar();
+      await cargar();
     } catch (e: any) { mostrar('err', e.message); }
     finally { setGuardando(false); }
   };
 
-  const handleEliminar = (id: string) => {
+  const handleEliminar = async (id: string) => {
     if (!confirm('¿Eliminar este alumno?')) return;
     setEliminando(id);
     try {
-      const todos = lsCargar().filter(a => a.id !== id);
-      lsGuardar(todos);
+      await api(`/api/alumnos?id=${id}`, 'DELETE');
       mostrar('ok', 'Alumno eliminado');
-      cargar();
+      await cargar();
     } catch (e: any) { mostrar('err', e.message); }
     finally { setEliminando(null); }
   };
@@ -202,7 +212,6 @@ export default function AlumnosScreen() {
     setShowForm(true);
   };
 
-  // ── Importación ───────────────────────────────────────────────────
   const handleArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -247,24 +256,14 @@ export default function AlumnosScreen() {
         'PRIMERO': '1°', 'SEGUNDO': '2°', 'TERCERO': '3°',
         'CUARTO': '4°', 'QUINTO': '5°', 'SEXTO': '6°',
       };
-      const normalGrado = (g: any): string => {
-        if (!g) return '';
-        const up = String(g).trim().toUpperCase();
-        return gradoMap[up] || String(g).trim();
-      };
-
-      const normalSeccion = (s: any): string => {
-        if (!s) return '';
-        return String(s).trim().replace(/^\d+/, '') || String(s).trim();
-      };
 
       const rows = dataRows.map((r: any[]) => ({
         apellidos_nombres: colVal(r, 'APELLIDOS Y NOMBRES', 'APELLIDO'),
         dni:               colVal(r, 'N° DNI DEL ALUMNO', 'DNI DEL ALUMNO', 'DNI'),
         fecha_nacimiento:  toDate(r[headers.findIndex(h => h.includes('NACIMIENTO'))]),
         sexo:              colVal(r, 'SEXO'),
-        grado:             normalGrado(colVal(r, 'GRADO DE ESTUDIOS', 'GRADO')),
-        seccion:           normalSeccion(colVal(r, 'SECCI')),
+        grado:             gradoMap[colVal(r, 'GRADO DE ESTUDIOS', 'GRADO').toUpperCase()] || colVal(r, 'GRADO DE ESTUDIOS', 'GRADO'),
+        seccion:           colVal(r, 'SECCI').replace(/^\d+/, '') || colVal(r, 'SECCI'),
         madre: {
           apellidos_nombres: colVal(r, 'NOMBRES DE LA MADRE', 'MADRE'),
           dni:               colVal(r, 'DNI MADRE'),
@@ -282,78 +281,25 @@ export default function AlumnosScreen() {
     } catch { mostrar('err', 'Error leyendo el archivo Excel'); }
   };
 
-  const handleImportar = () => {
+  const handleImportar = async () => {
     setImportando(true);
     let ok = 0, err = 0;
-    const todos = lsCargar();
-    const dnisExistentes = new Set(todos.map(a => a.dni));
-
     for (const r of importRows) {
       try {
-        if (!r.dni || !r.apellidos_nombres) { err++; continue; }
-        if (dnisExistentes.has(r.dni)) { err++; continue; }
-        const madre = r.madre || emptyApod;
-        const padre = r.padre || emptyApod;
-        const nuevo: Alumno = {
-          id: 'al-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-          apellidos_nombres: r.apellidos_nombres,
-          dni: r.dni,
-          fecha_nacimiento: r.fecha_nacimiento || '',
-          edad: calcularEdad(r.fecha_nacimiento),
-          sexo: r.sexo || '',
-          grado: r.grado || '',
-          seccion: r.seccion || '',
-          madre, padre,
-          madre_nombres: madre.apellidos_nombres,
-          madre_dni: madre.dni,
-          madre_celular: madre.celular,
-          padre_nombres: padre.apellidos_nombres,
-          padre_dni: padre.dni,
-          padre_celular: padre.celular,
-        };
-        todos.push(nuevo);
-        dnisExistentes.add(r.dni);
+        await api('/api/alumnos', 'POST', { ...r, edad: calcularEdad(r.fecha_nacimiento) });
         ok++;
       } catch { err++; }
     }
-    lsGuardar(todos);
     setImportResult({ ok, err });
     setImportando(false);
-    cargar();
+    await cargar();
   };
 
   const descargarPlantilla = async () => {
     // @ts-ignore
     const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs');
     const data = [
-      {
-        'APELLIDOS Y NOMBRES': 'MENDEZ FLORES, Carlos Alberto',
-        'DNI': '75123456',
-        'FECHA DE NACIMIENTO': '2010-05-12',
-        'SEXO': 'Masculino',
-        'GRADO': '3°',
-        'SECCI': 'A',
-        'NOMBRES DE LA MADRE': 'FLORES RÍOS, Ana María',
-        'DNI MADRE': '41234567',
-        'CELULAR DE LA MADRE': '987654321',
-        'NOMBRES DEL PADRE': 'MENDEZ TORRES, Pedro Luis',
-        'DNI PADRE': '40123456',
-        'CELULAR DEL PADRE': '976543210',
-      },
-      {
-        'APELLIDOS Y NOMBRES': 'GARCÍA LÓPEZ, Lucía Fernanda',
-        'DNI': '76234567',
-        'FECHA DE NACIMIENTO': '2011-08-20',
-        'SEXO': 'Femenino',
-        'GRADO': '2°',
-        'SECCI': 'B',
-        'NOMBRES DE LA MADRE': 'LÓPEZ VEGA, Carmen Rosa',
-        'DNI MADRE': '43456789',
-        'CELULAR DE LA MADRE': '965432109',
-        'NOMBRES DEL PADRE': 'GARCÍA PINTO, José Manuel',
-        'DNI PADRE': '42345678',
-        'CELULAR DEL PADRE': '954321098',
-      },
+      { 'APELLIDOS Y NOMBRES': 'MENDEZ FLORES, Carlos Alberto', 'DNI': '75123456', 'FECHA DE NACIMIENTO': '2010-05-12', 'SEXO': 'Masculino', 'GRADO': '3°', 'SECCI': 'A', 'NOMBRES DE LA MADRE': 'FLORES RÍOS, Ana María', 'DNI MADRE': '41234567', 'CELULAR DE LA MADRE': '987654321', 'NOMBRES DEL PADRE': 'MENDEZ TORRES, Pedro Luis', 'DNI PADRE': '40123456', 'CELULAR DEL PADRE': '976543210' },
     ];
     const ws = XLSX.utils.json_to_sheet(data);
     ws['!cols'] = Array(12).fill({ wch: 28 });
@@ -373,8 +319,6 @@ export default function AlumnosScreen() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-
-      {/* Header */}
       <div className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-green-500/20">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -401,8 +345,6 @@ export default function AlumnosScreen() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-5">
-
-        {/* Mensajes */}
         <AnimatePresence>
           {msg && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -417,8 +359,7 @@ export default function AlumnosScreen() {
           {showImport && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-              <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }}
-                className="bg-slate-800 border border-green-500/30 rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+              <div className="bg-slate-800 border border-green-500/30 rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
                 <div className="flex items-center justify-between p-6 border-b border-slate-700">
                   <h2 className="text-xl font-bold text-white">📥 Importar {importRows.length} alumnos</h2>
                   <button onClick={() => { setShowImport(false); setImportRows([]); setImportResult(null); }}>
@@ -471,7 +412,7 @@ export default function AlumnosScreen() {
                     </div>
                   </>
                 )}
-              </motion.div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -484,27 +425,21 @@ export default function AlumnosScreen() {
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Datos del Alumno</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="sm:col-span-2 lg:col-span-2">
+                  <div className="sm:col-span-2">
                     <label className="block text-xs text-slate-400 mb-1">Apellidos y Nombres <span className="text-red-400">*</span></label>
-                    <input type="text" value={form.apellidos_nombres}
-                      onChange={e => setForm({ ...form, apellidos_nombres: e.target.value })}
-                      placeholder="MENDEZ FLORES, Carlos Alberto" className={inputCls} />
+                    <input type="text" value={form.apellidos_nombres} onChange={e => setForm({ ...form, apellidos_nombres: e.target.value })} placeholder="MENDEZ FLORES, Carlos Alberto" className={inputCls} />
                   </div>
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">DNI <span className="text-red-400">*</span></label>
-                    <input type="text" maxLength={8} value={form.dni}
-                      onChange={e => setForm({ ...form, dni: e.target.value.replace(/\D/g, '') })}
-                      placeholder="75123456" className={inputCls} />
+                    <input type="text" maxLength={8} value={form.dni} onChange={e => setForm({ ...form, dni: e.target.value.replace(/\D/g, '') })} placeholder="75123456" className={inputCls} />
                   </div>
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Fecha de Nacimiento <span className="text-red-400">*</span></label>
-                    <input type="date" value={form.fecha_nacimiento}
-                      onChange={e => setForm({ ...form, fecha_nacimiento: e.target.value })} className={inputCls} />
+                    <input type="date" value={form.fecha_nacimiento} onChange={e => setForm({ ...form, fecha_nacimiento: e.target.value })} className={inputCls} />
                   </div>
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Edad</label>
-                    <input type="text" readOnly value={form.fecha_nacimiento ? calcularEdad(form.fecha_nacimiento) + ' años' : '—'}
-                      className={inputCls + ' opacity-60 cursor-not-allowed'} />
+                    <input type="text" readOnly value={form.fecha_nacimiento ? calcularEdad(form.fecha_nacimiento) + ' años' : '—'} className={inputCls + ' opacity-60 cursor-not-allowed'} />
                   </div>
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">Sexo <span className="text-red-400">*</span></label>
@@ -529,49 +464,39 @@ export default function AlumnosScreen() {
                   </div>
                 </div>
               </div>
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <ApoderadoForm label="👩 Datos de la Madre"
-                  data={form.madre || emptyApod}
-                  onChange={madre => setForm({ ...form, madre })} />
-                <ApoderadoForm label="👨 Datos del Padre"
-                  data={form.padre || emptyApod}
-                  onChange={padre => setForm({ ...form, padre })} />
+                <ApoderadoForm label="👩 Datos de la Madre" data={form.madre || emptyApod} onChange={madre => setForm({ ...form, madre })} />
+                <ApoderadoForm label="👨 Datos del Padre" data={form.padre || emptyApod} onChange={padre => setForm({ ...form, padre })} />
               </div>
-
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={guardando}
                   className="flex-1 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
                   {guardando ? <><RefreshCw size={14} className="animate-spin" />Guardando...</> : `✓ ${editando ? 'Actualizar' : 'Registrar'} Alumno`}
                 </button>
-                <button type="button" onClick={() => { setShowForm(false); setEditando(null); }}
-                  className="px-6 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 text-sm">Cancelar</button>
+                <button type="button" onClick={() => { setShowForm(false); setEditando(null); }} className="px-6 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 text-sm">Cancelar</button>
               </div>
             </form>
           </div>
         )}
 
-        {/* Filtros + Búsqueda */}
+        {/* Filtros */}
         <div className="flex gap-3 flex-wrap">
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
-            <input type="text" placeholder="Buscar por nombre, DNI o apoderado..." value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
+            <input type="text" placeholder="Buscar por nombre, DNI o apoderado..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
               className="w-full pl-11 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-green-500 text-sm" />
           </div>
-          <select value={filtroGrado} onChange={e => setFiltroGrado(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-green-500">
+          <select value={filtroGrado} onChange={e => setFiltroGrado(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-green-500">
             <option value="">Todos los grados</option>
             {GRADOS.map(g => <option key={g} value={g}>{g} Grado</option>)}
           </select>
-          <select value={filtroSeccion} onChange={e => setFiltroSeccion(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-green-500">
+          <select value={filtroSeccion} onChange={e => setFiltroSeccion(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-green-500">
             <option value="">Todas las secciones</option>
             {SECCIONES.map(s => <option key={s} value={s}>Sección {s}</option>)}
           </select>
         </div>
 
-        {/* Stats rápidos */}
+        {/* Stats */}
         <div className="flex gap-3 flex-wrap text-xs">
           {GRADOS.map(g => {
             const count = alumnos.filter(a => a.grado === g).length;
@@ -612,53 +537,26 @@ export default function AlumnosScreen() {
                     </div>
                   </div>
                   <div className="flex gap-2 items-center">
-                    <button onClick={() => setExpandido(expandido === a.id ? null : a.id)}
-                      className="p-2 bg-slate-700/60 hover:bg-slate-600 rounded-lg text-slate-400 transition-all">
+                    <button onClick={() => setExpandido(expandido === a.id ? null : a.id)} className="p-2 bg-slate-700/60 hover:bg-slate-600 rounded-lg text-slate-400">
                       {expandido === a.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </button>
-                    <button onClick={() => handleEditar(a)}
-                      className="p-2 bg-blue-500/15 hover:bg-blue-500/30 rounded-lg text-blue-400 transition-all">
-                      <Edit2 size={15} />
-                    </button>
-                    <button onClick={() => handleEliminar(a.id)} disabled={eliminando === a.id}
-                      className="p-2 bg-red-500/15 hover:bg-red-500/30 rounded-lg text-red-400 transition-all disabled:opacity-50">
+                    <button onClick={() => handleEditar(a)} className="p-2 bg-blue-500/15 hover:bg-blue-500/30 rounded-lg text-blue-400"><Edit2 size={15} /></button>
+                    <button onClick={() => handleEliminar(a.id)} disabled={eliminando === a.id} className="p-2 bg-red-500/15 hover:bg-red-500/30 rounded-lg text-red-400 disabled:opacity-50">
                       {eliminando === a.id ? <RefreshCw size={15} className="animate-spin" /> : <Trash2 size={15} />}
                     </button>
                   </div>
                 </div>
-
-                {/* Detalle expandido */}
                 <AnimatePresence>
                   {expandido === a.id && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                       className="border-t border-slate-700/50 px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       <div className="space-y-1">
                         <p className="text-slate-500 font-medium uppercase tracking-wide">👩 Madre</p>
-                        {a.madre_nombres ? (
-                          <>
-                            <p className="text-white">{a.madre_nombres}</p>
-                            <p className="text-slate-400">DNI: {a.madre_dni || '—'}</p>
-                            {a.madre_celular && (
-                              <a href={`tel:${a.madre_celular}`} className="flex items-center gap-1 text-green-400 hover:text-green-300">
-                                <Phone size={11} /> {a.madre_celular}
-                              </a>
-                            )}
-                          </>
-                        ) : <p className="text-slate-600">No registrada</p>}
+                        {a.madre_nombres ? (<><p className="text-white">{a.madre_nombres}</p><p className="text-slate-400">DNI: {a.madre_dni || '—'}</p>{a.madre_celular && <a href={`tel:${a.madre_celular}`} className="flex items-center gap-1 text-green-400"><Phone size={11} /> {a.madre_celular}</a>}</>) : <p className="text-slate-600">No registrada</p>}
                       </div>
                       <div className="space-y-1">
                         <p className="text-slate-500 font-medium uppercase tracking-wide">👨 Padre</p>
-                        {a.padre_nombres ? (
-                          <>
-                            <p className="text-white">{a.padre_nombres}</p>
-                            <p className="text-slate-400">DNI: {a.padre_dni || '—'}</p>
-                            {a.padre_celular && (
-                              <a href={`tel:${a.padre_celular}`} className="flex items-center gap-1 text-green-400 hover:text-green-300">
-                                <Phone size={11} /> {a.padre_celular}
-                              </a>
-                            )}
-                          </>
-                        ) : <p className="text-slate-600">No registrado</p>}
+                        {a.padre_nombres ? (<><p className="text-white">{a.padre_nombres}</p><p className="text-slate-400">DNI: {a.padre_dni || '—'}</p>{a.padre_celular && <a href={`tel:${a.padre_celular}`} className="flex items-center gap-1 text-green-400"><Phone size={11} /> {a.padre_celular}</a>}</>) : <p className="text-slate-600">No registrado</p>}
                       </div>
                       <div className="sm:col-span-2 border-t border-slate-700/50 pt-3 grid grid-cols-3 gap-3">
                         <div><p className="text-slate-500">F. Nacimiento</p><p className="text-white">{a.fecha_nacimiento}</p></div>

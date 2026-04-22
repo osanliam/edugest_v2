@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
-import { CheckCircle, XCircle, Clock, TrendingUp, Calendar, AlertCircle, Download, Filter } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CheckCircle, XCircle, Clock, TrendingUp, Calendar, AlertCircle, Download, Filter, ChevronDown, Save } from 'lucide-react';
 import FuturisticCard from '../components/FuturisticCard';
 import HologramText from '../components/HologramText';
 import DataGrid from '../components/DataGrid';
@@ -13,11 +14,92 @@ interface User {
   schoolId: string;
 }
 
+interface Alumno {
+  id: string;
+  apellidos_nombres?: string;
+  nombre?: string;
+  grado?: string;
+  seccion?: string;
+}
+
+interface RegistroAsistencia {
+  id: string;
+  alumnoId: string;
+  fecha: string;
+  estado: 'presente' | 'ausente' | 'tardanza';
+  hora?: string;
+}
+
+const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+const GRADOS = ['1', '2', '3', '4', '5', '6'];
+const LS_ASISTENCIA = 'ie_asistencia';
+
+function lsGet<T>(key: string, def: T): T {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch { return def; }
+}
+function lsSet(key: string, val: any) { localStorage.setItem(key, JSON.stringify(val)); }
+
 interface AttendanceScreenModernProps {
   user?: User;
 }
 
 export default function AttendanceScreenModern({ user }: AttendanceScreenModernProps) {
+  const [grado, setGrado] = useState<string>('1');
+  const [seccion, setSeccion] = useState<string>('A');
+  const [alumnos, setAlumnos] = useState<Alumno[]>([]);
+  const [asistencia, setAsistencia] = useState<RegistroAsistencia[]>([]);
+  const [fechaActual, setFechaActual] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [showFilters, setShowFilters] = useState(true);
+
+  useEffect(() => {
+    const storedAlumnos = lsGet<Alumno[]>('ie_alumnos', []);
+    setAlumnos(storedAlumnos);
+    const storedAsistencia = lsGet<RegistroAsistencia[]>(LS_ASISTENCIA, []);
+    setAsistencia(storedAsistencia);
+  }, []);
+
+  const filteredAlumnos = alumnos
+    .filter(a => a.grado === grado && a.seccion === seccion)
+    .sort((a, b) => {
+      const nameA = (a.apellidos_nombres || a.nombre || '').toLowerCase();
+      const nameB = (b.apellidos_nombres || b.nombre || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+  const getEstadoAsistencia = (alumnoId: string): 'presente' | 'ausente' | 'tardanza' | null => {
+    const reg = asistencia.find(r => r.alumnoId === alumnoId && r.fecha === fechaActual);
+    return reg?.estado || null;
+  };
+
+  const marcarAsistencia = (alumnoId: string, estado: 'presente' | 'ausente' | 'tardanza') => {
+    const newAsistencia = asistencia.filter(r => !(r.alumnoId === alumnoId && r.fecha === fechaActual));
+    const nuevoRegistro: RegistroAsistencia = {
+      id: `as-${Date.now()}-${alumnoId}`,
+      alumnoId,
+      fecha: fechaActual,
+      estado,
+      hora: estado !== 'ausente' ? new Date().toTimeString().slice(0, 5) : undefined
+    };
+    const updated = [...newAsistencia, nuevoRegistro];
+    setAsistencia(updated);
+    lsSet(LS_ASISTENCIA, updated);
+  };
+
+  const stats = (() => {
+    const hoy = asistencia.filter(r => r.fecha === fechaActual);
+    const presentes = hoy.filter(r => r.estado === 'presente').length;
+    const ausentes = hoy.filter(r => r.estado === 'ausente').length;
+    const tardanzas = hoy.filter(r => r.estado === 'tardanza').length;
+    const total = filteredAlumnos.length || 1;
+    const tasa = Math.round((presentes / total) * 100);
+    return [
+      { label: 'Presentes Hoy', value: String(presentes), color: 'lime', icon: CheckCircle },
+      { label: 'Ausentes', value: String(ausentes), color: 'blue', icon: XCircle },
+      { label: 'Tardanzas', value: String(tardanzas), color: 'magenta', icon: Clock },
+      { label: 'Tasa Asistencia', value: `${tasa}%`, color: 'cyan', icon: TrendingUp },
+    ];
+  })();
+
   const attendanceTrend = [
     { date: 'Lunes', percentage: 96 },
     { date: 'Martes', percentage: 94 },
@@ -26,19 +108,16 @@ export default function AttendanceScreenModern({ user }: AttendanceScreenModernP
     { date: 'Viernes', percentage: 91 },
   ];
 
-  const stats = [
-    { label: 'Presentes Hoy', value: '442', color: 'lime', icon: CheckCircle },
-    { label: 'Ausentes', value: '14', color: 'blue', icon: XCircle },
-    { label: 'Tardanzas', value: '8', color: 'magenta', icon: Clock },
-    { label: 'Tasa Semanal', value: '94.8%', color: 'cyan', icon: TrendingUp },
-  ];
-
-  const recentRecords = [
-    { id: '1', student: 'Carlos Mendez', date: '2024-04-19', status: 'Presente', time: '08:02' },
-    { id: '2', student: 'María García', date: '2024-04-19', status: 'Ausente', time: '-' },
-    { id: '3', student: 'Juan Pérez', date: '2024-04-19', status: 'Presente', time: '08:00' },
-    { id: '4', student: 'Ana López', date: '2024-04-19', status: 'Tardanza', time: '08:35' },
-  ];
+  const recentRecords = filteredAlumnos.slice(0, 8).map((alumno, i) => {
+    const estado = getEstadoAsistencia(alumno.id);
+    return {
+      id: String(i + 1),
+      student: alumno.apellidos_nombres || alumno.nombre || 'Sin nombre',
+      date: fechaActual,
+      status: estado === 'presente' ? 'Presente' : estado === 'ausente' ? 'Ausente' : estado === 'tardanza' ? 'Tardanza' : 'Sin registrar',
+      time: '-'
+    };
+  });
 
   return (
     <div className="min-h-screen bg-dark-bg text-white overflow-hidden p-6">
@@ -58,6 +137,143 @@ export default function AttendanceScreenModern({ user }: AttendanceScreenModernP
             Control de <HologramText>Asistencia</HologramText>
           </h1>
           <p className="text-white/85 font-mono tracking-widest text-sm">REGISTRO Y ANÁLISIS DE PRESENCIA</p>
+        </motion.div>
+
+        {/* Filters */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <FuturisticCard variant="cyan" glow>
+            <div className="p-4 flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-neon-cyan" />
+                <label className="text-white/85 text-sm font-bold uppercase">Fecha:</label>
+                <input
+                  type="date"
+                  value={fechaActual}
+                  onChange={(e) => setFechaActual(e.target.value)}
+                  className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-neon-cyan"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-white/85 text-sm font-bold uppercase">Grado:</label>
+                <select
+                  value={grado}
+                  onChange={(e) => setGrado(e.target.value)}
+                  className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-neon-cyan"
+                >
+                  {GRADOS.map(g => (
+                    <option key={g} value={g} className="bg-slate-800">{g}º</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-white/85 text-sm font-bold uppercase">Sección:</label>
+                <select
+                  value={seccion}
+                  onChange={(e) => setSeccion(e.target.value)}
+                  className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-neon-cyan"
+                >
+                  {SECCIONES.map(s => (
+                    <option key={s} value={s} className="bg-slate-800">Sección {s}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="ml-auto text-white/70 text-sm">
+                {filteredAlumnos.length} estudiantes
+              </div>
+            </div>
+          </FuturisticCard>
+        </motion.div>
+
+        {/* Attendance List */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+        >
+          <FuturisticCard variant="lime" glow>
+            <div className="p-4">
+              <h3 className="text-white font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-neon-lime" />
+                Registrar Asistencia - {grado}º Sección {seccion}
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-white/70 text-sm uppercase border-b border-white/20">
+                      <th className="px-3 py-2 text-left w-12">#</th>
+                      <th className="px-3 py-2 text-left">Estudiante</th>
+                      <th className="px-3 py-2 text-center">Estado</th>
+                      <th className="px-3 py-2 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAlumnos.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-8 text-center text-white/50">
+                          No hay estudiantes registrados para {grado}º sección {seccion}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAlumnos.map((alumno, idx) => {
+                        const estado = getEstadoAsistencia(alumno.id);
+                        return (
+                          <tr key={alumno.id} className="border-b border-white/10 hover:bg-white/5">
+                            <td className="px-3 py-3 text-white/70">{idx + 1}</td>
+                            <td className="px-3 py-3 text-white font-medium">
+                              {alumno.apellidos_nombres || alumno.nombre || 'Sin nombre'}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              {estado === 'presente' && (
+                                <span className="px-2 py-1 rounded bg-neon-lime/20 text-neon-lime text-xs font-bold">Presente</span>
+                              )}
+                              {estado === 'ausente' && (
+                                <span className="px-2 py-1 rounded bg-neon-blue/20 text-neon-blue text-xs font-bold">Ausente</span>
+                              )}
+                              {estado === 'tardanza' && (
+                                <span className="px-2 py-1 rounded bg-neon-magenta/20 text-neon-magenta text-xs font-bold">Tardanza</span>
+                              )}
+                              {!estado && (
+                                <span className="px-2 py-1 rounded bg-white/10 text-white/50 text-xs">Sin registrar</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex justify-center gap-2">
+                                <button
+                                  onClick={() => marcarAsistencia(alumno.id, 'presente')}
+                                  className={`p-2 rounded-lg transition-all ${estado === 'presente' ? 'bg-neon-lime text-black' : 'bg-white/10 text-neon-lime hover:bg-neon-lime/20'}`}
+                                  title="Presente"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => marcarAsistencia(alumno.id, 'tardanza')}
+                                  className={`p-2 rounded-lg transition-all ${estado === 'tardanza' ? 'bg-neon-magenta text-black' : 'bg-white/10 text-neon-magenta hover:bg-neon-magenta/20'}`}
+                                  title="Tardanza"
+                                >
+                                  <Clock className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => marcarAsistencia(alumno.id, 'ausente')}
+                                  className={`p-2 rounded-lg transition-all ${estado === 'ausente' ? 'bg-neon-blue text-black' : 'bg-white/10 text-neon-blue hover:bg-neon-blue/20'}`}
+                                  title="Ausente"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </FuturisticCard>
         </motion.div>
 
         {/* Real-time Stats */}

@@ -6,6 +6,29 @@ import { mockLogin } from '../utils/mockAuth';
 
 // En producción (Vercel) usa la API real; en local usa mock
 async function loginRequest(email: string, password: string) {
+  // Primero verificar en localStorage (usuarios registrados)
+  try {
+    const storedUsers = localStorage.getItem('sistema_usuarios');
+    if (storedUsers) {
+      const users = JSON.parse(storedUsers);
+      const foundUser = users.find((u: any) => u.email === email && u.contraseña === password);
+      if (foundUser) {
+        return {
+          token: 'local-token-' + foundUser.id,
+          user: {
+            id: foundUser.id,
+            name: foundUser.nombre,
+            email: foundUser.email,
+            role: foundUser.rol,
+            school_id: '1'
+          }
+        };
+      }
+    }
+  } catch (e) {
+    console.error('Error checking localStorage users:', e);
+  }
+
   if (import.meta.env.PROD) {
     const res = await fetch('/api/auth', {
       method: 'POST',

@@ -27,6 +27,7 @@ import AttendanceScreen from './screens/AttendanceScreen';
 import AttendanceScreenModern from './screens/AttendanceScreenModern';
 import ConductRulesScreen from './screens/ConductRulesScreen';
 import CalificativosScreen from './screens/CalificativosScreen';
+import ReporteAlumnoScreen from './screens/ReporteAlumnoScreen';
 import AdminUsersScreen from './screens/AdminUsersScreen';
 import GradesScreenAPI from './screens/GradesScreenAPI';
 import CalificacionesProModerno from './screens/CalificacionesProModerno';
@@ -49,7 +50,8 @@ type ScreenType = 'login' | 'panel-admin' | 'inicio' | 'inicio-modern' | 'aula-v
                  'panel-director' | 'panel-subdirector' | 'comunidad' | 'profesores' |
                  'estudiantes' | 'dashboard-estudiante' | 'calificaciones' | 'horario' |
                  'asistencia' | 'normas-convivencia' | 'gestionar-usuarios' |
-                 'gestion-docentes' | 'gestion-alumnos' | 'calificativos' | 'configuracion';
+                 'gestion-docentes' | 'gestion-alumnos' | 'calificativos' | 'configuracion' |
+                 'reporte-alumno';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -134,7 +136,7 @@ export default function App() {
       ],
       parent: [
         'inicio', 'inicio-modern', 'mensajes', 'informes', 'comunidad',
-        'dashboard-estudiante'
+        'dashboard-estudiante', 'reporte-alumno'
       ]
     };
 
@@ -153,7 +155,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return <LoginScreen key="login-screen" onLogin={handleLogin} />;
   }
 
   if (!canAccessScreen(currentScreen)) {
@@ -165,27 +167,28 @@ export default function App() {
     <>
       {currentScreen === 'inicio-modern' && <DashboardUltraModern />}
       {currentScreen !== 'inicio-modern' && (
-        <MainLayoutModern user={user} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onNavigate={setCurrentScreen}>
-          {currentScreen === 'panel-admin' && <AdminPanelScreenModern />}
-          {currentScreen === 'inicio' && <DashboardScreen user={user} />}
-          {currentScreen === 'aula-virtual' && <VirtualClassroomScreenModern />}
-      {currentScreen === 'mensajes' && <MessagingScreen user={user} />}
-      {currentScreen === 'informes' && <ReportsScreenModern user={user} />}
-      {currentScreen === 'panel-director' && <DirectorDashboardModern user={user} />}
-      {currentScreen === 'panel-subdirector' && <SubdirectorDashboard user={user} />}
-      {currentScreen === 'comunidad' && <CommunityScreen user={user} />}
-      {currentScreen === 'profesores' && <TeachersScreenModern user={user} />}
-      {currentScreen === 'estudiantes' && <StudentsScreenModern user={user} />}
-      {currentScreen === 'dashboard-estudiante' && <StudentDashboard user={user} />}
-      {currentScreen === 'calificaciones' && <CalificacionesProModerno />}
-      {currentScreen === 'gestionar-usuarios' && <AdminUsersScreen />}
-      {currentScreen === 'gestion-docentes' && <DocentesScreen />}
-      {currentScreen === 'gestion-alumnos' && <AlumnosScreen />}
-      {currentScreen === 'calificativos' && <CalificativosScreen />}
-      {currentScreen === 'configuracion' && <ConfiguracionScreen />}
-          {currentScreen === 'horario' && <ScheduleScreenModern user={user} />}
-          {currentScreen === 'asistencia' && <AttendanceScreenModern user={user} />}
-          {currentScreen === 'normas-convivencia' && <ConductRulesScreen user={user} />}
+        <MainLayoutModern key={`layout-${user.id}`} user={user} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onNavigate={setCurrentScreen}>
+          {currentScreen === 'panel-admin'         && <AdminPanelScreenModern />}
+          {currentScreen === 'inicio'              && <DashboardScreen user={user} />}
+          {currentScreen === 'aula-virtual'        && <VirtualClassroomScreenModern />}
+          {currentScreen === 'mensajes'            && <MessagingScreen user={user} />}
+          {currentScreen === 'informes'            && <ReportsScreenModern user={user} />}
+          {currentScreen === 'panel-director'      && <DirectorDashboardModern user={user} />}
+          {currentScreen === 'panel-subdirector'   && <SubdirectorDashboard user={user} />}
+          {currentScreen === 'comunidad'           && <CommunityScreen user={user} />}
+          {currentScreen === 'profesores'          && <TeachersScreenModern user={user} />}
+          {currentScreen === 'estudiantes'         && <StudentsScreenModern user={user} />}
+          {currentScreen === 'dashboard-estudiante'&& <StudentDashboard user={user} />}
+          {currentScreen === 'calificaciones'      && <CalificativosScreen user={user} />}
+          {currentScreen === 'gestionar-usuarios'  && <AdminUsersScreen />}
+          {currentScreen === 'gestion-docentes'    && <DocentesScreen />}
+          {currentScreen === 'gestion-alumnos'     && <AlumnosScreen />}
+          {currentScreen === 'calificativos'       && <CalificativosScreen user={user} />}
+          {currentScreen === 'configuracion'       && <ConfiguracionScreen />}
+          {currentScreen === 'horario'             && <ScheduleScreenModern user={user} />}
+          {currentScreen === 'asistencia'          && <AttendanceScreenModern user={user} />}
+          {currentScreen === 'normas-convivencia'  && <ConductRulesScreen user={user} />}
+          {currentScreen === 'reporte-alumno'     && <ReporteAlumnoScreen user={user} />}
         </MainLayoutModern>
       )}
     </>

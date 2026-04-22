@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Edit2, Search, Eye, EyeOff, Upload, Download, X, Check, AlertCircle, RefreshCw, UserX, UserCheck, Key } from 'lucide-react';
+import { guardarUsuarios } from '../services/dataService';
 
 interface Usuario {
   id: string;
@@ -25,14 +26,46 @@ const ROL_CONFIG: Record<string, { label: string; color: string }> = {
 const LS_KEY = 'sistema_usuarios';
 const LS_DOCENTES = 'ie_docentes';
 
+function getToken() { return localStorage.getItem('auth_token') || ''; }
 function lsCargar(): Usuario[] {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; }
 }
-function lsGuardar(data: Usuario[]) {
+function lsGuardar(data: Usuario[]) { 
   localStorage.setItem(LS_KEY, JSON.stringify(data));
+  guardarUsuarios(data); // Sincronizar con Turso
 }
 function lsDocentes(): any[] {
   try { return JSON.parse(localStorage.getItem(LS_DOCENTES) || '[]'); } catch { return []; }
+}
+
+async function apiUsers(path: string, method = 'GET', body?: object): Promise<any> {
+  if (!import.meta.env.PROD) {
+    const todos = lsCargar();
+    if (method === 'GET') return todos;
+    if (method === 'POST') {
+      const b = body as any;
+      if (todos.some(u => u.email === b.email)) throw new Error('Email ya existe');
+      const nuevo = { ...b, id: 'usr-' + Date.now(), activo: true, creado: new Date().toISOString() };
+      lsGuardar([...todos, nuevo]); return { ok: true };
+    }
+    if (method === 'PUT') {
+      const id = path.split('id=')[1];
+      lsGuardar(todos.map(u => u.id === id ? { ...u, ...(body as any) } : u)); return { ok: true };
+    }
+    if (method === 'DELETE') {
+      const id = path.split('id=')[1];
+      lsGuardar(todos.filter(u => u.id !== id)); return { ok: true };
+    }
+    return {};
+  }
+  const res = await fetch(path, {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error');
+  return data;
 }
 
 // Parsear CSV simple
@@ -58,6 +91,7 @@ export default function AdminUsersScreen() {
   const [docentes, setDocentes] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [filtroRol, setFiltroRol] = useState('todos');
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState<Usuario | null>(null);
@@ -78,6 +112,7 @@ export default function AdminUsersScreen() {
   const [importError, setImportError] = useState('');
   const [importando, setImportando] = useState(false);
   const [importResultado, setImportResultado] = useState<{ ok: number; error: number } | null>(null);
+  const jsonRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -86,13 +121,20 @@ export default function AdminUsersScreen() {
 
   useEffect(() => { cargar(); }, []);
 
-  const cargar = () => {
+  const cargar = async () => {
     setCargando(true);
-    const us = lsCargar();
-    const docs = lsDocentes();
-    setUsuarios(us);
-    setDocentes(docs);
-    setCargando(false);
+    try {
+      const us = await apiUsers('/api/users');
+      const docs = lsDocentes(); // docentes siempre desde localStorage por ahora
+      setUsuarios(Array.isArray(us) ? us : us.users || []);
+      setDocentes(docs);
+    } catch {
+      // fallback a localStorage si falla
+      setUsuarios(lsCargar());
+      setDocentes(lsDocentes());
+    } finally {
+      setCargando(false);
+    }
   };
 
   const mostrarMensaje = (tipo: 'ok' | 'err', msg: string) => {
@@ -101,7 +143,7 @@ export default function AdminUsersScreen() {
   };
 
   // ── CRUD usuarios ─────────────────────────────────────────────────
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!formData.nombre.trim()) return mostrarMensaje('err', 'El nombre es requerido');
@@ -109,35 +151,24 @@ export default function AdminUsersScreen() {
     if (!editando && formData.contraseña.length < 6) return mostrarMensaje('err', 'Contraseña mínimo 6 caracteres');
 
     setGuardando(true);
-    const todos = lsCargar();
     try {
       if (editando) {
-        const idx = todos.findIndex(u => u.id === editando.id);
-        if (idx >= 0) {
-          todos[idx] = {
-            ...todos[idx],
-            nombre: formData.nombre,
-            email: formData.email,
-            rol: formData.rol,
-            ...(formData.contraseña ? { contraseña: formData.contraseña } : {}),
-          };
-        }
+        await apiUsers(`/api/users?id=${editando.id}`, 'PUT', {
+          nombre: formData.nombre,
+          email: formData.email,
+          rol: formData.rol,
+          ...(formData.contraseña ? { contraseña: formData.contraseña } : {}),
+        });
         mostrarMensaje('ok', 'Usuario actualizado');
       } else {
-        if (todos.some(u => u.email === formData.email))
-          return mostrarMensaje('err', 'Ese email ya existe');
-        todos.push({
-          id: 'usr-' + Date.now(),
+        await apiUsers('/api/users', 'POST', {
           nombre: formData.nombre,
           email: formData.email,
           contraseña: formData.contraseña,
           rol: formData.rol,
-          activo: true,
-          creado: new Date().toISOString(),
         });
         mostrarMensaje('ok', 'Usuario creado');
       }
-      lsGuardar(todos);
       setShowForm(false);
       setEditando(null);
       setFormData({ nombre: '', email: '', contraseña: '', rol: 'teacher' });
@@ -149,13 +180,18 @@ export default function AdminUsersScreen() {
     }
   };
 
-  const handleEliminar = (id: string) => {
+  const handleEliminar = async (id: string) => {
     if (!confirm('¿Eliminar este usuario?')) return;
     setEliminando(id);
-    lsGuardar(lsCargar().filter(u => u.id !== id));
-    mostrarMensaje('ok', 'Usuario eliminado');
-    cargar();
-    setEliminando(null);
+    try {
+      await apiUsers(`/api/users?id=${id}`, 'DELETE');
+      mostrarMensaje('ok', 'Usuario eliminado');
+      cargar();
+    } catch (err: any) {
+      mostrarMensaje('err', err.message || 'Error al eliminar');
+    } finally {
+      setEliminando(null);
+    }
   };
 
   const handleEditar = (u: Usuario) => {
@@ -165,14 +201,15 @@ export default function AdminUsersScreen() {
     setError('');
   };
 
-  const toggleActivo = (id: string) => {
-    const todos = lsCargar();
-    const idx = todos.findIndex(u => u.id === id);
-    if (idx >= 0) {
-      todos[idx].activo = !todos[idx].activo;
-      lsGuardar(todos);
+  const toggleActivo = async (id: string) => {
+    const u = usuarios.find(u => u.id === id);
+    if (!u) return;
+    try {
+      await apiUsers(`/api/users?id=${id}`, 'PUT', { activo: !u.activo });
+      mostrarMensaje('ok', !u.activo ? 'Usuario activado' : 'Usuario suspendido');
       cargar();
-      mostrarMensaje('ok', todos[idx].activo ? 'Usuario activado' : 'Usuario suspendido');
+    } catch (err: any) {
+      mostrarMensaje('err', err.message || 'Error');
     }
   };
 
@@ -189,41 +226,59 @@ export default function AdminUsersScreen() {
     setShowAsignar(true);
   };
 
-  const handleGuardarAsignar = () => {
+  const handleGuardarAsignar = async () => {
     if (!asignarForm.email) return mostrarMensaje('err', 'Ingresa el email');
     if (asignarForm.contraseña && asignarForm.contraseña !== asignarForm.confirmar)
       return mostrarMensaje('err', 'Las contraseñas no coinciden');
     if (asignarForm.contraseña && asignarForm.contraseña.length < 6)
       return mostrarMensaje('err', 'Contraseña mínimo 6 caracteres');
 
-    const todos = lsCargar();
-    const existente = todos.find(u => u.docenteId === docenteSelec.id);
-    if (existente) {
-      const idx = todos.findIndex(u => u.id === existente.id);
-      todos[idx].email = asignarForm.email;
-      if (asignarForm.contraseña) todos[idx].contraseña = asignarForm.contraseña;
-      lsGuardar(todos);
-      mostrarMensaje('ok', 'Credenciales actualizadas');
-    } else {
-      if (!asignarForm.contraseña) return mostrarMensaje('err', 'Contraseña requerida para nuevo usuario');
-      if (todos.some(u => u.email === asignarForm.email))
-        return mostrarMensaje('err', 'Ese email ya tiene cuenta');
-      todos.push({
-        id: 'usr-' + Date.now(),
-        nombre: docenteSelec.nombre || docenteSelec.apellidos_nombres || '',
-        email: asignarForm.email,
-        contraseña: asignarForm.contraseña,
-        rol: 'teacher',
-        activo: true,
-        creado: new Date().toISOString(),
-        docenteId: docenteSelec.id,
-      });
-      lsGuardar(todos);
-      mostrarMensaje('ok', 'Usuario docente creado');
+    try {
+      // Siempre usar localStorage directamente para esta operación
+      const todos = lsCargar();
+      const existente = todos.find(u => u.docenteId === docenteSelec.id);
+      if (existente) {
+        const idx = todos.findIndex(u => u.id === existente.id);
+        todos[idx].email = asignarForm.email;
+        if (asignarForm.contraseña) todos[idx].contraseña = asignarForm.contraseña;
+        lsGuardar(todos);
+        mostrarMensaje('ok', 'Credenciales actualizadas');
+      } else {
+        if (!asignarForm.contraseña) return mostrarMensaje('err', 'Contraseña requerida para nuevo usuario');
+        if (todos.some(u => u.email === asignarForm.email))
+          return mostrarMensaje('err', 'Ese email ya tiene cuenta');
+        todos.push({
+          id: 'usr-' + Date.now(),
+          nombre: docenteSelec.nombre || docenteSelec.apellidos_nombres || '',
+          email: asignarForm.email,
+          contraseña: asignarForm.contraseña,
+          rol: 'teacher' as const,
+          activo: true,
+          creado: new Date().toISOString(),
+          docenteId: docenteSelec.id,
+        });
+        lsGuardar(todos);
+        mostrarMensaje('ok', 'Usuario docente creado');
+      }
+      // También intentar sync con API en prod
+      if (import.meta.env.PROD && getToken()) {
+        try {
+          const existenteApi = todos.find(u => u.docenteId === docenteSelec.id);
+          if (existenteApi) {
+            await fetch(`/api/users?id=${existenteApi.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+              body: JSON.stringify({ email: asignarForm.email, ...(asignarForm.contraseña ? { contraseña: asignarForm.contraseña } : {}) }),
+            });
+          }
+        } catch { /* silencioso */ }
+      }
+      setShowAsignar(false);
+      setDocenteSelec(null);
+      cargar();
+    } catch (err: any) {
+      mostrarMensaje('err', err.message || 'Error al guardar');
     }
-    setShowAsignar(false);
-    setDocenteSelec(null);
-    cargar();
   };
 
   // ── Importación ───────────────────────────────────────────────────
@@ -273,24 +328,26 @@ export default function AdminUsersScreen() {
     e.target.value = '';
   };
 
-  const handleImportar = () => {
+  const handleImportar = async () => {
     setImportando(true);
     let ok = 0, errores = 0;
-    const todos = lsCargar();
-    const emailsExistentes = new Set(todos.map(u => u.email));
+    const emailsExistentes = new Set(usuarios.map(u => u.email));
     for (const u of importPreview) {
       if (!u.nombre || !u.email || !u.contraseña) { errores++; continue; }
       if (emailsExistentes.has(u.email!)) { errores++; continue; }
-      todos.push({
-        id: 'usr-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
-        nombre: u.nombre!, email: u.email!, contraseña: u.contraseña!,
-        rol: (u.rol as any) || 'teacher', activo: true,
-        creado: new Date().toISOString(),
-      });
-      emailsExistentes.add(u.email!);
-      ok++;
+      try {
+        await apiUsers('/api/users', 'POST', {
+          nombre: u.nombre,
+          email: u.email,
+          contraseña: u.contraseña,
+          rol: u.rol || 'teacher',
+        });
+        emailsExistentes.add(u.email!);
+        ok++;
+      } catch {
+        errores++;
+      }
     }
-    lsGuardar(todos);
     setImportResultado({ ok, error: errores });
     setImportando(false);
     cargar();
@@ -303,6 +360,67 @@ export default function AdminUsersScreen() {
     const a = document.createElement('a');
     a.href = url; a.download = 'plantilla_usuarios.csv'; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportarDatosCompletos = () => {
+    const datos = {
+      usuarios: localStorage.getItem('sistema_usuarios'),
+      docentes: localStorage.getItem('ie_docentes'),
+      alumnos: localStorage.getItem('ie_alumnos'),
+      columnas: localStorage.getItem('cal_columnas'),
+      calificativos: localStorage.getItem('ie_calificativos_v2'),
+      asistencia: localStorage.getItem('ie_asistencia'),
+      exportado: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `respaldo_edugest_${new Date().toISOString().split('T')[0]}.json`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importarDatosCompletos = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          const datos = JSON.parse(ev.target?.result as string);
+          let importado = 0;
+          if (datos.usuarios) {
+            localStorage.setItem('sistema_usuarios', datos.usuarios);
+            const us = JSON.parse(datos.usuarios);
+            setUsuarios(us);
+            importado += us.length;
+          }
+          if (datos.docentes) {
+            localStorage.setItem('ie_docentes', datos.docentes);
+            const dc = JSON.parse(datos.docentes);
+            setDocentes(dc);
+            importado += dc.length;
+          }
+          if (datos.alumnos) {
+            localStorage.setItem('ie_alumnos', datos.alumnos);
+          }
+          if (datos.columnas) {
+            localStorage.setItem('cal_columnas', datos.columnas);
+          }
+          if (datos.calificativos) {
+            localStorage.setItem('ie_calificativos_v2', datos.calificativos);
+          }
+          if (datos.asistencia) {
+            localStorage.setItem('ie_asistencia', datos.asistencia);
+          }
+          alert(`✅ Importado: ${importado} usuarios/docentes\n📅 Fecha: ${datos.exportado || 'desconocida'}`);
+        } catch { alert('Error al importar backup'); }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
   };
 
   // Detectar si docente ya tiene usuario
@@ -331,8 +449,17 @@ export default function AdminUsersScreen() {
             <button onClick={cargar} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
               <RefreshCw size={14} /> Actualizar
             </button>
+<button onClick={exportarDatosCompletos} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
+              <Download size={16} /> Respaldo
+            </button>
+            <button onClick={importarDatosCompletos} className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm">
+              <Upload size={16} /> Restaurar</button>
             <button onClick={descargarPlantilla} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
-              <Download size={14} /> Plantilla CSV
+              <Upload size={16} /> Plantilla
+            </button>
+            <button onClick={() => { setShowForm(true); setEditando(null); setForm(emptyForm); }}
+              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold rounded-lg text-sm hover:opacity-90">
+              <Plus size={16} /> Nuevo Usuario
             </button>
             <label className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm cursor-pointer">
               <Upload size={14} /> Importar
@@ -557,12 +684,18 @@ export default function AdminUsersScreen() {
                 <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
                   placeholder="juan@manuelfidencio.edu.pe" className={inputCls} />
               </div>
-              <div>
-                <label className="block text-purple-400/80 text-xs font-medium mb-1.5">
+<div>
+                <label className="block purple-400/80 text-xs font-medium mb-1.5">
                   Contraseña {editando ? '(vacío = no cambiar)' : '*'}
                 </label>
-                <input type="password" value={formData.contraseña} onChange={e => setFormData({...formData, contraseña: e.target.value})}
-                  placeholder="••••••••" className={inputCls} />
+                <div className="relative">
+                  <input type={showPassword ? "text" : "password"} value={formData.contraseña} onChange={e => setFormData({...formData, contraseña: e.target.value})}
+                    placeholder="••••••••" className={inputCls} pr-10 />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-400">
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-purple-400/80 text-xs font-medium mb-1.5">Rol *</label>
@@ -592,7 +725,7 @@ export default function AdminUsersScreen() {
             className="w-full pl-11 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-sm" />
         </div>
 
-        {/* Lista usuarios */}
+        {/* Lista usuarios agrupada por rol */}
         {cargando ? (
           <div className="text-center py-16">
             <RefreshCw size={30} className="animate-spin text-purple-400 mx-auto mb-3" />
@@ -601,49 +734,61 @@ export default function AdminUsersScreen() {
         ) : usuariosFiltrados.length === 0 ? (
           <div className="text-center py-12 text-slate-500">No se encontraron usuarios</div>
         ) : (
-          <div className="space-y-2">
-            {usuariosFiltrados.map((u, i) => (
-              <motion.div key={u.id} initial={{ opacity:0, x:-12 }} animate={{ opacity:1, x:0 }} transition={{ delay: i*0.02 }}
-                className={`bg-slate-800/70 border rounded-xl px-5 py-4 flex items-center gap-4 transition-all ${u.activo ? 'border-slate-700/60 hover:border-purple-500/30' : 'border-red-500/20 opacity-60'}`}>
-                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${ROL_CONFIG[u.rol]?.color || 'from-slate-500 to-slate-600'} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
-                  {u.nombre.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-white font-semibold truncate">{u.nombre}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r ${ROL_CONFIG[u.rol]?.color} text-white`}>
-                      {ROL_CONFIG[u.rol]?.label || u.rol}
-                    </span>
-                    {!u.activo && <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full text-xs font-bold">SUSPENDIDO</span>}
+          <div className="space-y-6">
+            {Object.entries(ROL_CONFIG).map(([rol, cfg]) => {
+              const grupo = usuariosFiltrados.filter(u => u.rol === rol);
+              if (grupo.length === 0) return null;
+              return (
+                <div key={rol}>
+                  <div className={`flex items-center gap-3 px-4 py-2 rounded-xl bg-gradient-to-r ${cfg.color} bg-opacity-10 mb-2`}>
+                    <span className="text-xl">{cfg.label.split(' ')[0]}</span>
+                    <span className="text-white font-bold text-sm">{cfg.label.split(' ').slice(1).join(' ')}</span>
+                    <span className="ml-auto text-white/70 text-xs font-medium">{grupo.length} usuario{grupo.length !== 1 ? 's' : ''}</span>
                   </div>
-                  <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-400 flex-wrap">
-                    <span>{u.email}</span>
-                    <span className="flex items-center gap-1">
-                      {mostrarPassword === u.id ? u.contraseña : '••••••••'}
-                      <button onClick={() => setMostrarPassword(mostrarPassword === u.id ? null : u.id)}
-                        className="hover:text-purple-400 ml-0.5">
-                        {mostrarPassword === u.id ? <EyeOff size={11} /> : <Eye size={11} />}
-                      </button>
-                    </span>
+                  <div className="space-y-2 pl-2">
+                    {grupo.map((u, i) => (
+                      <motion.div key={u.id} initial={{ opacity:0, x:-12 }} animate={{ opacity:1, x:0 }} transition={{ delay: i*0.02 }}
+                        className={`bg-slate-800/70 border rounded-xl px-5 py-4 flex items-center gap-4 transition-all ${u.activo ? 'border-slate-700/60 hover:border-purple-500/30' : 'border-red-500/20 opacity-60'}`}>
+                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${ROL_CONFIG[u.rol]?.color || 'from-slate-500 to-slate-600'} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                          {u.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-white font-semibold truncate">{u.nombre}</span>
+                            {!u.activo && <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full text-xs font-bold">SUSPENDIDO</span>}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-400 flex-wrap">
+                            <span>{u.email}</span>
+                            <span className="flex items-center gap-1">
+                              {mostrarPassword === u.id ? u.contraseña : '••••••••'}
+                              <button onClick={() => setMostrarPassword(mostrarPassword === u.id ? null : u.id)}
+                                className="hover:text-purple-400 ml-0.5">
+                                {mostrarPassword === u.id ? <EyeOff size={11} /> : <Eye size={11} />}
+                              </button>
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button onClick={() => toggleActivo(u.id)}
+                            className={`p-2 rounded-lg transition-all ${u.activo ? 'bg-red-500/15 hover:bg-red-500/30 text-red-400' : 'bg-green-500/15 hover:bg-green-500/30 text-green-400'}`}
+                            title={u.activo ? 'Suspender' : 'Activar'}>
+                            {u.activo ? <UserX size={15} /> : <UserCheck size={15} />}
+                          </button>
+                          <button onClick={() => handleEditar(u)}
+                            className="p-2 bg-blue-500/15 hover:bg-blue-500/30 rounded-lg text-blue-400">
+                            <Edit2 size={15} />
+                          </button>
+                          <button onClick={() => handleEliminar(u.id)} disabled={eliminando === u.id}
+                            className="p-2 bg-red-500/15 hover:bg-red-500/30 rounded-lg text-red-400 disabled:opacity-50">
+                            {eliminando === u.id ? <RefreshCw size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <button onClick={() => toggleActivo(u.id)}
-                    className={`p-2 rounded-lg transition-all ${u.activo ? 'bg-red-500/15 hover:bg-red-500/30 text-red-400' : 'bg-green-500/15 hover:bg-green-500/30 text-green-400'}`}
-                    title={u.activo ? 'Suspender' : 'Activar'}>
-                    {u.activo ? <UserX size={15} /> : <UserCheck size={15} />}
-                  </button>
-                  <button onClick={() => handleEditar(u)}
-                    className="p-2 bg-blue-500/15 hover:bg-blue-500/30 rounded-lg text-blue-400">
-                    <Edit2 size={15} />
-                  </button>
-                  <button onClick={() => handleEliminar(u.id)} disabled={eliminando === u.id}
-                    className="p-2 bg-red-500/15 hover:bg-red-500/30 rounded-lg text-red-400 disabled:opacity-50">
-                    {eliminando === u.id ? <RefreshCw size={15} className="animate-spin" /> : <Trash2 size={15} />}
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

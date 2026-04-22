@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { guardarDocentes } from '../services/dataService';
 
 interface Docente {
   id: string;
@@ -21,13 +22,45 @@ const CARGOS = [
   'Docente de Arte', 'Docente de Inglés', 'Psicólogo(a)', 'Otro'
 ];
 
-// ── Persistencia local (sin backend) ─────────────────────────────────────────
+// ── API (Turso en prod, localStorage en local) ────────────────────────────────
 const LS_DOCENTES = 'ie_docentes';
+function getToken() { return localStorage.getItem('auth_token') || ''; }
 function lsCargar(): Docente[] {
   try { return JSON.parse(localStorage.getItem(LS_DOCENTES) || '[]'); } catch { return []; }
 }
-function lsGuardar(lista: Docente[]) {
+function lsGuardar(lista: Docente[]) { 
   localStorage.setItem(LS_DOCENTES, JSON.stringify(lista));
+  guardarDocentes(lista); // Sincronizar con Turso
+}
+
+async function api(path: string, method = 'GET', body?: object): Promise<any> {
+  if (!import.meta.env.PROD) {
+    const todos = lsCargar();
+    if (method === 'GET') return todos;
+    if (method === 'POST') {
+      const b = body as any;
+      if (todos.some(d => d.dni === b.dni)) throw new Error('DNI ya registrado');
+      const nuevo = { ...b, id: 'doc-' + Date.now() };
+      lsGuardar([...todos, nuevo]); return { ok: true };
+    }
+    if (method === 'PUT') {
+      const id = path.split('id=')[1];
+      lsGuardar(todos.map(d => d.id === id ? { ...d, ...(body as any) } : d)); return { ok: true };
+    }
+    if (method === 'DELETE') {
+      const id = path.split('id=')[1];
+      lsGuardar(todos.filter(d => d.id !== id)); return { ok: true };
+    }
+    return {};
+  }
+  const res = await fetch(path, {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error');
+  return data;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -65,51 +98,48 @@ export default function DocentesScreen() {
 
   useEffect(() => { cargar(); }, []);
 
-  const cargar = () => {
-    setCargando(true);
-    setDocentes(lsCargar());
-    setCargando(false);
-  };
-
   const mostrar = (tipo: 'ok' | 'err', texto: string) => {
     setMsg({ tipo, texto });
     setTimeout(() => setMsg(null), 3500);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const cargar = async () => {
+    setCargando(true);
+    try {
+      const data = await api('/api/docentes');
+      setDocentes(Array.isArray(data) ? data : []);
+    } catch { mostrar('err', 'Error al cargar docentes'); }
+    finally { setCargando(false); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.apellidos_nombres || !form.dni || !form.genero || !form.fecha_nacimiento)
       return mostrar('err', 'Completa los campos obligatorios');
     setGuardando(true);
-    const lista = lsCargar();
-    if (editando) {
-      const actualizada = lista.map(d => d.id === editando.id ? { ...form, id: editando.id } : d);
-      lsGuardar(actualizada);
-      setDocentes(actualizada);
-      mostrar('ok', 'Docente actualizado');
-    } else {
-      if (lista.some(d => d.dni === form.dni)) {
-        setGuardando(false);
-        return mostrar('err', 'Ya existe un docente con ese DNI');
+    try {
+      if (editando) {
+        await api(`/api/docentes?id=${editando.id}`, 'PUT', form);
+        mostrar('ok', 'Docente actualizado');
+      } else {
+        await api('/api/docentes', 'POST', form);
+        mostrar('ok', 'Docente registrado');
       }
-      const nuevo = { ...form, id: 'doc-' + Date.now() };
-      const nueva = [...lista, nuevo];
-      lsGuardar(nueva);
-      setDocentes(nueva);
-      mostrar('ok', 'Docente registrado');
-    }
-    setShowForm(false); setEditando(null); setForm(emptyForm);
-    setGuardando(false);
+      setShowForm(false); setEditando(null); setForm(emptyForm);
+      await cargar();
+    } catch (err: any) { mostrar('err', err.message); }
+    finally { setGuardando(false); }
   };
 
-  const handleEliminar = (id: string) => {
+  const handleEliminar = async (id: string) => {
     if (!confirm('¿Eliminar este docente?')) return;
     setEliminando(id);
-    const nueva = lsCargar().filter(d => d.id !== id);
-    lsGuardar(nueva);
-    setDocentes(nueva);
-    mostrar('ok', 'Docente eliminado');
-    setEliminando(null);
+    try {
+      await api(`/api/docentes?id=${id}`, 'DELETE');
+      mostrar('ok', 'Docente eliminado');
+      await cargar();
+    } catch (err: any) { mostrar('err', err.message); }
+    finally { setEliminando(null); }
   };
 
   // ── Importación ───────────────────────────────────────────────────
@@ -170,21 +200,19 @@ export default function DocentesScreen() {
     } catch { mostrar('err', 'Error leyendo el archivo Excel'); }
   };
 
-  const handleImportar = () => {
+  const handleImportar = async () => {
     setImportando(true);
-    const lista = lsCargar();
     let ok = 0, err = 0;
-    const nuevos = [...lista];
     for (const r of importRows) {
       if (!r.apellidos_nombres || !r.dni) { err++; continue; }
-      if (nuevos.some(d => d.dni === r.dni)) { err++; continue; }
-      nuevos.push({ ...emptyForm, ...r, id: 'doc-' + Date.now() + ok });
-      ok++;
+      try {
+        await api('/api/docentes', 'POST', { ...emptyForm, ...r });
+        ok++;
+      } catch { err++; }
     }
-    lsGuardar(nuevos);
-    setDocentes(nuevos);
     setImportResult({ ok, err });
     setImportando(false);
+    await cargar();
   };
 
   const descargarPlantilla = async () => {

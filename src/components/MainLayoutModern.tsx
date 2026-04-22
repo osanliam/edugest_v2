@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Menu, X, LogOut, Moon, Sun, Bell, User, BarChart3, Users,
   BookOpen, MessageSquare, Home, Settings, Building2, Users2,
-  Flame, Clock, CheckSquare, BookMarked, Shield, ChevronDown, GraduationCap, Cog
+  Flame, Clock, CheckSquare, BookMarked, Shield, ChevronDown, GraduationCap, Cog, FileText
 } from 'lucide-react';
 import { User as UserType } from '../types';
 
@@ -40,6 +40,7 @@ const allNavigationItems = [
   { id: 'horario',            label: 'Horario',       icon: <Clock className="w-5 h-5" />,         roles: ['teacher', 'student'],                         category: 'Académico' },
   { id: 'asistencia',         label: 'Asistencia',    icon: <CheckSquare className="w-5 h-5" />,   roles: ['teacher', 'student'],                         category: 'Académico' },
   { id: 'dashboard-estudiante',label: 'Mi Desempeño', icon: <Flame className="w-5 h-5" />,        roles: ['student', 'parent'],                          category: 'Académico' },
+  { id: 'reporte-alumno',      label: 'Informe Alumno', icon: <FileText className="w-5 h-5" />,    roles: ['admin', 'director', 'subdirector', 'teacher', 'parent'],              category: 'Académico' },
   { id: 'normas-convivencia', label: 'Normas',        icon: <BookMarked className="w-5 h-5" />,    roles: ['student'],                                    category: 'Académico' },
 ];
 
