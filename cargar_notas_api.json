@@ -1,0 +1,126 @@
+{
+  "notas": [
+    {
+      "student_id": "3vbmgrg",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "examen",
+      "score": "7"
+    },
+    {
+      "student_id": "3vbmgrg",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "m21653g",
+      "score": "{\"CA3-2\":\"ADECUADA\",\"CA3-1\":\"ADECUADA\",\"CA2-2\":\"NO ADECUADA\",\"CA2-1\":\"NO ADECUADA\",\"CA1-2\":\"NO ADECUADA\",\"CA1-1\":\"NO ADECUADA\",\"CA1-3\":\"NO ADECUADA\"}"
+    },
+    {
+      "student_id": "3vbmgrg",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "6l8wwbh",
+      "score": "{\"1\":\"C\",\"2\":\"B\",\"3\":\"B\",\"4\":\"B\",\"5\":\"A\",\"6\":\"B\",\"7\":\"C\",\"8\":\"C\",\"9\":\"C\",\"10\":\"D\"}"
+    },
+    {
+      "student_id": "hugzi0m",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "examen",
+      "score": "4"
+    },
+    {
+      "student_id": "hugzi0m",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "m21653g",
+      "score": "{\"CA1-1\":\"ADECUADA\",\"CA1-2\":\"ADECUADA\",\"CA1-3\":\"NO ADECUADA\",\"CA2-1\":\"NO ADECUADA\",\"CA2-2\":\"NO ADECUADA\",\"CA3-1\":\"ADECUADA\",\"CA3-2\":\"ADECUADA\"}"
+    },
+    {
+      "student_id": "hugzi0m",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "6l8wwbh",
+      "score": "{\"1\":\"B\",\"2\":\"C\",\"3\":\"B\",\"4\":\"C\",\"5\":\"C\",\"6\":\"B\",\"7\":\"C\",\"8\":\"B\",\"9\":\"C\",\"10\":\"B\"}"
+    },
+    {
+      "student_id": "474hmrj",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "examen",
+      "score": "3"
+    },
+    {
+      "student_id": "474hmrj",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "m21653g",
+      "score": "{\"CA1-1\":\"ADECUADA\",\"CA1-2\":\"ADECUADA\",\"CA3-2\":\"ADECUADA\",\"CA3-1\":\"ADECUADA\",\"CA1-3\":\"ADECUADA\",\"CA2-1\":\"NO ADECUADA\",\"CA2-2\":\"NO ADECUADA\"}"
+    },
+    {
+      "student_id": "474hmrj",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "6l8wwbh",
+      "score": "{\"1\":\"B\",\"2\":\"C\",\"3\":\"B\",\"4\":\"C\",\"5\":\"C\",\"6\":\"B\",\"7\":\"A\",\"8\":\"B\",\"9\":\"A\",\"10\":\"B\"}"
+    },
+    {
+      "student_id": "ck5wx9t",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "examen",
+      "score": "5"
+    },
+    {
+      "student_id": "ck5wx9t",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "m21653g",
+      "score": "{\"CA1-1\":\"NO ADECUADA\",\"CA1-2\":\"NO ADECUADA\",\"CA1-3\":\"ADECUADA\",\"CA2-1\":\"NO ADECUADA\",\"CA2-2\":\"NO ADECUADA\",\"CA3-1\":\"ADECUADA\",\"CA3-2\":\"ADECUADA\"}"
+    },
+    {
+      "student_id": "ck5wx9t",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "6l8wwbh",
+      "score": "{\"1\":\"B\",\"2\":\"C\",\"3\":\"B\",\"4\":\"C\",\"5\":\"D\",\"6\":\"B\",\"7\":\"D\",\"8\":\"D\",\"9\":\"C\",\"10\":\"D\"}"
+    },
+    {
+      "student_id": "561zzvx",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "examen",
+      "score": "3"
+    },
+    {
+      "student_id": "561zzvx",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "m21653g",
+      "score": "{\"CA3-2\":\"ADECUADA\",\"CA3-1\":\"ADECUADA\",\"CA2-2\":\"NO ADECUADA\",\"CA2-1\":\"NO ADECUADA\",\"CA1-3\":\"NO ADECUADA\",\"CA1-2\":\"NO ADECUADA\",\"CA1-1\":\"NO ADECUADA\"}"
+    },
+    {
+      "student_id": "561zzvx",
+      "teacher_id": "teacher-default",
+      "subject": "Comunicación",
+      "competence": "Lee textos diversos",
+      "instrument": "6l8wwbh",
+      "score": "{\"1\":\"B\",\"2\":\"C\",\"3\":\"B\",\"4\":\"C\",\"5\":\"D\",\"6\":\"B\",\"7\":\"C\",\"8\":\"D\",\"9\":\"C\",\"10\":\"D\"}"
+    }
+  ],
+  "total": 15,
+  "fecha": "2026-04-24"
+}

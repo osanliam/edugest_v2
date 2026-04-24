@@ -4,13 +4,13 @@ import { syncToTurso } from '../services/dataService';
 
 // ── Competencias ──────────────────────────────────────────────────────────────
 const COMPETENCIAS = [
-  { id: 'comp1', label: 'C1', nombre: 'Se comunica oralmente en lengua materna',                  color: 'from-violet-500 to-purple-600',  text: 'text-violet-300',  bg: 'bg-violet-500/10',  headerBg: 'bg-violet-900/40',  promBg: 'bg-violet-500/20 border-violet-400/50 text-violet-200' },
-  { id: 'comp2', label: 'C2', nombre: 'Lee diversos tipos de textos escritos en lengua materna',  color: 'from-cyan-500 to-blue-600',       text: 'text-cyan-300',    bg: 'bg-cyan-500/10',    headerBg: 'bg-cyan-900/40',    promBg: 'bg-cyan-500/20 border-cyan-400/50 text-cyan-200'       },
-  { id: 'comp3', label: 'C3', nombre: 'Escribe diversos tipos de textos en lengua materna',       color: 'from-emerald-500 to-teal-600',    text: 'text-emerald-300', bg: 'bg-emerald-500/10', headerBg: 'bg-emerald-900/40', promBg: 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200' },
+  { id: 'comp1', label: 'C1', nombre: 'Lee diversos tipos de textos escritos en lengua materna',  color: 'from-cyan-500 to-blue-600',       text: 'text-cyan-300',    bg: 'bg-cyan-500/10',    headerBg: 'bg-cyan-900/40',    promBg: 'bg-cyan-500/20 border-cyan-400/50 text-cyan-200'       },
+  { id: 'comp2', label: 'C2', nombre: 'Escribe diversos tipos de textos en lengua materna',       color: 'from-emerald-500 to-teal-600',    text: 'text-emerald-300', bg: 'bg-emerald-500/10', headerBg: 'bg-emerald-900/40', promBg: 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200' },
+  { id: 'comp3', label: 'C3', nombre: 'Se comunica oralmente en lengua materna',                  color: 'from-violet-500 to-purple-600',  text: 'text-violet-300',  bg: 'bg-violet-500/10',  headerBg: 'bg-violet-900/40',  promBg: 'bg-violet-500/20 border-violet-400/50 text-violet-200' },
 ];
 
 // ── Tipos de instrumento ──────────────────────────────────────────────────────
-type TipoInstrumento = 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica' | 'portafolio-evidencias' | 'registro-anecdotico' | 'escala-valoracion';
+type TipoInstrumento = 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica' | 'portafolio-evidencias' | 'registro-anecdotico' | 'escala-valoracion' | 'nota-numerica';
 
 const TIPO_CONFIG: Record<string, { label: string; icono: string; puedeAD: boolean }> = {
   'examen':                 { label: 'Examen',                 icono: '📝', puedeAD: false },
@@ -20,6 +20,7 @@ const TIPO_CONFIG: Record<string, { label: string; icono: string; puedeAD: boole
   'portafolio-evidencias':  { label: 'Portafolio Evidencias', icono: '📁', puedeAD: false },
   'registro-anecdotico':   { label: 'Registro Anecdótico',  icono: '📋', puedeAD: false },
   'escala-valoracion':    { label: 'Escala de Valoración',icono: '📊', puedeAD: false },
+  'nota-numerica':       { label: 'Nota Numérica',       icono: '🔢', puedeAD: false },
   'desconocido':          { label: 'Desconocido',          icono: '❓', puedeAD: false },
 };
 
@@ -55,15 +56,20 @@ interface Columna {
   tipo: TipoInstrumento;
   totalItems: number;
   competenciaId: string;
+  bimestreId?: string;
   promediar: boolean;
-  itemsExamen?: ItemExamen[]; // solo para examen: clave de respuestas
+  itemsExamen?: ItemExamen[];
+  items?: string[];
+  columnasEval?: string[];
+  creatorId?: string; // email de quien creó la columna
 }
 
 interface Calificativo {
   alumnoId: string;
   columnaId: string;
-  marcados: boolean[];          // instrumento/rubrica: logrado por ítem
-  claves?: string[];            // examen: letra marcada por alumno
+  marcados: boolean[];
+  claves?: string[];
+  notaNumerica?: number; // solo para nota-numerica: 0-20
   calificativo: 'C' | 'B' | 'A' | 'AD';
   esAD: boolean;
   fecha: string;
@@ -237,18 +243,109 @@ interface ItemEditable {
   observaciones: string;
 }
 
+function PopupNotaNumerica({ alumno, columna, calActual, onGuardar, onCerrar }: {
+  alumno: Alumno; columna: Columna; calActual?: Calificativo;
+  onGuardar: (c: Calificativo) => void; onCerrar: () => void;
+}) {
+  const notaDefault = calActual?.calificativo || 'C';
+  const valorNota = (() => {
+    if (calActual?.notaNumerica !== undefined) return calActual.notaNumerica;
+    if (calActual?.calificativo === 'A') return 18;
+    if (calActual?.calificativo === 'B') return 14;
+    if (calActual?.calificativo === 'AD') return 20;
+    return 11;
+  })();
+  
+  const [nota, setNota] = useState<number>(valorNota || 11);
+  const nomAlumno = alumno.apellidos_nombres || alumno.nombre || '—';
+  
+  const getCalificativo = (n: number): 'C'|'B'|'A'|'AD' => {
+    if (n >= 18) return 'A';
+    if (n >= 14) return 'B';
+    if (n >= 11) return 'C';
+    return 'C';
+  };
+  
+  const cal = getCalificativo(nota);
+  
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
+      <div className="bg-slate-800 border border-green-500/30 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-slate-700 bg-slate-700/40 rounded-t-2xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-white font-black text-base">{nomAlumno}</p>
+              <p className="text-slate-400 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className="px-2 py-1 bg-green-500/20 border border-green-500/40 text-green-300 rounded-lg text-xs font-bold">🔢 {columna.nombre}</span>
+                <span className="text-xs text-slate-500">Nota Numérica (0-20)</span>
+              </div>
+            </div>
+            <button onClick={onCerrar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 flex-shrink-0"><X size={18}/></button>
+          </div>
+        </div>
+        
+        <div className="px-6 py-8 flex flex-col items-center">
+          <label className="block text-xs text-slate-400 mb-3 font-medium uppercase tracking-wide">Ingrese la nota (0-20)</label>
+          <input 
+            type="number" 
+            min={0} 
+            max={20} 
+            value={nota} 
+            onChange={e => setNota(Math.max(0, Math.min(20, Number(e.target.value))))}
+            className="w-32 text-center text-4xl font-black bg-slate-700 border-2 border-slate-500 rounded-xl py-4 text-white focus:outline-none focus:border-green-500"
+          />
+          <div className="flex gap-2 mt-4">
+            {[0,5,10,11,12,13,14,15,16,17,18,19,20].map(n => (
+              <button key={n} onClick={() => setNota(n)} className={`w-10 h-10 rounded-lg font-bold text-sm ${nota === n ? 'bg-green-500 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{n}</button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="px-6 py-4 border-t border-slate-700 flex items-center gap-4 bg-slate-700/50">
+          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[cal]}`}>{cal}</div>
+          <div className="flex-1">
+            <p className="text-white font-bold">{CAL_LABEL[cal]}</p>
+            <p className="text-slate-400 text-xs mt-0.5">18-20=A · 14-17=B · 11-13=C · 0-10=C</p>
+          </div>
+        </div>
+        
+        <div className="px-6 py-4 border-t border-slate-700 flex gap-3">
+          <button onClick={() => onGuardar({ alumnoId: (alumno as any).id, columnaId: columna.id, marcados: [], notaNumerica: nota, calificativo: cal, esAD: false, fecha: new Date().toISOString().split('T')[0] })}
+            className="flex-1 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
+            <Save size={15}/> Guardar
+          </button>
+          <button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PopupInstrumento({ alumno, columna, calActual, onGuardar, onCerrar }: {
   alumno: Alumno; columna: Columna; calActual?: Calificativo;
   onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
   const cfg = TIPO_CONFIG[columna.tipo];
   
+  const getColumnasInicio = () => {
+    if (columna.columnasEval && columna.columnasEval.length > 0) return columna.columnasEval;
+    switch (cfg.label) {
+      case 'Lista de Cotejo': return ['Sí', 'No'];
+      case 'Ficha de Observación': return ['Logrado', 'Parcial', 'No Logrado'];
+      case 'Portafolio Evidencias': return ['Presentó', 'No Presentó'];
+      case 'Escala de Valoración': return ['Siempre', 'Casi siempre', 'A veces', 'Rara vez', 'Nunca'];
+      default: return ['Sí', 'No'];
+    }
+  };
+  
   const inicialItems = (): ItemEditable[] => {
     if (calActual?.items?.length) return calActual.items;
+    const cols = getColumnasInicio();
     return Array(columna.totalItems).fill(null).map((_, i) => ({
-      indicador: `Indicador ${i + 1}`,
-      columnas: ['Sí', 'No'],
-      respuestas: Array(columna.totalItems).fill(''),
+      indicador: columna.items?.[i] || `Indicador ${i + 1}`,
+      columnas: cols,
+      respuestas: Array(cols.length).fill(''),
       observaciones: ''
     }));
   };
@@ -272,9 +369,10 @@ function PopupInstrumento({ alumno, columna, calActual, onGuardar, onCerrar }: {
   };
   
   const cal = calcularCal();
-  const nomAlumno = aluno.apellidos_nombres || aluno.nombre || '—';
+  const nomAlumno = alumno.apellidos_nombres || alumno.nombre || '—';
   
   const getColumnas = () => {
+    if (columna.columnasEval && columna.columnasEval.length > 0) return columna.columnasEval;
     switch (cfg.label) {
       case 'Lista de Cotejo': return ['Sí', 'No'];
       case 'Ficha de Observación': return ['Logrado', 'Parcial', 'No Logrado'];
@@ -406,20 +504,20 @@ interface ItemRubrica {
   respuestas: string[];
 }
 
-function PopupRubrica({ aluno, coluna, calAtual, onSalvar, onFechar }: {
-  aluno: Alumno; coluna: Columna; calAtual?: Calificativo;
-  onSalvar: (c: Calificativo) => void; onFechar: () => void;
+function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
+  alumno: Alumno; columna: Columna; calActual?: Calificativo;
+  onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
   const inicialItems = (): ItemRubrica[] => {
-    if (calAtual?.items?.length) return calAtual.items;
-    return Array(coluna.totalItems).fill(null).map((_, i) => ({
+    if (calActual?.items?.length) return calActual.items;
+    return Array(columna.totalItems).fill(null).map((_, i) => ({
       criterio: `Criterio ${i + 1}`,
       respuestas: ['', '', '', '']
     }));
   };
   
   const [items, setItems] = useState<ItemRubrica[]>(inicialItems);
-  const [esAD, setEsAD] = useState(calAtual?.esAD ?? false);
+  const [esAD, setEsAD] = useState(calActual?.esAD ?? false);
   const colsLabel = ['C', 'B', 'A', 'AD'];
 
   const marcar = (i: number, colIdx: number, valor: string) => {
@@ -448,24 +546,24 @@ function PopupRubrica({ aluno, coluna, calAtual, onSalvar, onFechar }: {
   
   const calAuto = calcularCal();
   const calFinal: 'C'|'B'|'A'|'AD' = esAD && calAuto === 'A' ? 'AD' : calAuto;
-  const nomAlumno = aluno.apellidos_nombres || aluno.nombre || '—';
+  const nomAlumno = alumno.apellidos_nombres || alumno.nombre || '—';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onFechar}>
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
       <div className="bg-slate-800 border border-purple-500/30 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 
         <div className="px-6 py-4 border-b border-slate-700 bg-slate-700/40 rounded-t-2xl sticky top-0 z-10">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-white font-black text-base">{nomAlumno}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{(aluno as any).grado}° "{(aluno as any).seccion}"</p>
+              <p className="text-slate-400 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="px-2 py-1 bg-purple-500/20 border border-purple-500/40 text-purple-300 rounded-lg text-xs font-bold">📐 {coluna.nombre}</span>
+                <span className="px-2 py-1 bg-purple-500/20 border border-purple-500/40 text-purple-300 rounded-lg text-xs font-bold">📐 {columna.nombre}</span>
                 <span className="text-xs text-slate-500">Rúbrica · {items.length} criterios</span>
                 {calAuto === 'A' && <span className="text-xs text-blue-400 font-semibold">⭐ Puede AD</span>}
               </div>
             </div>
-            <button onClick={onFechar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 flex-shrink-0"><X size={18}/></button>
+            <button onClick={onCerrar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 flex-shrink-0"><X size={18}/></button>
           </div>
         </div>
 
@@ -541,11 +639,11 @@ function PopupRubrica({ aluno, coluna, calAtual, onSalvar, onFechar }: {
         </div>
 
         <div className="px-6 py-4 border-t border-slate-700 flex gap-3">
-          <button onClick={() => onSalvar({ alunoId: (aluno as any).id, colunaId: coluna.id, marcados: items.map(i => i.respuestas), calificativo: calFinal, esAD, fecha: new Date().toISOString().split('T')[0] })}
+          <button onClick={() => onGuardar({ alumnoId: (alumno as any).id, columnaId: columna.id, marcados: items.map(i => i.respuestas), calificativo: calFinal, esAD, fecha: new Date().toISOString().split('T')[0] })}
             className="flex-1 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
             <Save size={15}/> Guardar
           </button>
-          <button onClick={onFechar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
+          <button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
         </div>
       </div>
     </div>
@@ -555,17 +653,28 @@ function PopupRubrica({ aluno, coluna, calAtual, onSalvar, onFechar }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // Modal NUEVA / EDITAR columna
 // ─────────────────────────────────────────────────────────────────────────────
-function ModalColumna({ columnaEditar, onGuardar, onCerrar }: {
-  columnaEditar?: Columna; onGuardar: (c: Columna) => void; onCerrar: () => void;
+function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail }: {
+  columnaEditar?: Columna; onGuardar: (c: Columna) => void; onCerrar: () => void; userEmail?: string;
 }) {
   const [nombre,    setNombre]    = useState(columnaEditar?.nombre ?? '');
   const [tipo,      setTipo]      = useState<TipoInstrumento>(columnaEditar?.tipo ?? 'lista-cotejo');
   const [total,     setTotal]     = useState(columnaEditar?.totalItems ?? 10);
   const [compId,    setCompId]    = useState(columnaEditar?.competenciaId ?? 'comp1');
+  const [bimestreId, setBimestreId] = useState(columnaEditar?.bimestreId ?? '');
   const [promediar, setPromediar] = useState(columnaEditar?.promediar ?? true);
   const [correctas, setCorrectas] = useState<string[]>(() =>
     columnaEditar?.itemsExamen ? columnaEditar.itemsExamen.map(i => i.correcta) : Array(columnaEditar?.totalItems ?? 10).fill('A')
   );
+  const [nuevasColumnasEval, setNuevasColumnasEval] = useState<string>(() => {
+    if (columnaEditar?.columnasEval) return columnaEditar.columnasEval.join(', ');
+    if (tipo === 'lista-cotejo') return 'Sí,No';
+    if (tipo === 'ficha-observacion') return 'Logrado,Parcial,No Logrado';
+    if (tipo === 'rubrica') return 'C,B,A,AD';
+    if (tipo === 'portafolio-evidencias') return 'Presentó,No Presentó';
+    if (tipo === 'registro-anecdotico') return 'Positivo,Negativo';
+    return 'Siempre,Casi siempre,A veces,Rara vez,Nunca';
+  });
+  const unidades = lsGet<any[]>('cfg_unidades', []);
 
   const ajustarTotal = (n: number) => {
     setTotal(n);
@@ -575,7 +684,8 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar }: {
   const guardar = () => {
     if (!nombre.trim()) return;
     const itemsExamen = tipo === 'examen' ? correctas.map(c => ({ correcta: c })) : undefined;
-    onGuardar({ id: columnaEditar?.id ?? 'col-' + Date.now(), nombre: nombre.trim(), tipo, totalItems: total, competenciaId: compId, promediar, itemsExamen });
+    const cols = nuevasColumnasEval.split(',').map(c => c.trim()).filter(c => c);
+    onGuardar({ id: columnaEditar?.id ?? 'col-' + Date.now(), nombre: nombre.trim(), tipo, totalItems: total, competenciaId: compId, bimestreId: bimestreId || undefined, promediar, itemsExamen, columnasEval: cols.length > 0 ? cols : undefined, creatorId: userEmail || 'admin' });
   };
 
   const inp = "w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-500";
@@ -596,6 +706,23 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar }: {
             <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
               placeholder="Ej: Examen Bimestre 1, Rúbrica Exposición U2..."
               className={inp} autoFocus />
+          </div>
+
+          {/* Bimestre/Unidad */}
+          <div>
+            <label className="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wide">Unidad / Bimestre</label>
+            <div className="flex gap-2">
+              <button onClick={() => setBimestreId('')}
+                className={`px-3 py-2 rounded-lg text-xs font-bold border-2 transition-all ${!bimestreId ? 'bg-slate-600 border-white text-white' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'}`}>
+                Todas las unidades
+              </button>
+              {unidades.map(b => (
+                <button key={b.id} onClick={() => setBimestreId(b.id)}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold border-2 transition-all ${bimestreId === b.id ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'}`}>
+                  {b.nombre}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Competencia */}
@@ -645,10 +772,28 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar }: {
           {/* N° ítems */}
           <div>
             <label className="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wide">
-              N° de {tipo === 'examen' ? 'preguntas' : 'criterios'} *
+              N° de {tipo === 'examen' ? 'preguntas' : 'indicadores/criterios'} *
             </label>
             <input type="number" min={1} max={50} value={total} onChange={e => ajustarTotal(Number(e.target.value))} className={inp} />
           </div>
+
+          {/* Opciones de evaluación (para instrumentos no-examen) */}
+          {tipo !== 'examen' && (
+            <div>
+              <label className="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wide">
+                Opciones de evaluación (encabezados de columnas)
+              </label>
+              <p className="text-xs text-slate-500 mb-2">Separa las opciones con coma. Ej: Sí,No o Logrado,Parcial,No Logrado</p>
+              <input 
+                type="text" 
+                value={nuevasColumnasEval}
+                onChange={e => setNuevasColumnasEval(e.target.value)}
+                placeholder="Sí,No"
+                className={inp} 
+              />
+              <p className="text-xs text-indigo-400 mt-1">Las opciones se guardan al crear/editar el instrumento</p>
+            </div>
+          )}
 
           {/* Clave de respuestas (solo examen) */}
           {tipo === 'examen' && (
@@ -718,6 +863,9 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const [alumnos,       setAlumnos]       = useState<Alumno[]>([]);
   const [columnas,      setColumnas]      = useState<Columna[]>([]);
   const [calificativos, setCalificativos] = useState<Calificativo[]>([]);
+  const [bimestres,    setBimestres]    = useState<any[]>([]);
+  const [filtroUnidad, setFiltroUnidad] = useState<string>('');
+  const [filtroCreador, setFiltroCreador] = useState<string>('');
   const [filtroGrado,   setFiltroGrado]   = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [filtroSeccion, setFiltroSeccion] = useState('');
@@ -730,6 +878,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     setAlumnos(lsGet(LS_ALUMNOS));
     setColumnas(lsGet(LS_COLUMNAS));
     setCalificativos(lsGet(LS_CALS));
+    setBimestres(lsGet('cfg_unidades', []).filter((u: any) => u.activa !== false));
   }, []);
 
   const recargar = () => setCalificativos(lsGet(LS_CALS));
@@ -817,7 +966,10 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   };
 
   const nombre = (a: Alumno) => a.apellidos_nombres || a.nombre || '—';
-  const colPorComp = (cid: string) => columnas.filter(c => c.competenciaId === cid);
+  const colPorComp = (cid: string) => columnas.filter(c => {
+    const matchUnidad = !filtroUnidad || c.bimestreId === filtroUnidad || !c.bimestreId;
+    return c.competenciaId === cid && matchUnidad;
+  });
   const avance = (alumnoId: string) => {
     if (columnas.length === 0) return 0;
     return Math.round(columnas.filter(c => getCal(alumnoId, c.id)).length / columnas.length * 100);
@@ -835,10 +987,12 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
           ? <PopupExamen alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
           : popup.columna.tipo === 'rubrica'
             ? <PopupRubrica alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
-            : <PopupInstrumento alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
+            : popup.columna.tipo === 'nota-numerica'
+              ? <PopupNotaNumerica alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
+              : <PopupInstrumento alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
       )}
       {modalColumna !== null && (
-        <ModalColumna columnaEditar={modalColumna.columna} onGuardar={handleGuardarColumna} onCerrar={() => setModalColumna(null)} />
+        <ModalColumna columnaEditar={modalColumna.columna} onGuardar={handleGuardarColumna} onCerrar={() => setModalColumna(null)} userEmail={user?.email} />
       )}
 
       {/* Header */}
@@ -864,6 +1018,11 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
             </button>
           </div>
         </div>
+        {columnas.length > 0 && !filtroUnidad && (
+          <div className="px-4 py-2 bg-amber-500/20 border border-amber-500/40 mx-4 rounded-lg">
+            <p className="text-amber-300 text-xs font-bold">⚠️ Selecciona una unidad para ver sus columnas independientes</p>
+          </div>
+        )}
         <div className="px-4 pb-3 flex gap-2 flex-wrap items-center">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -871,6 +1030,11 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
               placeholder="Buscar por nombre o DNI..."
               className="bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-500 w-48" />
           </div>
+          <select value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}
+            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-indigo-500">
+            <option value="">Selecciona una unidad</option>
+            {bimestres.map(b => <option key={b.id} value={b.id}>Unidad {b.numero}: {b.nombre}</option>)}
+          </select>
           <select value={filtroGrado} onChange={e => setFiltroGrado(e.target.value)}
             className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-500">
             <option value="">Todos los grados</option>

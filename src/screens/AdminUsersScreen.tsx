@@ -86,7 +86,7 @@ function parseCSV(text: string): Partial<Usuario>[] {
   });
 }
 
-export default function AdminUsersScreen() {
+export default function AdminUsersScreen({ user }: { user?: any }) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [docentes, setDocentes] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -379,7 +379,7 @@ export default function AdminUsersScreen() {
     URL.revokeObjectURL(url);
   };
 
-  const importarDatosCompletos = () => {
+const importarDatosCompletos = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -390,33 +390,52 @@ export default function AdminUsersScreen() {
       reader.onload = async (ev) => {
         try {
           const datos = JSON.parse(ev.target?.result as string);
-          let importado = 0;
-          if (datos.usuarios) {
-            localStorage.setItem('sistema_usuarios', datos.usuarios);
-            const us = JSON.parse(datos.usuarios);
-            setUsuarios(us);
-            importado += us.length;
-          }
-          if (datos.docentes) {
-            localStorage.setItem('ie_docentes', datos.docentes);
-            const dc = JSON.parse(datos.docentes);
-            setDocentes(dc);
-            importado += dc.length;
-          }
-          if (datos.alumnos) {
-            localStorage.setItem('ie_alumnos', datos.alumnos);
+          const msgs: string[] = [];
+          
+          const mergeData = (key: string, newData: any[], idField = 'id') => {
+            if (!newData || !Array(newData)) return 0;
+            const existing = JSON.parse(localStorage.getItem(key) || '[]');
+            const existingIds = new Set(existing.map((x: any) => x[idField]));
+            let added = 0;
+            newData.forEach((item: any) => {
+              if (!existingIds.has(item[idField])) {
+                existing.push(item);
+                added++;
+              }
+            });
+            if (added > 0) localStorage.setItem(key, JSON.stringify(existing));
+            return added;
+          };
+          
+          if (datos.students || datos.alumnos) {
+            const arr = datos.students || datos.alumnos;
+            const added = mergeData('ie_alumnos', Array.isArray(arr) ? arr : JSON.parse(arr), 'id');
+            if (added > 0) msgs.push(`📚 ${added} alumnos nuevos`);
           }
           if (datos.columnas) {
-            localStorage.setItem('cal_columnas', datos.columnas);
+            const arr = Array.isArray(datos.columnas) ? datos.columnas : JSON.parse(datos.columnas);
+            const added = mergeData('cal_columnas', arr, 'id');
+            if (added > 0) msgs.push(`📊 ${added} columnas nuevas`);
           }
-          if (datos.calificativos) {
-            localStorage.setItem('ie_calificativos_v2', datos.calificativos);
+          if (datos.calificativos || datos.grades) {
+            const arr = datos.calificativos || datos.grades;
+            const calif = Array.isArray(arr) ? arr : JSON.parse(arr);
+            const added = mergeData('ie_calificativos_v2', calif, 'alumnoId');
+            if (added > 0) msgs.push(`📝 ${added} calificaciones nuevas`);
           }
-          if (datos.asistencia) {
-            localStorage.setItem('ie_asistencia', datos.asistencia);
+          if (datos.asistencia || datos.attendance) {
+            const arr = datos.asistencia || datos.attendance;
+            const asist = Array.isArray(arr) ? arr : JSON.parse(arr);
+            const added = mergeData('ie_asistencia', asist, 'alumnoId');
+            if (added > 0) msgs.push(`✅ ${added} asistencia nueva`);
           }
-          alert(`✅ Importado: ${importado} usuarios/docentes\n📅 Fecha: ${datos.exportado || 'desconocida'}`);
-        } catch { alert('Error al importar backup'); }
+          
+          if (msgs.length === 0) {
+            alert('No se reconoció ningún formato. Las claves disponibles son: ' + Object.keys(datos).join(', '));
+          } else {
+            alert('✅ Importado:\n' + msgs.join('\n'));
+          }
+        } catch (err) { alert('Error al importar: ' + err); }
       };
       reader.readAsText(file);
     };
@@ -435,19 +454,24 @@ export default function AdminUsersScreen() {
       reader.onload = async (ev) => {
         try {
           const datos = JSON.parse(ev.target?.result as string);
-          if (!datos.calificativos) {
-            alert('El archivo no contiene calificaciones'); return;
+          const claves = Object.keys(datos);
+          
+          const nuevasCalif = datos.grades;
+          
+          if (!nuevasCalif) {
+            alert('No se encontraron grades.\nClaves: ' + claves.join(', ')); return;
           }
           
+          const arrCalif = Array.isArray(nuevasCalif) ? nuevasCalif : [nuevasCalif];
+          
           // Leer calificaciones actuales
-          const califActuales = lsGet<any[]>('ie_calificativos_v2', []);
-          const nuevasCalif = JSON.parse(datos.calificativos);
+          const califActuales = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
           
           // Fusionar: agregar solo las que no existen
           const actualesIds = new Set(califActuales.map(c => `${c.alumnoId}-${c.columnaId}-${c.fecha}`));
           let agregadas = 0;
           
-          nuevasCalif.forEach((cal: any) => {
+          arrCalif.forEach((cal: any) => {
             const key = `${cal.alumnoId}-${cal.columnaId}-${cal.fecha}`;
             if (!actualesIds.has(key)) {
               califActuales.push(cal);
@@ -457,7 +481,7 @@ export default function AdminUsersScreen() {
           
           localStorage.setItem('ie_calificativos_v2', JSON.stringify(califActuales));
           alert(`✅ Se agregaron ${agregadas} calificaciones nuevas\n📊 Total now: ${califActuales.length}`);
-        } catch { alert('Error al importar notas'); }
+        } catch (err) { alert('Error al importar notas: ' + err); }
       };
       reader.readAsText(file);
     };

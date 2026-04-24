@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agrupador de Estudiantes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+
+        .panel {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+
+        .panel h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        select, input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: transform 0.2s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #999;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .students-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background: white;
+        }
+
+        .student-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            background: white;
+        }
+
+        .student-item:last-child {
+            border-bottom: none;
+        }
+
+        .student-info {
+            flex: 1;
+        }
+
+        .student-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .student-score {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .btn-remove {
+            background: #e74c3c;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .btn-remove:hover {
+            background: #c0392b;
+        }
+
+        .groups-display {
+            margin-top: 20px;
+        }
+
+        .group-card {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .group-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .group-members {
+            list-style: none;
+        }
+
+        .group-members li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            color: #555;
+        }
+
+        .group-members li:last-child {
+            border-bottom: none;
+        }
+
+        .stats {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            color: #555;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .filter-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-section input, .filter-section select {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section-divider {
+            border-top: 2px solid #667eea;
+            margin: 20px 0;
+            padding-top: 20px;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Agrupador de Estudiantes</h1>
+            <p>Crea grupos de estudiantes de forma inteligente</p>
+        </div>
+
+        <div class="content">
+            <!-- Panel izquierdo: Entrada de datos -->
+            <div class="panel">
+                <h2>📚 Datos de Estudiantes</h2>
+
+                <div id="message"></div>
+
+                <div class="form-group">
+                    <label>Curso</label>
+                    <input type="text" id="courseInput" placeholder="Ej: 5º A, 1º Secundaria">
+                </div>
+
+                <div class="form-group">
+                    <label>Grado</label>
+                    <select id="gradeSelect">
+                        <option value="">Selecciona grado</option>
+                        <option value="1">1º Primaria</option>
+                        <option value="2">2º Primaria</option>
+                        <option value="3">3º Primaria</option>
+                        <option value="4">4º Primaria</option>
+                        <option value="5">5º Primaria</option>
+                        <option value="6">6º Primaria</option>
+                        <option value="7">1º Secundaria</option>
+                        <option value="8">2º Secundaria</option>
+                        <option value="9">3º Secundaria</option>
+                        <option value="10">4º Secundaria</option>
+                        <option value="11">5º Secundaria</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Sección</label>
+                    <input type="text" id="sectionInput" placeholder="Ej: A, B, C">
+                </div>
+
+                <div class="section-divider"></div>
+
+                <div class="form-group">
+                    <label>Agregar Estudiante</label>
+                    <input type="text" id="studentNameInput" placeholder="Nombre del estudiante">
+                </div>
+
+                <div class="form-group">
+                    <label>Calificación/Rendimiento</label>
+                    <input type="number" id="scoreInput" placeholder="Ej: 85" min="0" max="100">
+                </div>
+
+                <button onclick="addStudent()">➕ Agregar Estudiante</button>
+
+                <div class="section-divider"></div>
+
+                <h3 style="color: #667eea; margin-bottom: 10px;">Estudiantes Cargados</h3>
+                <div id="studentsList" class="students-list">
+                    <div class="empty-state">Sin estudiantes aún</div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-secondary" onclick="clearAll()">🗑️ Limpiar Todo</button>
+                    <button class="btn-danger" onclick="deleteLastStudent()">❌ Eliminar Último</button>
+                </div>
+            </div>
+
+            <!-- Panel derecho: Configuración de grupos -->
+            <div class="panel">
+                <h2>🔧 Configuración de Grupos</h2>
+
+                <div class="form-group">
+                    <label>Tamaño del Grupo</label>
+                    <select id="groupSizeSelect">
+                        <option value="2">2 estudiantes</option>
+                        <option value="3">3 estudiantes</option>
+                        <option value="4" selected>4 estudiantes</option>
+                        <option value="5">5 estudiantes</option>
+                        <option value="6">6 estudiantes</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Método de Agrupación</label>
+                    <select id="methodSelect">
+                        <option value="random">🎲 Sorteo (Aleatorio)</option>
+                        <option value="balanced">⚖️ Balanceado (por Calificación)</option>
+                        <option value="homogeneous">📊 Homogéneo (Mismo Nivel)</option>
+                    </select>
+                </div>
+
+                <div class="section-divider"></div>
+
+                <h3 style="color: #667eea; margin-bottom: 10px;">Métodos Explicados</h3>
+                <div style="background: white; padding: 10px; border-radius: 5px; font-size: 0.9em; color: #555; line-height: 1.6;">
+                    <strong>🎲 Sorteo:</strong> Agrupa estudiantes al azar.<br><br>
+                    <strong>⚖️ Balanceado:</strong> Distribuye buenos y malos estudiantes equitativamente.<br><br>
+                    <strong>📊 Homogéneo:</strong> Agrupa por nivel de rendimiento.
+                </div>
+
+                <div class="section-divider"></div>
+
+                <button onclick="createGroups()" style="font-size: 1.2em; padding: 15px;">
+                    🎯 CREAR GRUPOS
+                </button>
+
+                <button class="btn-secondary" onclick="saveGroups()" style="margin-top: 10px;">
+                    💾 Guardar Grupos
+                </button>
+
+                <button class="btn-danger" onclick="clearGroups()" style="margin-top: 10px;">
+                    🔄 Borrar Grupos Actuales
+                </button>
+
+                <div class="section-divider"></div>
+
+                <div class="form-group">
+                    <label>Cargar Grupos Guardados</label>
+                    <select id="savedGroupsSelect" onchange="loadSelectedGroups()">
+                        <option value="">-- Selecciona grupos guardados --</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Panel inferior: Resultados -->
+            <div class="panel full-width">
+                <h2>👥 Grupos Creados</h2>
+                <div id="groupsResult">
+                    <div class="empty-state">Los grupos aparecerán aquí después de crear</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Almacenamiento en localStorage
+        let students = [];
+        let currentGroups = [];
+        let groupHistory = {};
+
+        // Cargar datos al iniciar
+        window.addEventListener('load', () => {
+            loadFromStorage();
+            updateStudentsList();
+            updateSavedGroupsList();
+        });
+
+        function addStudent() {
+            const nameInput = document.getElementById('studentNameInput');
+            const scoreInput = document.getElementById('scoreInput');
+            const course = document.getElementById('courseInput').value;
+            const grade = document.getElementById('gradeSelect').value;
+            const section = document.getElementById('sectionInput').value;
+
+            if (!nameInput.value.trim()) {
+                showMessage('Por favor ingresa el nombre del estudiante', 'error');
+                return;
+            }
+
+            if (!grade || !section || !course) {
+                showMessage('Por favor completa curso, grado y sección', 'error');
+                return;
+            }
+
+            const score = scoreInput.value ? parseInt(scoreInput.value) : 50;
+
+            const student = {
+                id: Date.now(),
+                name: nameInput.value.trim(),
+                score: Math.max(0, Math.min(100, score)),
+                course: course,
+                grade: grade,
+                section: section
+            };
+
+            students.push(student);
+            saveToStorage();
+            updateStudentsList();
+
+            nameInput.value = '';
+            scoreInput.value = '';
+            nameInput.focus();
+            showMessage('Estudiante agregado correctamente', 'success');
+        }
+
+        function deleteLastStudent() {
+            if (students.length === 0) {
+                showMessage('No hay estudiantes para eliminar', 'error');
+                return;
+            }
+            students.pop();
+            saveToStorage();
+            updateStudentsList();
+            showMessage('Último estudiante eliminado', 'success');
+        }
+
+        function deleteStudent(id) {
+            students = students.filter(s => s.id !== id);
+            saveToStorage();
+            updateStudentsList();
+        }
+
+        function clearAll() {
+            if (confirm('¿Estás seguro de que deseas limpiar todos los estudiantes?')) {
+                students = [];
+                currentGroups = [];
+                saveToStorage();
+                updateStudentsList();
+                updateGroupsDisplay();
+                showMessage('Todo limpiado correctamente', 'success');
+            }
+        }
+
+        function createGroups() {
+            if (students.length === 0) {
+                showMessage('Por favor agrega estudiantes primero', 'error');
+                return;
+            }
+
+            const size = parseInt(document.getElementById('groupSizeSelect').value);
+            const method = document.getElementById('methodSelect').value;
+
+            let sortedStudents = [...students];
+
+            if (method === 'balanced') {
+                sortedStudents.sort((a, b) => b.score - a.score);
+            } else if (method === 'homogeneous') {
+                sortedStudents.sort((a, b) => b.score - a.score);
+            } else {
+                // Random
+                for (let i = sortedStudents.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [sortedStudents[i], sortedStudents[j]] = [sortedStudents[j], sortedStudents[i]];
+                }
+            }
+
+            currentGroups = [];
+            let groupNum = 1;
+
+            if (method === 'balanced') {
+                // Distribuir alternando de arriba y abajo
+                const groups = [];
+                for (let i = 0; i < size; i++) {
+                    groups[i] = [];
+                }
+
+                for (let i = 0; i < sortedStudents.length; i++) {
+                    const groupIndex = i % size;
+                    groups[groupIndex].push(sortedStudents[i]);
+                }
+
+                groups.forEach((group, idx) => {
+                    if (group.length > 0) {
+                        currentGroups.push({
+                            number: groupNum++,
+                            students: group,
+                            method: 'Balanceado'
+                        });
+                    }
+                });
+            } else if (method === 'homogeneous') {
+                // Agrupar por nivel similar consecutivo
+                for (let i = 0; i < sortedStudents.length; i += size) {
+                    const group = sortedStudents.slice(i, i + size);
+                    if (group.length > 0) {
+                        currentGroups.push({
+                            number: groupNum++,
+                            students: group,
+                            method: 'Homogéneo'
+                        });
+                    }
+                }
+            } else {
+                // Random
+                for (let i = 0; i < sortedStudents.length; i += size) {
+                    const group = sortedStudents.slice(i, i + size);
+                    if (group.length > 0) {
+                        currentGroups.push({
+                            number: groupNum++,
+                            students: group,
+                            method: 'Sorteo'
+                        });
+                    }
+                }
+            }
+
+            updateGroupsDisplay();
+            showMessage(`Grupos creados exitosamente (${currentGroups.length} grupos)`, 'success');
+        }
+
+        function updateStudentsList() {
+            const list = document.getElementById('studentsList');
+
+            if (students.length === 0) {
+                list.innerHTML = '<div class="empty-state">Sin estudiantes aún</div>';
+                return;
+            }
+
+            list.innerHTML = students.map(student => `
+                <div class="student-item">
+                    <div class="student-info">
+                        <div class="student-name">${student.name}</div>
+                        <div class="student-score">${student.course} • Grado ${student.grade} • Sección ${student.section} • Calificación: ${student.score}</div>
+                    </div>
+                    <button class="btn-remove" onclick="deleteStudent(${student.id})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function updateGroupsDisplay() {
+            const result = document.getElementById('groupsResult');
+
+            if (currentGroups.length === 0) {
+                result.innerHTML = '<div class="empty-state">Los grupos aparecerán aquí después de crear</div>';
+                return;
+            }
+
+            const stats = {
+                totalGroups: currentGroups.length,
+                totalStudents: currentGroups.reduce((sum, g) => sum + g.students.length, 0),
+                method: currentGroups[0]?.method || 'N/A'
+            };
+
+            let html = `
+                <div class="stats">
+                    <div class="stat-item">
+                        <span>Total de Grupos:</span>
+                        <span class="stat-value">${stats.totalGroups}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Total de Estudiantes:</span>
+                        <span class="stat-value">${stats.totalStudents}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Método:</span>
+                        <span class="stat-value">${stats.method}</span>
+                    </div>
+                </div>
+            `;
+
+            currentGroups.forEach(group => {
+                const avgScore = (group.students.reduce((sum, s) => sum + s.score, 0) / group.students.length).toFixed(1);
+                html += `
+                    <div class="group-card">
+                        <div class="group-header">
+                            Grupo ${group.number} (${group.students.length} estudiantes) - Promedio: ${avgScore}
+                        </div>
+                        <ul class="group-members">
+                            ${group.students.map(s => `
+                                <li>
+                                    <strong>${s.name}</strong>
+                                    <span style="color: #999;">(${s.course} • Grado ${s.grade} • Sección ${s.section} • Cal: ${s.score})</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            });
+
+            result.innerHTML = html;
+        }
+
+        function saveGroups() {
+            if (currentGroups.length === 0) {
+                showMessage('No hay grupos para guardar', 'error');
+                return;
+            }
+
+            const timestamp = new Date().toLocaleString();
+            const key = `groups_${Date.now()}`;
+
+            groupHistory[key] = {
+                timestamp: timestamp,
+                groups: currentGroups,
+                students: students,
+                size: currentGroups[0]?.students.length || 0
+            };
+
+            localStorage.setItem('groupHistory', JSON.stringify(groupHistory));
+            updateSavedGroupsList();
+            showMessage('Grupos guardados correctamente', 'success');
+        }
+
+        function updateSavedGroupsList() {
+            const select = document.getElementById('savedGroupsSelect');
+            select.innerHTML = '<option value="">-- Selecciona grupos guardados --</option>';
+
+            Object.entries(groupHistory).forEach(([key, data]) => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = `${data.timestamp} (${data.groups.length} grupos de ${data.size})`;
+                select.appendChild(option);
+            });
+        }
+
+        function loadSelectedGroups() {
+            const select = document.getElementById('savedGroupsSelect');
+            const key = select.value;
+
+            if (!key) return;
+
+            const saved = groupHistory[key];
+            currentGroups = saved.groups;
+            students = saved.students;
+            updateGroupsDisplay();
+            updateStudentsList();
+            showMessage('Grupos cargados correctamente', 'success');
+        }
+
+        function clearGroups() {
+            if (confirm('¿Deseas eliminar los grupos actuales?')) {
+                currentGroups = [];
+                updateGroupsDisplay();
+                showMessage('Grupos eliminados', 'success');
+            }
+        }
+
+        function showMessage(text, type) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.innerHTML = `<div class="${type}-message">${text}</div>`;
+            setTimeout(() => {
+                msgDiv.innerHTML = '';
+            }, 3000);
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('students', JSON.stringify(students));
+        }
+
+        function loadFromStorage() {
+            const saved = localStorage.getItem('students');
+            if (saved) {
+                students = JSON.parse(saved);
+            }
+
+            const savedHistory = localStorage.getItem('groupHistory');
+            if (savedHistory) {
+                groupHistory = JSON.parse(savedHistory);
+            }
+        }
+
+        // Enter key para agregar estudiante
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('studentNameInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addStudent();
+            });
+        });
+    </script>
+</body>
+</html>

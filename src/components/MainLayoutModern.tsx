@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Menu, X, LogOut, Moon, Sun, Bell, User, BarChart3, Users,
   BookOpen, MessageSquare, Home, Settings, Building2, Users2,
-  Flame, Clock, CheckSquare, BookMarked, Shield, ChevronDown, GraduationCap, Cog, FileText
+  Flame, Clock, CheckSquare, BookMarked, Shield, ChevronDown, GraduationCap, Cog, FileText,
+  Cloud, CloudOff, HardDrive, Zap
 } from 'lucide-react';
 import { User as UserType } from '../types';
+import { getStorageStats, isSyncedToCloud, getTursoDBSize } from '../services/dataService';
 
 interface MainLayoutModernProps {
   user: UserType;
@@ -12,6 +14,7 @@ interface MainLayoutModernProps {
   darkMode: boolean;
   setDarkMode: (dark: boolean) => void;
   onNavigate: (screen: string) => void;
+  currentScreen: string;
   children: React.ReactNode;
 }
 
@@ -33,14 +36,15 @@ const allNavigationItems = [
   { id: 'panel-subdirector', label: 'Panel Subdirector', icon: <Users className="w-5 h-5" />,    roles: ['admin', 'subdirector'],             category: 'Administración' },
   { id: 'gestion-docentes',  label: 'Docentes',          icon: <Users className="w-5 h-5" />,    roles: ['admin', 'director', 'subdirector'], category: 'Administración' },
   { id: 'gestion-alumnos',   label: 'Alumnos',           icon: <Users2 className="w-5 h-5" />,   roles: ['admin', 'director', 'subdirector'], category: 'Administración' },
+  { id: 'grupos',            label: 'Grupos de Trabajo', icon: <Zap className="w-5 h-5" />,      roles: ['admin', 'director', 'subdirector', 'teacher'], category: 'Administración' },
 
   // ACADÉMICO
   { id: 'calificativos',      label: 'Calificativos', icon: <GraduationCap className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector', 'teacher'], category: 'Académico' },
-  { id: 'horario',            label: 'Horario',       icon: <Clock className="w-5 h-5" />,         roles: ['teacher', 'student'],                         category: 'Académico' },
-  { id: 'asistencia',         label: 'Asistencia',    icon: <CheckSquare className="w-5 h-5" />,   roles: ['teacher', 'student'],                         category: 'Académico' },
+  { id: 'horario',            label: 'Horario',       icon: <Clock className="w-5 h-5" />,         roles: ['admin', 'director', 'subdirector', 'teacher', 'student'], category: 'Académico' },
+  { id: 'asistencia',         label: 'Asistencia',    icon: <CheckSquare className="w-5 h-5" />,   roles: ['admin', 'director', 'subdirector', 'teacher', 'student'], category: 'Académico' },
   { id: 'dashboard-estudiante',label: 'Mi Desempeño', icon: <Flame className="w-5 h-5" />,        roles: ['student', 'parent'],                          category: 'Académico' },
   { id: 'reporte-alumno',      label: 'Informe Alumno', icon: <FileText className="w-5 h-5" />,    roles: ['admin', 'director', 'subdirector', 'teacher', 'parent'],              category: 'Académico' },
-  { id: 'normas-convivencia', label: 'Normas',        icon: <BookMarked className="w-5 h-5" />,    roles: ['student'],                                    category: 'Académico' },
+  { id: 'normas-convivencia', label: 'Normas Conv.', icon: <BookMarked className="w-5 h-5" />, roles: ['admin', 'director', 'subdirector', 'teacher', 'student'], category: 'Académico' },
 ];
 
 export default function MainLayoutModern({
@@ -49,11 +53,26 @@ export default function MainLayoutModern({
   darkMode,
   setDarkMode,
   onNavigate,
+  currentScreen,
   children,
 }: MainLayoutModernProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null); // null = todas expandidas
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [storageStats, setStorageStats] = useState<any>(null);
+  const [tursoSize, setTursoSize] = useState<number>(0);
+
+  useEffect(() => {
+    const updateStats = async () => {
+      const stats = getStorageStats();
+      setStorageStats(stats);
+      const tursoSz = await getTursoDBSize();
+      setTursoSize(tursoSz);
+    };
+    updateStats();
+    const interval = setInterval(updateStats, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Filtrar items por rol
   const visibleItems = allNavigationItems.filter(item =>
@@ -102,6 +121,36 @@ export default function MainLayoutModern({
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
 
+            {/* Storage Info */}
+            {storageStats && (
+              <div className="flex items-center gap-2 text-xs border-l border-slate-300 pl-3">
+                {isSyncedToCloud() ? (
+                  <Cloud className="w-4 h-4 text-green-500" />
+                ) : (
+                  <CloudOff className="w-4 h-4 text-amber-500" />
+                )}
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-1">
+                    <HardDrive className="w-3 h-3 text-slate-400" />
+                    <span className={`${storageStats.percentage > 80 ? 'text-red-500 font-bold' : storageStats.percentage > 50 ? 'text-yellow-500' : 'text-green-500'}`}>
+                      local: {storageStats.totalKB}KB
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Cloud className="w-3 h-3 text-blue-400" />
+                    <span className="text-blue-500">
+                      turso: {tursoSize > 0 ? `${Math.round(tursoSize / 1024)}KB` : '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${isSyncedToCloud() ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300'}`}>
+                      {isSyncedToCloud() ? 'PROD' : 'DEV'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Dark Mode Toggle */}
             <button
               onClick={() => setDarkMode(!darkMode)}
@@ -130,31 +179,24 @@ export default function MainLayoutModern({
 
               {/* User Dropdown Menu */}
               {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-50">
-                  <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-                    <p className="font-semibold text-slate-900 dark:text-white text-sm">{user.name}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 capitalize">
-                      {user.role === 'director'
-                        ? 'Director'
-                        : user.role === 'subdirector'
-                          ? 'Subdirector'
-                          : user.role === 'teacher'
-                            ? 'Docente'
-                            : user.role === 'student'
-                              ? 'Estudiante'
-                              : user.role === 'admin'
-                                ? 'Administrador'
-                                : 'Apoderado'}
+                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-[9999]">
+                  <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-xl">
+                    <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white text-xl font-bold mb-2">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <p className="font-bold text-white text-base">{user.name}</p>
+                    <p className="text-white/80 text-sm mt-0.5">{user.email}</p>
+                    <p className="text-white/60 text-xs mt-1 capitalize">
+                      {user.role === 'director' ? 'Director' : user.role === 'subdirector' ? 'Subdirector' : user.role === 'teacher' ? 'Docente' : user.role === 'student' ? 'Estudiante' : user.role === 'admin' ? 'Administrador' : 'Apoderado'}
                     </p>
                   </div>
-                  <button className="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 transition-colors">
-                    <User className="w-4 h-4" />
-                    Mi Perfil
+                  <button onClick={() => { onNavigate('mi-perfil'); setShowUserMenu(false); }}
+                    className="w-full text-left px-4 py-3 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300 transition-colors">
+                    <User className="w-4 h-4" /> Mi Perfil
                   </button>
-                  <button className="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 transition-colors border-b border-slate-200 dark:border-slate-700">
-                    <Settings className="w-4 h-4" />
-                    Configuración
+                  <button onClick={() => { onNavigate('configuracion'); setShowUserMenu(false); }}
+                    className="w-full text-left px-4 py-3 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300 transition-colors border-b border-slate-200 dark:border-slate-700">
+                    <Settings className="w-4 h-4" /> Configuración
                   </button>
                   <button
                     onClick={() => {
@@ -191,7 +233,11 @@ export default function MainLayoutModern({
                       <button
                         key={item.id}
                         onClick={() => handleNavigation(item.id)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors text-sm font-medium"
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm font-medium ${
+                          currentScreen === item.id
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'text-slate-700 dark:text-slate-300'
+                        }`}
                       >
                         {item.icon}
                         {item.label}

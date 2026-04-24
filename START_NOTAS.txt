@@ -1,0 +1,157 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                     🎓 NOTAS MIGRADAS Y LISTAS PARA SUBIR                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📊 RESUMEN FINAL DE LA MIGRACIÓN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✓ Total notas migradas:      1,166
+  ✓ Total estudiantes:          750
+  ✓ Competencias incluidas:     Lee textos diversos
+  ✓ Instrumentos:               Examen, Rúbrica, Observación
+  ✓ Periodo:                    Abril 2026
+  ✓ Fecha de migración:         2026-04-24
+
+📁 ARCHIVO PRINCIPAL A USAR:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  👉 sistemita_datos_final.json (803 KB)
+
+  Este archivo contiene TODAS tus notas migradas y listas para usar.
+
+🚀 CÓMO SUBIR LAS NOTAS (3 OPCIONES):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPCIÓN 1: AUTOMÁTICO (MÁS FÁCIL) ⭐
+────────────────────────────────────────────────────────────────────────────
+
+  Sistema Operativo: WINDOWS
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ 1. Haz doble clic en: subir-notas.bat                            │
+  │ 2. Espera a que termine                                          │
+  │ 3. Inicia tu app: npm start                                      │
+  │ 4. Abre: http://localhost:3000                                   │
+  └──────────────────────────────────────────────────────────────────┘
+
+  Sistema Operativo: MAC / LINUX
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ 1. Abre terminal en esta carpeta                                 │
+  │ 2. Ejecuta: bash subir-notas.sh                                  │
+  │ 3. Inicia tu app: npm start                                      │
+  │ 4. Abre: http://localhost:3000                                   │
+  └──────────────────────────────────────────────────────────────────┘
+
+
+OPCIÓN 2: MANUAL (SI OPCIÓN 1 NO FUNCIONA)
+────────────────────────────────────────────────────────────────────────────
+
+  1. Abre tu carpeta Sistemita_Nuevo en el explorador
+
+  2. Busca tu archivo de datos original:
+     ¿Cómo se llama? Puede ser:
+        - sistemita_datos.json
+        - data.json
+        - db.json
+        - app-data.json
+        - otro nombre similar
+
+  3. Haz copia de seguridad:
+     RENAME "nombre-del-archivo.json" "nombre-del-archivo.json.backup"
+
+  4. Reemplaza con el nuevo:
+     Copia "sistemita_datos_final.json" al sitio del anterior
+     O renómbralo: "sistemita_datos_final.json" → "nombre-del-archivo.json"
+
+  5. Inicia tu app:
+     npm start
+
+  6. Las notas aparecerán en tu aplicación ✅
+
+
+OPCIÓN 3: VÍA CÓDIGO (PARA DESARROLLADORES)
+────────────────────────────────────────────────────────────────────────────
+
+  En tu código React/TypeScript, importa los datos:
+
+  import datosConNotas from './sistemita_datos_final.json';
+
+  Luego úsalos en tu estado:
+
+  const [estudiantesConNotas, setEstudiantes] = useState(datosConNotas.notas);
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 ARCHIVOS DISPONIBLES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PARA SUBIR NOTAS:
+  ✓ sistemita_datos_final.json       ← ESTE ES EL PRINCIPAL
+  ✓ subir-notas.sh                   ← Script automático (Mac/Linux)
+  ✓ subir-notas.bat                  ← Script automático (Windows)
+  ✓ COMO_SUBIR_NOTAS.md              ← Guía detallada
+
+  DE REFERENCIA:
+  - sistemita_datos_con_notas.json   (intermedio)
+  - cargar-notas.py                  (script Python)
+  - cargar_notas_api.json            (formato API)
+  - INSTRUCCIONES_NOTAS.md           (documentación técnica)
+
+✅ VERIFICACIÓN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Después de subir las notas, verifica que funciona:
+
+EN EL NAVEGADOR:
+  1. Abre DevTools: F12
+  2. Ve a Console
+  3. No debería haber errores en rojo
+  4. En la aplicación deberías ver:
+     - Estudiantes con sus notas
+     - Competencias: "Lee textos diversos"
+     - Calificaciones por instrumento
+
+EN LA TERMINAL:
+  1. npm start  (tu aplicación debería iniciar sin errores)
+  2. La consola debería mostrar: "✓ App running at..."
+
+🆘 SI ALGO NO FUNCIONA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PROBLEMA: "No veo las notas"
+  SOLUCIÓN:
+    ✓ Limpia caché: Ctrl+Shift+Del (Windows) o Cmd+Shift+Del (Mac)
+    ✓ Recarga página: F5 o Ctrl+R
+    ✓ Reinicia servidor: npm start
+
+  PROBLEMA: "Error al iniciar la app"
+  SOLUCIÓN:
+    ✓ npm install
+    ✓ npm start
+
+  PROBLEMA: "El archivo no se reemplazó bien"
+  SOLUCIÓN:
+    ✓ Abre COMO_SUBIR_NOTAS.md para instrucciones detalladas
+
+🎯 PRÓXIMOS PASOS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. HACED DOBLE CLIC EN:
+     → subir-notas.bat (Windows)
+     → o ejecutad: bash subir-notas.sh (Mac/Linux)
+
+  2. ESPERA A QUE TERMINE
+
+  3. EJECUTA:
+     → npm start
+
+  4. ABRE EN TU NAVEGADOR:
+     → http://localhost:3000
+
+  5. ¡LAS NOTAS ESTARÁN ALLÍ! 🎉
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+¿DUDAS?
+Abre y lee: COMO_SUBIR_NOTAS.md
+
+¡La migración está COMPLETA y lista para usar! ✨

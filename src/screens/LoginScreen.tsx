@@ -45,15 +45,7 @@ async function loginRequest(email: string, password: string) {
   return mockLogin(email, password);
 }
 
-// Cuentas de demo fijas (sin depender de localStorage ni API externa)
-const DEMO_ACCOUNTS = [
-  { id: 'user-admin', name: 'Administrador del Sistema', email: 'admin@manuelfidencio.edu.pe',       password: 'admin123',    role: '👑 ADMIN',          rol: 'admin' as const },
-  { id: 'user-001',   name: 'Dr. Fernando López',        email: 'director@escuela.edu',    password: 'director123', role: '🏛️ Director',       rol: 'director' as const },
-  { id: 'user-002',   name: 'Mg. María García',          email: 'subdirector@escuela.edu', password: 'sub123',      role: '📋 Subdirector',    rol: 'subdirector' as const },
-  { id: 'user-003',   name: 'Lic. Juan Pérez',           email: 'profesor@escuela.edu',    password: 'prof123',     role: '👨‍🏫 Docente',      rol: 'teacher' as const },
-  { id: 'user-004',   name: 'Carlos Mendez',             email: 'estudiante@escuela.edu',  password: 'est123',      role: '👨‍🎓 Estudiante',   rol: 'student' as const },
-  { id: 'user-005',   name: 'Pedro Mendez',              email: 'apoderado@escuela.edu',   password: 'apod123',     role: '👨‍👩‍👧 Apoderado', rol: 'parent' as const },
-];
+// Sin cuentas demo — todos usan sus credenciales reales registradas en el sistema
 
 interface LoginScreenProps {
   onLogin: (user: UserType) => void;
@@ -91,25 +83,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     }
   };
 
-  const handleDemoLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
-    setError('');
-    setIsLoading(true);
-    try {
-      const user: UserType = {
-        id: account.id,
-        name: account.name,
-        email: account.email,
-        role: account.rol as any,
-        schoolId: '1',
-      };
-      localStorage.setItem('user', JSON.stringify(user));
-      onLogin(user);
-    } catch (err) {
-      setError('Error al iniciar sesión de demo');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center px-4">
@@ -201,46 +174,12 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               </button>
             </form>
 
-            {/* Divider */}
-            <div className="mt-6 relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-300 dark:border-slate-600"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                  Cuentas de Demo
-                </span>
-              </div>
-            </div>
-
-            {/* Demo Accounts */}
-            <div className="mt-6 space-y-2">
-              {DEMO_ACCOUNTS.map((account) => (
-                <motion.button
-                  key={account.email}
-                  onClick={() => handleDemoLogin(account)}
-                  whileHover={{ scale: 1.02 }}
-                  className={`w-full text-left p-3 rounded-lg border transition-all ${
-                    account.rol === 'admin'
-                      ? 'border-red-600 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40'
-                      : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{account.name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{account.email}</p>
-                    </div>
-                    <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                      account.rol === 'admin'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                    }`}>
-                      {account.role}
-                    </span>
-                  </div>
-                </motion.button>
-              ))}
+            {/* Nota de acceso */}
+            <div className="mt-6 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-center">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Usa las credenciales asignadas por tu institución.<br />
+                Contacta al administrador si no tienes acceso.
+              </p>
             </div>
           </div>
         </div>

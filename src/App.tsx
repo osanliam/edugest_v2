@@ -25,6 +25,7 @@ import ScheduleScreen from './screens/ScheduleScreen';
 import ScheduleScreenModern from './screens/ScheduleScreenModern';
 import AttendanceScreen from './screens/AttendanceScreen';
 import AttendanceScreenModern from './screens/AttendanceScreenModern';
+import NormasConvivenciaScreen from './screens/NormasConvivenciaScreen';
 import ConductRulesScreen from './screens/ConductRulesScreen';
 import CalificativosScreen from './screens/CalificativosScreen';
 import ReporteAlumnoScreen from './screens/ReporteAlumnoScreen';
@@ -34,6 +35,7 @@ import CalificacionesProModerno from './screens/CalificacionesProModerno';
 import DocentesScreen from './screens/DocentesScreen';
 import AlumnosScreen from './screens/AlumnosScreen';
 import ConfiguracionScreen from './screens/ConfiguracionScreen';
+import GroupsScreen from './screens/GroupsScreen';
 import MainLayoutModern from './components/MainLayoutModern';
 
 type UserRole = 'admin' | 'director' | 'subdirector' | 'teacher' | 'student' | 'parent';
@@ -51,7 +53,7 @@ type ScreenType = 'login' | 'panel-admin' | 'inicio' | 'inicio-modern' | 'aula-v
                  'estudiantes' | 'dashboard-estudiante' | 'calificaciones' | 'horario' |
                  'asistencia' | 'normas-convivencia' | 'gestionar-usuarios' |
                  'gestion-docentes' | 'gestion-alumnos' | 'calificativos' | 'configuracion' |
-                 'reporte-alumno';
+                 'reporte-alumno' | 'grupos';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -60,28 +62,28 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    // Cargar datos del sistema al iniciar
-    loadSystemData().then(() => {
-      // Verificar si hay usuario autenticado
-      const storedUser = localStorage.getItem('user');
-      const storedDarkMode = localStorage.getItem('darkMode');
+    // Cargar datos del sistema al iniciar (sin esperar a Turso)
+    const storedUser = localStorage.getItem('user');
+    const storedDarkMode = localStorage.getItem('darkMode');
 
-      if (storedUser) {
-        try {
-          const userData = JSON.parse(storedUser);
-          setUser(userData);
-          setCurrentScreen('inicio');
-        } catch (e) {
-          localStorage.removeItem('user');
-        }
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        setCurrentScreen('inicio');
+      } catch (e) {
+        localStorage.removeItem('user');
       }
+    }
 
-      if (storedDarkMode) {
-        setDarkMode(JSON.parse(storedDarkMode));
-      }
+    if (storedDarkMode) {
+      setDarkMode(JSON.parse(storedDarkMode));
+    }
 
-      setIsLoading(false);
-    });
+    setIsLoading(false);
+
+    // Sincronizar con Turso en background (no bloquea UI)
+    loadSystemData();
   }, []);
 
   useEffect(() => {
@@ -113,21 +115,22 @@ export default function App() {
       admin: [
         'panel-admin', 'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
         'panel-director', 'panel-subdirector', 'profesores', 'estudiantes', 'calificaciones',
-        'gestionar-usuarios', 'gestion-docentes', 'gestion-alumnos', 'calificativos', 'configuracion'
+        'gestionar-usuarios', 'gestion-docentes', 'gestion-alumnos', 'calificativos', 'configuracion',
+        'horario', 'asistencia', 'normas-convivencia', 'reporte-alumno', 'grupos'
       ],
       director: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
         'panel-director', 'profesores', 'estudiantes', 'gestion-docentes', 'gestion-alumnos',
-        'calificativos', 'configuracion'
+        'calificativos', 'configuracion', 'asistencia', 'normas-convivencia', 'grupos'
       ],
       subdirector: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
         'panel-subdirector', 'panel-director', 'profesores', 'estudiantes', 'gestion-docentes', 'gestion-alumnos',
-        'calificativos', 'configuracion'
+        'calificativos', 'configuracion', 'asistencia', 'normas-convivencia', 'grupos'
       ],
       teacher: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
-        'calificativos', 'horario', 'asistencia'
+        'calificativos', 'horario', 'asistencia', 'normas-convivencia', 'grupos'
       ],
       student: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
@@ -167,7 +170,7 @@ export default function App() {
     <>
       {currentScreen === 'inicio-modern' && <DashboardUltraModern />}
       {currentScreen !== 'inicio-modern' && (
-        <MainLayoutModern key={`layout-${user.id}`} user={user} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onNavigate={setCurrentScreen}>
+        <MainLayoutModern key={`layout-${user.id}`} user={user} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onNavigate={setCurrentScreen} currentScreen={currentScreen}>
           {currentScreen === 'panel-admin'         && <AdminPanelScreenModern />}
           {currentScreen === 'inicio'              && <DashboardScreen user={user} />}
           {currentScreen === 'aula-virtual'        && <VirtualClassroomScreenModern />}
@@ -180,15 +183,16 @@ export default function App() {
           {currentScreen === 'estudiantes'         && <StudentsScreenModern user={user} />}
           {currentScreen === 'dashboard-estudiante'&& <StudentDashboard user={user} />}
           {currentScreen === 'calificaciones'      && <CalificativosScreen user={user} />}
-          {currentScreen === 'gestionar-usuarios'  && <AdminUsersScreen />}
+          {currentScreen === 'gestionar-usuarios'  && <AdminUsersScreen user={user} />}
           {currentScreen === 'gestion-docentes'    && <DocentesScreen />}
           {currentScreen === 'gestion-alumnos'     && <AlumnosScreen />}
           {currentScreen === 'calificativos'       && <CalificativosScreen user={user} />}
           {currentScreen === 'configuracion'       && <ConfiguracionScreen />}
           {currentScreen === 'horario'             && <ScheduleScreenModern user={user} />}
           {currentScreen === 'asistencia'          && <AttendanceScreenModern user={user} />}
-          {currentScreen === 'normas-convivencia'  && <ConductRulesScreen user={user} />}
+          {currentScreen === 'normas-convivencia'  && <NormasConvivenciaScreen user={user} />}
           {currentScreen === 'reporte-alumno'     && <ReporteAlumnoScreen user={user} />}
+          {currentScreen === 'grupos'              && <GroupsScreen />}
         </MainLayoutModern>
       )}
     </>

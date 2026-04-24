@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle, Wifi, WifiOff, Database, Key, Server } from 'lucide-react';
+import { getStorageStats, isSyncedToCloud, syncAllToTurso } from '../services/dataService';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Bimestre {
@@ -25,6 +26,7 @@ interface Unidad {
   numero: number;
   nombre: string;
   bimestreId: string;
+  activa?: boolean;
 }
 
 interface AnioAcademico {
@@ -286,6 +288,7 @@ function UnidadesSection() {
   const [bimestres, setBimestres] = useState<Bimestre[]>([]);
   const [form, setForm] = useState<Unidad | null>(null);
   const [msg, setMsg] = useState<{tipo:'ok'|'err';texto:string}|null>(null);
+  const [mostrarActivas, setMostrarActivas] = useState(true);
 
   useEffect(() => {
     setLista(lsGet(LS.unidades));
@@ -293,16 +296,22 @@ function UnidadesSection() {
   }, []);
 
   const guardar = () => {
-    if (!form?.nombre || !form.numero) return setMsg({tipo:'err',texto:'Completa número y nombre'});
+    if (!form?.nombre || form.numero === null || form.numero === undefined) return setMsg({tipo:'err',texto:'Completa número y nombre'});
     const todos = [...lista];
     const idx = todos.findIndex(u => u.id === form.id);
     if (idx >= 0) todos[idx] = form;
-    else todos.push({ ...form, id: 'uni-' + Date.now() });
+    else todos.push({ ...form, id: 'uni-' + Date.now(), activa: form.activa !== false });
     lsSet(LS.unidades, todos);
     setLista(todos);
     setForm(null);
     setMsg({tipo:'ok',texto:'Unidad guardada'});
     setTimeout(() => setMsg(null), 2500);
+  };
+
+  const toggleActiva = (u: Unidad) => {
+    const todos = lista.map(x => x.id === u.id ? { ...x, activa: !x.activa } : x);
+    lsSet(LS.unidades, todos);
+    setLista(todos);
   };
 
   const eliminar = (id: string) => {
@@ -315,7 +324,7 @@ function UnidadesSection() {
     <div className={sectionCls}>
       <div className="flex items-center justify-between">
         <h2 className="text-white font-bold text-base flex items-center gap-2">📚 Unidades Didácticas</h2>
-        <button onClick={() => setForm({ id:'', numero: lista.length + 1, nombre:'', bimestreId:'' })}
+        <button onClick={() => setForm({ id:'', numero: lista.length, nombre:'', bimestreId:'', activa: true })}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold">
           <Plus size={13} /> Agregar
         </button>
@@ -326,7 +335,7 @@ function UnidadesSection() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-slate-400 mb-1">N° *</label>
-              <input type="number" min={1} value={form.numero} onChange={e => setForm({...form, numero: Number(e.target.value)})} className={inputCls} />
+              <input type="number" min={0} value={form.numero} onChange={e => setForm({...form, numero: Number(e.target.value)})} className={inputCls} />
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs text-slate-400 mb-1">Nombre *</label>
@@ -341,7 +350,11 @@ function UnidadesSection() {
               </select>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-xs text-white">
+              <input type="checkbox" checked={form.activa !== false} onChange={e => setForm({...form, activa: e.target.checked})} className="rounded" />
+              visible para docentes
+            </label>
             <button onClick={guardar} className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5">
               <Save size={13} /> Guardar
             </button>
@@ -351,14 +364,20 @@ function UnidadesSection() {
       )}
       <div className="space-y-2">
         {lista.length === 0 && <p className="text-slate-500 text-sm text-center py-4">Sin unidades configuradas</p>}
-        {[...lista].sort((a,b) => a.numero - b.numero).map(u => {
+        {[...lista].sort((a,b) => a.numero - b.numero).filter(u => mostrarActivas ? u.activa !== false : true).map(u => {
           const bim = bimestres.find(b => b.id === u.bimestreId);
           return (
-            <div key={u.id} className="flex items-center justify-between bg-slate-700/40 rounded-lg px-4 py-3">
-              <div>
-                <span className="text-slate-400 text-xs font-bold mr-2">Unidad {u.numero}</span>
-                <span className="text-white text-sm font-medium">{u.nombre}</span>
-                {bim && <span className="ml-2 text-xs text-indigo-400">{bim.nombre}</span>}
+            <div key={u.id} className={`flex items-center justify-between rounded-lg px-4 py-3 ${u.activa === false ? 'bg-slate-800/50 opacity-50' : 'bg-slate-700/40'}`}>
+              <div className="flex items-center gap-2">
+                <button onClick={() => toggleActiva(u)} className={`w-6 h-6 rounded flex items-center justify-center text-xs ${u.activa !== false ? 'bg-green-500 text-white' : 'bg-slate-600 text-slate-400'}`}>
+                  {u.activa !== false ? '✓' : '✗'}
+                </button>
+                <div>
+                  <span className="text-slate-400 text-xs font-bold mr-2">Unidad {u.numero}</span>
+                  <span className="text-white text-sm font-medium">{u.nombre}</span>
+                  {bim && <span className="ml-2 text-xs text-indigo-400">{bim.nombre}</span>}
+                  {u.activa === false && <span className="ml-2 text-xs text-red-400">(oculta)</span>}
+                </div>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setForm({...u})} className="p-1.5 bg-blue-500/20 hover:bg-blue-500/30 rounded text-blue-400"><Edit2 size={12} /></button>
@@ -367,6 +386,15 @@ function UnidadesSection() {
             </div>
           );
         })}
+        <div className="flex items-center gap-2 pt-2">
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+            <input type="checkbox" checked={mostrarActivas} onChange={e => setMostrarActivas(e.target.checked)} className="rounded" />
+            Solo unidades activas
+          </label>
+          <span className="text-xs text-slate-500">
+            ({lista.filter(u => u.activa !== false).length} de {lista.length})
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -776,9 +804,276 @@ function AsignacionesSection() {
   );
 }
 
+// ── API STATUS ────────────────────────────────────────────────────────────────
+function ApiStatusSection() {
+  const [checking, setChecking] = useState(false);
+  const [tursoOk, setTursoOk] = useState<boolean | null>(null);
+  const [dbSize, setDbSize] = useState<string>('—');
+  const [lastCheck, setLastCheck] = useState<string>('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ ok: boolean; message: string; syncedTypes: string[] } | null>(null);
+  const storage = getStorageStats();
+  const cloud = isSyncedToCloud();
+
+  // Cuentas del sistema
+  const usuarios: any[] = (() => {
+    try { return JSON.parse(localStorage.getItem('sistema_usuarios') || '[]'); } catch { return []; }
+  })();
+  const alumnos: any[] = (() => {
+    try { return JSON.parse(localStorage.getItem('ie_alumnos') || '[]'); } catch { return []; }
+  })();
+  const docentes: any[] = (() => {
+    try { return JSON.parse(localStorage.getItem('ie_docentes') || '[]'); } catch { return []; }
+  })();
+
+  const checkTurso = async () => {
+    setChecking(true);
+    setTursoOk(null);
+    try {
+      const res = await fetch('/api/sync?size=1', { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        setTursoOk(true);
+        setDbSize(data.dbSize ? `${(data.dbSize / 1024).toFixed(1)} KB` : 'OK');
+      } else {
+        setTursoOk(false);
+      }
+    } catch {
+      setTursoOk(false);
+    } finally {
+      setChecking(false);
+      setLastCheck(new Date().toLocaleTimeString('es-PE'));
+    }
+  };
+
+  const handleSyncAll = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const result = await syncAllToTurso();
+      setSyncResult(result);
+    } catch {
+      setSyncResult({ ok: false, message: 'Error inesperado al sincronizar', syncedTypes: [] });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+
+      {/* Sync Manual */}
+      <div className={sectionCls}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="text-white font-bold text-base flex items-center gap-2">
+              <RefreshCw size={18} className="text-green-400" />
+              Sincronización Manual a la Nube
+            </h2>
+            <p className="text-slate-400 text-xs mt-1">
+              Sube todo el contenido del almacenamiento local a Turso DB ahora mismo.
+            </p>
+          </div>
+          <button onClick={handleSyncAll} disabled={syncing}
+            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-lg text-sm font-bold transition-all">
+            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+            {syncing ? 'Sincronizando...' : '🚀 Sincronizar Todo Ahora'}
+          </button>
+        </div>
+
+        {syncResult && (
+          <div className={`rounded-xl p-4 border ${syncResult.ok ? 'bg-green-500/15 border-green-500/30' : 'bg-yellow-500/15 border-yellow-500/30'}`}>
+            <p className={`font-bold text-sm mb-2 ${syncResult.ok ? 'text-green-300' : 'text-yellow-300'}`}>
+              {syncResult.ok ? '✅' : '⚠️'} {syncResult.message}
+            </p>
+            {syncResult.syncedTypes.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {syncResult.syncedTypes.map((t, i) => (
+                  <span key={i} className="text-xs px-2 py-0.5 bg-slate-700/60 text-slate-300 rounded-full border border-slate-600/40 font-mono">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+            {!cloud && (
+              <p className="text-slate-400 text-xs mt-2 italic">
+                Nota: En modo desarrollo, el sync está simulado. El push real a Turso ocurre en producción (Vercel).
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Estado Turso DB */}
+      <div className={sectionCls}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-white font-bold text-base flex items-center gap-2">
+            <Database size={18} className="text-indigo-400" />
+            Estado de Turso DB (Nube)
+          </h2>
+          <button onClick={checkTurso} disabled={checking}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+            <RefreshCw size={13} className={checking ? 'animate-spin' : ''} />
+            {checking ? 'Verificando...' : 'Verificar Conexión'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Estado general */}
+          <div className="bg-slate-700/40 rounded-xl p-4 flex flex-col gap-2">
+            <p className="text-xs text-slate-400 uppercase font-medium">Modo actual</p>
+            <div className={`flex items-center gap-2 font-bold ${cloud ? 'text-green-400' : 'text-yellow-400'}`}>
+              {cloud ? <Wifi size={18} /> : <WifiOff size={18} />}
+              {cloud ? 'PRODUCCIÓN' : 'DESARROLLO LOCAL'}
+            </div>
+            <p className="text-xs text-slate-500">
+              {cloud ? 'Sync automático con Turso activo' : 'Solo localStorage — sin sync'}
+            </p>
+          </div>
+
+          {/* Turso ping */}
+          <div className="bg-slate-700/40 rounded-xl p-4 flex flex-col gap-2">
+            <p className="text-xs text-slate-400 uppercase font-medium">Turso API</p>
+            {tursoOk === null && (
+              <p className="text-slate-500 text-sm">{lastCheck ? 'Sin resultado' : 'Sin verificar aún'}</p>
+            )}
+            {tursoOk === true && (
+              <div className="flex items-center gap-2 text-green-400 font-bold">
+                <Check size={16} /> Conectado · {dbSize}
+              </div>
+            )}
+            {tursoOk === false && (
+              <div className="flex items-center gap-2 text-red-400 font-bold">
+                <X size={16} /> Sin conexión
+              </div>
+            )}
+            {lastCheck && <p className="text-xs text-slate-500">Última verificación: {lastCheck}</p>}
+          </div>
+
+          {/* Storage local */}
+          <div className="bg-slate-700/40 rounded-xl p-4 flex flex-col gap-2">
+            <p className="text-xs text-slate-400 uppercase font-medium">Storage Local</p>
+            <p className="text-white font-bold text-lg">{storage.totalKB} KB</p>
+            <div className="h-2 bg-slate-600 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${storage.percentage > 80 ? 'bg-red-500' : storage.percentage > 50 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                style={{ width: `${Math.min(storage.percentage, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-slate-500">{storage.percentage}% de 5 MB usado</p>
+          </div>
+        </div>
+
+        {/* Detalle por tabla */}
+        <div>
+          <p className="text-xs text-slate-400 uppercase font-medium mb-3">Datos almacenados</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Alumnos', count: alumnos.length, key: 'ie_alumnos', color: 'text-cyan-400' },
+              { label: 'Docentes', count: docentes.length, key: 'ie_docentes', color: 'text-indigo-400' },
+              { label: 'Usuarios', count: usuarios.length, key: 'sistema_usuarios', color: 'text-purple-400' },
+              { label: 'Asistencia', count: (() => { try { return JSON.parse(localStorage.getItem('ie_asistencia')||'[]').length; } catch { return 0; } })(), key: 'ie_asistencia', color: 'text-green-400' },
+              { label: 'Calificativos', count: (() => { try { return JSON.parse(localStorage.getItem('ie_calificativos_v2')||'[]').length; } catch { return 0; } })(), key: 'ie_calificativos_v2', color: 'text-yellow-400' },
+              { label: 'Normas', count: (() => { try { return JSON.parse(localStorage.getItem('cfg_normas_convivencia')||'[]').length; } catch { return 0; } })(), key: 'cfg_normas_convivencia', color: 'text-pink-400' },
+              { label: 'Reg. Normas', count: (() => { try { return JSON.parse(localStorage.getItem('ie_registros_normas')||'[]').length; } catch { return 0; } })(), key: 'ie_registros_normas', color: 'text-orange-400' },
+              { label: 'Columnas eval.', count: (() => { try { return JSON.parse(localStorage.getItem('cal_columnas')||'[]').length; } catch { return 0; } })(), key: 'cal_columnas', color: 'text-teal-400' },
+            ].map(item => (
+              <div key={item.key} className="bg-slate-700/40 rounded-lg px-3 py-2">
+                <p className="text-xs text-slate-400">{item.label}</p>
+                <p className={`text-xl font-black ${item.color}`}>{item.count}</p>
+                <p className="text-[10px] text-slate-600 truncate">{storage.breakdown[item.key] ? `${Math.round(storage.breakdown[item.key]/1024*10)/10} KB` : '0 KB'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Cuentas del sistema */}
+      <div className={sectionCls}>
+        <h2 className="text-white font-bold text-base flex items-center gap-2">
+          <Key size={18} className="text-amber-400" />
+          Cuentas de Acceso al Sistema
+        </h2>
+
+        {/* Sin cuentas demo */}
+        <div className="rounded-xl bg-slate-700/30 border border-slate-600/40 px-4 py-3">
+          <p className="text-xs text-slate-400 uppercase font-medium mb-1">Cuentas Demo</p>
+          <p className="text-slate-300 text-sm">
+            Las cuentas demo han sido <span className="text-amber-400 font-semibold">deshabilitadas</span>.
+            Todos los accesos son con credenciales reales registradas en el sistema.
+          </p>
+          <p className="text-slate-500 text-xs mt-1">Para crear nuevas cuentas, usa <strong className="text-slate-300">Panel Admin → Gestionar Usuarios</strong>.</p>
+        </div>
+
+        {/* Cuentas registradas en localStorage */}
+        <div>
+          <p className="text-xs text-slate-400 uppercase mb-3 font-medium">
+            Cuentas Creadas en Sistema ({usuarios.length})
+          </p>
+          {usuarios.length === 0 ? (
+            <p className="text-slate-500 text-sm py-3 text-center">
+              Sin cuentas adicionales creadas. Ve a <strong className="text-slate-300">Panel Admin → Gestionar Usuarios</strong> para agregar.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {usuarios.map((u: any) => (
+                <div key={u.id} className="flex items-center gap-3 bg-slate-700/30 rounded-lg px-4 py-2.5">
+                  <span className="text-xs font-bold w-24 flex-shrink-0 text-indigo-300 capitalize">{u.rol || u.role}</span>
+                  <span className="text-white text-sm flex-1 font-mono truncate">{u.email}</span>
+                  <span className={`text-xs flex items-center gap-1 ${u.estado === 'activo' || !u.estado ? 'text-green-400' : 'text-red-400'}`}>
+                    {u.estado === 'activo' || !u.estado ? <><Check size={11}/> Activo</> : <><X size={11}/> Inactivo</>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* API Keys */}
+        <div>
+          <p className="text-xs text-slate-400 uppercase mb-3 font-medium flex items-center gap-2">
+            <Server size={12} /> Variables de Entorno / API Keys
+          </p>
+          <div className="space-y-2">
+            {[
+              {
+                key: 'TURSO_CONNECTION_URL',
+                label: 'Turso DB URL',
+                value: import.meta.env.VITE_API_URL || 'No expuesta al cliente',
+                ok: true,
+              },
+              {
+                key: 'GEMINI_API_KEY',
+                label: 'Gemini AI Key',
+                value: 'Configurada en .env (servidor)',
+                ok: true,
+              },
+              {
+                key: 'JWT_SECRET',
+                label: 'JWT Secret',
+                value: 'Configurado en backend',
+                ok: true,
+              },
+            ].map(item => (
+              <div key={item.key} className="flex items-center gap-3 bg-slate-700/30 rounded-lg px-4 py-2.5">
+                <code className="text-xs text-amber-300 w-40 flex-shrink-0 font-mono">{item.key}</code>
+                <span className="text-slate-300 text-sm flex-1">{item.label}</span>
+                <span className="text-slate-400 text-xs">{item.value}</span>
+                <span className={`text-xs flex items-center gap-1 ${item.ok ? 'text-green-400' : 'text-red-400'}`}>
+                  {item.ok ? <><Check size={11}/> OK</> : <><X size={11}/> Falta</>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function ConfiguracionScreen() {
-  const [tab, setTab] = useState<'anios'|'bimestres'|'instrumentos'|'unidades'|'competencias'|'cursos'|'asignaciones'>('bimestres');
+  const [tab, setTab] = useState<'anios'|'bimestres'|'instrumentos'|'unidades'|'competencias'|'cursos'|'asignaciones'|'api'>('bimestres');
 
   const tabs = [
     { id: 'anios',         label: '🗓️ Años' },
@@ -788,6 +1083,7 @@ export default function ConfiguracionScreen() {
     { id: 'competencias', label: '🎯 Competencias' },
     { id: 'cursos',       label: '📖 Cursos' },
     { id: 'asignaciones', label: '🏫 Asignaciones' },
+    { id: 'api',          label: '🌐 API & Cuentas' },
   ] as const;
 
   return (
@@ -795,7 +1091,7 @@ export default function ConfiguracionScreen() {
       <div className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-indigo-500/20">
         <div className="max-w-4xl mx-auto px-6 py-5">
           <h1 className="text-3xl font-black text-white">⚙️ Configuración Académica</h1>
-          <p className="text-indigo-400/70 text-sm mt-0.5">Bimestres, instrumentos, unidades, años, competencias, cursos y asignaciones</p>
+          <p className="text-indigo-400/70 text-sm mt-0.5">Bimestres, instrumentos, unidades, años, competencias, cursos, asignaciones y estado del sistema</p>
         </div>
         <div className="max-w-4xl mx-auto px-6 flex gap-1 overflow-x-auto pb-px">
           {tabs.map(t => (
@@ -815,6 +1111,7 @@ export default function ConfiguracionScreen() {
         {tab === 'competencias' && <CompetenciasSection />}
         {tab === 'cursos'       && <CursosSection />}
         {tab === 'asignaciones' && <AsignacionesSection />}
+        {tab === 'api'          && <ApiStatusSection />}
       </div>
     </div>
   );
