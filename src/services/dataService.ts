@@ -1,6 +1,6 @@
 // ── Persistencia localStorage + Turso ───────────────────────────────────────────
 
-const TURSO_ENABLED = import.meta.env.PROD;
+const TURSO_ENABLED = true;
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 5000): Promise<Response> {
   const controller = new AbortController();
