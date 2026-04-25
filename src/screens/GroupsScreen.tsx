@@ -1,58 +1,146 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Download, Save, AlertCircle } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Download, Save, AlertCircle, RefreshCw, Users } from 'lucide-react';
+import HeaderElegante from '../components/HeaderElegante';
 
-interface Student {
+interface Alumno {
   id: string;
-  name: string;
-  score: number;
-  course: string;
-  grade: string;
-  section: string;
+  apellidos_nombres?: string;
+  nombre?: string;
+  apellido?: string;
+  grado: string;
+  seccion: string;
+}
+
+interface Calificativo {
+  id: string;
+  alumnoId: string;
+  nota: number;
+  [key: string]: any;
+}
+
+interface StudentGroup {
+  id: string;
+  nombre: string;
+  apellido?: string;
+  grado: string;
+  seccion: string;
+  promedio: number;
 }
 
 interface Group {
   number: number;
-  students: Student[];
+  students: StudentGroup[];
   method: string;
+  seccion: string;
 }
 
 interface SavedGroup {
   timestamp: string;
   groups: Group[];
-  students: Student[];
   size: number;
+  method: string;
 }
 
+const GRADOS_SECUNDARIA = ['1°', '2°', '3°', '4°', '5°'];
+
 export default function GroupsScreen() {
-  const [students, setStudents] = useState<Student[]>([]);
+  const [alumnos, setAlumnos] = useState<StudentGroup[]>([]);
+  const [grados, setGrados] = useState<string[]>([]);
+  const [secciones, setSecciones] = useState<string[]>([]);
+  const [selectedGrado, setSelectedGrado] = useState('');
+  const [selectedSeccion, setSelectedSeccion] = useState('');
   const [currentGroups, setCurrentGroups] = useState<Group[]>([]);
   const [groupHistory, setGroupHistory] = useState<Record<string, SavedGroup>>({});
 
-  const [studentName, setStudentName] = useState('');
-  const [studentScore, setStudentScore] = useState('50');
-  const [course, setCourse] = useState('');
-  const [grade, setGrade] = useState('');
-  const [section, setSection] = useState('');
   const [groupSize, setGroupSize] = useState('4');
   const [method, setMethod] = useState('random');
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadFromStorage();
+    loadData();
   }, []);
 
-  const loadFromStorage = () => {
-    const saved = localStorage.getItem('groups_students');
-    const savedHistory = localStorage.getItem('groups_history');
+  // Actualizar secciones disponibles cuando cambia el grado
+  useEffect(() => {
+    if (selectedGrado && alumnos.length > 0) {
+      const seccionesFiltradas = Array.from(
+        new Set(alumnos.filter(a => a.grado === selectedGrado).map(a => a.seccion))
+      ).sort();
+      setSecciones(seccionesFiltradas);
+      setSelectedSeccion(seccionesFiltradas.length > 0 ? seccionesFiltradas[0] : '');
+      setCurrentGroups([]);
+    }
+  }, [selectedGrado, alumnos]);
 
-    if (saved) setStudents(JSON.parse(saved));
-    if (savedHistory) setGroupHistory(JSON.parse(savedHistory));
-  };
+  const loadData = () => {
+    setLoading(true);
+    try {
+      // Cargar alumnos
+      const alumnosRaw = localStorage.getItem('ie_alumnos');
+      const calificativosRaw = localStorage.getItem('ie_calificativos_v2');
+      const savedHistoryRaw = localStorage.getItem('groups_history');
 
-  const saveToStorage = (updatedStudents: Student[]) => {
-    setStudents(updatedStudents);
-    localStorage.setItem('groups_students', JSON.stringify(updatedStudents));
+      const alumnosData: Alumno[] = alumnosRaw ? JSON.parse(alumnosRaw) : [];
+      const calificativosData: Calificativo[] = calificativosRaw ? JSON.parse(calificativosRaw) : [];
+
+      // Calcular promedios para todos los alumnos
+      const alumnosConPromedio: StudentGroup[] = alumnosData.map(alumno => {
+        const califAlumno = calificativosData.filter(c => c.alumnoId === alumno.id);
+        const notas = califAlumno
+          .map(c => c.nota)
+          .filter(n => typeof n === 'number' && n > 0);
+
+        const promedio = notas.length > 0
+          ? Math.round((notas.reduce((a, b) => a + b, 0) / notas.length) * 100) / 100
+          : 0;
+
+        return {
+          id: alumno.id,
+          nombre: (alumno as any).apellidos_nombres || alumno.nombre || '',
+          apellido: alumno.apellido || '',
+          grado: alumno.grado,
+          seccion: alumno.seccion,
+          promedio
+        };
+      });
+
+      setAlumnos(alumnosConPromedio);
+
+      // Extraer grados únicos presentes en los alumnos, priorizando el orden de GRADOS_SECUNDARIA
+      const gradosPresentes = GRADOS_SECUNDARIA.filter(g =>
+        alumnosConPromedio.some(a => a.grado === g)
+      );
+      // También incluir cualquier otro grado que exista en los datos
+      const otrosGrados = Array.from(new Set(alumnosConPromedio.map(a => a.grado)))
+        .filter(g => !GRADOS_SECUNDARIA.includes(g))
+        .sort();
+      const todosGrados = [...gradosPresentes, ...otrosGrados];
+
+      setGrados(todosGrados);
+
+      const gradoInicial = todosGrados.length > 0 ? todosGrados[0] : '';
+      setSelectedGrado(gradoInicial);
+
+      if (gradoInicial) {
+        const seccionesFiltradas = Array.from(
+          new Set(alumnosConPromedio.filter(a => a.grado === gradoInicial).map(a => a.seccion))
+        ).sort();
+        setSecciones(seccionesFiltradas);
+        setSelectedSeccion(seccionesFiltradas.length > 0 ? seccionesFiltradas[0] : '');
+      }
+
+      if (savedHistoryRaw) {
+        setGroupHistory(JSON.parse(savedHistoryRaw));
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      showMessage('Error al cargar datos del sistema', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const showMessage = (text: string, type: 'success' | 'error') => {
@@ -61,52 +149,25 @@ export default function GroupsScreen() {
     setTimeout(() => setMessage(''), 3000);
   };
 
-  const addStudent = () => {
-    if (!studentName.trim()) {
-      showMessage('Por favor ingresa el nombre del estudiante', 'error');
-      return;
-    }
-
-    if (!grade || !section || !course) {
-      showMessage('Por favor completa curso, grado y sección', 'error');
-      return;
-    }
-
-    const newStudent: Student = {
-      id: Date.now().toString(),
-      name: studentName.trim(),
-      score: Math.max(0, Math.min(100, parseInt(studentScore) || 50)),
-      course,
-      grade,
-      section
-    };
-
-    const updated = [...students, newStudent];
-    saveToStorage(updated);
-
-    setStudentName('');
-    setStudentScore('50');
-    showMessage('Estudiante agregado correctamente', 'success');
-  };
-
-  const deleteStudent = (id: string) => {
-    const updated = students.filter(s => s.id !== id);
-    saveToStorage(updated);
+  const getAlumnosBySeccion = () => {
+    return alumnos.filter(a => a.grado === selectedGrado && a.seccion === selectedSeccion);
   };
 
   const createGroups = () => {
-    if (students.length === 0) {
-      showMessage('Por favor agrega estudiantes primero', 'error');
+    const alumnosSeccion = getAlumnosBySeccion();
+
+    if (alumnosSeccion.length === 0) {
+      showMessage('No hay estudiantes en esta sección', 'error');
       return;
     }
 
     const size = parseInt(groupSize);
-    let sortedStudents = [...students];
+    let sortedStudents = [...alumnosSeccion];
 
     if (method === 'balanced') {
-      sortedStudents.sort((a, b) => b.score - a.score);
+      sortedStudents.sort((a, b) => b.promedio - a.promedio);
     } else if (method === 'homogeneous') {
-      sortedStudents.sort((a, b) => b.score - a.score);
+      sortedStudents.sort((a, b) => b.promedio - a.promedio);
     } else {
       for (let i = sortedStudents.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -118,7 +179,7 @@ export default function GroupsScreen() {
     let groupNum = 1;
 
     if (method === 'balanced') {
-      const groupArrays: Student[][] = [];
+      const groupArrays: StudentGroup[][] = [];
       for (let i = 0; i < size; i++) {
         groupArrays[i] = [];
       }
@@ -133,7 +194,8 @@ export default function GroupsScreen() {
           groups.push({
             number: groupNum++,
             students: group,
-            method: 'Balanceado'
+            method: 'Balanceado',
+            seccion: selectedSeccion
           });
         }
       });
@@ -144,7 +206,8 @@ export default function GroupsScreen() {
           groups.push({
             number: groupNum++,
             students: group,
-            method: 'Homogéneo'
+            method: 'Homogéneo',
+            seccion: selectedSeccion
           });
         }
       }
@@ -155,7 +218,8 @@ export default function GroupsScreen() {
           groups.push({
             number: groupNum++,
             students: group,
-            method: 'Sorteo'
+            method: 'Sorteo',
+            seccion: selectedSeccion
           });
         }
       }
@@ -179,22 +243,14 @@ export default function GroupsScreen() {
       [key]: {
         timestamp,
         groups: currentGroups,
-        students,
-        size: currentGroups[0]?.students.length || 0
+        size: currentGroups[0]?.students.length || 0,
+        method: method
       }
     };
 
     setGroupHistory(updated);
     localStorage.setItem('groups_history', JSON.stringify(updated));
     showMessage('Grupos guardados correctamente', 'success');
-  };
-
-  const clearAll = () => {
-    if (confirm('¿Estás seguro de que deseas limpiar todos los estudiantes?')) {
-      saveToStorage([]);
-      setCurrentGroups([]);
-      showMessage('Todo limpiado correctamente', 'success');
-    }
   };
 
   const exportGroups = () => {
@@ -205,8 +261,18 @@ export default function GroupsScreen() {
 
     const data = {
       timestamp: new Date().toLocaleString(),
-      groups: currentGroups,
-      totalStudents: currentGroups.reduce((sum, g) => sum + g.students.length, 0)
+      grado: selectedGrado,
+      seccion: selectedSeccion,
+      groups: currentGroups.map(g => ({
+        numero: g.number,
+        estudiantes: g.students.map(s => ({
+          nombre: ((s as any).apellidos_nombres || `${s.nombre || ''} ${s.apellido || ''}`).trim(),
+          promedio: s.promedio
+        })),
+        promedio_grupo: (g.students.reduce((sum, s) => sum + s.promedio, 0) / g.students.length).toFixed(2)
+      })),
+      totalEstudiantes: currentGroups.reduce((sum, g) => sum + g.students.length, 0),
+      metodo: method
     };
 
     const json = JSON.stringify(data, null, 2);
@@ -214,9 +280,10 @@ export default function GroupsScreen() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `grupos_${Date.now()}.json`;
+    a.download = `grupos_${selectedGrado}_${selectedSeccion}_${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    showMessage('Grupos exportados como JSON', 'success');
   };
 
   const methodDescriptions = {
@@ -225,17 +292,32 @@ export default function GroupsScreen() {
     homogeneous: '📊 Agrupa por nivel de rendimiento similar'
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-2">
-            📊 Agrupador de Estudiantes
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Crea grupos de estudiantes de forma inteligente
-          </p>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-full border-4 border-slate-300 dark:border-slate-700 border-t-blue-600 animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Cargando datos...</p>
         </div>
+      </div>
+    );
+  }
+
+  const alumnosSeccion = getAlumnosBySeccion();
+
+  return (
+    <div className="min-h-screen bg-dark-bg text-white overflow-hidden p-6">
+      {/* Fondo animado */}
+      <div className="fixed inset-0 -z-50">
+        <div className="absolute inset-0 bg-gradient-cyber opacity-60"></div>
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto space-y-8">
+        <HeaderElegante
+          icon={Users}
+          title="EDUGEST AGRUPADOR"
+          subtitle="Crea grupos de trabajo automáticamente desde el sistema"
+        />
 
         {message && (
           <div className={`mb-4 p-4 rounded-lg flex items-center gap-3 ${
@@ -249,140 +331,107 @@ export default function GroupsScreen() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Panel Izquierdo: Entrada de Datos */}
+          {/* Panel Izquierdo: Selección */}
           <div className="lg:col-span-1">
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                📚 Datos de Estudiantes
+                📚 Seleccionar Sección
               </h2>
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Curso
-                  </label>
-                  <input
-                    type="text"
-                    value={course}
-                    onChange={(e) => setCourse(e.target.value)}
-                    placeholder="Ej: 5º A"
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Grado
                   </label>
-                  <select
-                    value={grade}
-                    onChange={(e) => setGrade(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  >
-                    <option value="">Selecciona grado</option>
-                    <option value="1">1º Primaria</option>
-                    <option value="2">2º Primaria</option>
-                    <option value="3">3º Primaria</option>
-                    <option value="4">4º Primaria</option>
-                    <option value="5">5º Primaria</option>
-                    <option value="6">6º Primaria</option>
-                    <option value="7">1º Secundaria</option>
-                    <option value="8">2º Secundaria</option>
-                    <option value="9">3º Secundaria</option>
-                    <option value="10">4º Secundaria</option>
-                    <option value="11">5º Secundaria</option>
-                  </select>
+                  {grados.length === 0 ? (
+                    <div className="bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 p-3 rounded-lg text-sm">
+                      No hay alumnos registrados. Agrega alumnos primero.
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedGrado}
+                      onChange={(e) => {
+                        setSelectedGrado(e.target.value);
+                        setCurrentGroups([]);
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-medium"
+                    >
+                      {grados.map(g => (
+                        <option key={g} value={g}>
+                          {g} Grado
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Sección
                   </label>
-                  <input
-                    type="text"
-                    value={section}
-                    onChange={(e) => setSection(e.target.value)}
-                    placeholder="Ej: A, B, C"
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  />
+                  {secciones.length === 0 ? (
+                    <div className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 p-3 rounded-lg text-sm">
+                      No hay secciones para este grado
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedSeccion}
+                      onChange={(e) => {
+                        setSelectedSeccion(e.target.value);
+                        setCurrentGroups([]);
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-medium"
+                    >
+                      {secciones.map(sec => (
+                        <option key={sec} value={sec}>
+                          Sección {sec}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
+
+                {alumnosSeccion.length > 0 && (
+                  <div className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 p-3 rounded-lg text-sm">
+                    <strong>{alumnosSeccion.length} estudiantes</strong> en esta sección
+                  </div>
+                )}
 
                 <hr className="border-slate-300 dark:border-slate-600" />
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Nombre del Estudiante
-                  </label>
-                  <input
-                    type="text"
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && addStudent()}
-                    placeholder="Ej: Juan Pérez"
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Calificación/Rendimiento
-                  </label>
-                  <input
-                    type="number"
-                    value={studentScore}
-                    onChange={(e) => setStudentScore(e.target.value)}
-                    placeholder="0-100"
-                    min="0"
-                    max="100"
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  />
+                  <h3 className="font-bold text-slate-900 dark:text-white mb-3">Estudiantes</h3>
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {alumnosSeccion.length === 0 ? (
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">Sin estudiantes</p>
+                    ) : (
+                      alumnosSeccion.map(student => (
+                        <div key={student.id} className="flex items-center justify-between bg-slate-100 dark:bg-slate-700 p-3 rounded text-sm">
+                          <div className="flex-1">
+                            <p className="font-medium text-slate-900 dark:text-white">
+                              {(student as any).apellidos_nombres || student.nombre || ''}
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                              Grado {student.grado} • Promedio: {student.promedio}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
 
                 <button
-                  onClick={addStudent}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition"
+                  onClick={loadData}
+                  className="w-full bg-slate-500 hover:bg-slate-600 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition"
                 >
-                  <Plus size={20} /> Agregar Estudiante
+                  <RefreshCw size={20} /> Recargar Datos
                 </button>
               </div>
-
-              {/* Lista de Estudiantes */}
-              <div className="mt-6">
-                <h3 className="font-bold text-slate-900 dark:text-white mb-3">Estudiantes Cargados</h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {students.length === 0 ? (
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">Sin estudiantes aún</p>
-                  ) : (
-                    students.map(student => (
-                      <div key={student.id} className="flex items-center justify-between bg-slate-100 dark:bg-slate-700 p-3 rounded">
-                        <div className="flex-1">
-                          <p className="font-medium text-slate-900 dark:text-white text-sm">{student.name}</p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400">
-                            {student.course} • Grado {student.grade} • Sección {student.section} • Cal: {student.score}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => deleteStudent(student.id)}
-                          className="bg-red-500 hover:bg-red-600 text-white p-1 rounded text-xs"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <button
-                onClick={clearAll}
-                className="w-full mt-4 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition"
-              >
-                <Trash2 size={20} /> Limpiar Todo
-              </button>
             </div>
           </div>
 
-          {/* Panel Derecho: Configuración */}
+          {/* Panel Centro: Configuración */}
           <div className="lg:col-span-1">
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
@@ -428,21 +477,24 @@ export default function GroupsScreen() {
 
                 <button
                   onClick={createGroups}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg text-lg transition"
+                  disabled={alumnosSeccion.length === 0}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-400 text-white font-bold py-3 px-4 rounded-lg text-lg transition"
                 >
                   🎯 CREAR GRUPOS
                 </button>
 
                 <button
                   onClick={saveGroups}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition"
+                  disabled={currentGroups.length === 0}
+                  className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-slate-400 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition"
                 >
                   <Save size={20} /> Guardar Grupos
                 </button>
 
                 <button
                   onClick={exportGroups}
-                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition"
+                  disabled={currentGroups.length === 0}
+                  className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-400 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition"
                 >
                   <Download size={20} /> Exportar JSON
                 </button>
@@ -450,23 +502,23 @@ export default function GroupsScreen() {
                 {Object.keys(groupHistory).length > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Grupos Guardados
+                      Historial ({Object.keys(groupHistory).length})
                     </label>
-                    <select className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm">
-                      <option value="">-- Selecciona --</option>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
                       {Object.entries(groupHistory).map(([key, data]) => (
-                        <option key={key} value={key}>
-                          {data.timestamp} ({data.groups.length} grupos)
-                        </option>
+                        <div key={key} className="bg-slate-100 dark:bg-slate-700 p-2 rounded text-xs text-slate-700 dark:text-slate-300">
+                          <p className="font-medium">{data.timestamp}</p>
+                          <p>{data.groups.length} grupos • {data.method}</p>
+                        </div>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Panel Resultados */}
+          {/* Panel Derecho: Resultados */}
           <div className="lg:col-span-1">
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
@@ -479,6 +531,12 @@ export default function GroupsScreen() {
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   <div className="bg-slate-100 dark:bg-slate-700 p-3 rounded text-sm">
                     <p className="text-slate-700 dark:text-slate-300">
+                      <strong>Grado:</strong> {selectedGrado}
+                    </p>
+                    <p className="text-slate-700 dark:text-slate-300">
+                      <strong>Sección:</strong> {selectedSeccion}
+                    </p>
+                    <p className="text-slate-700 dark:text-slate-300">
                       <strong>Total Grupos:</strong> {currentGroups.length}
                     </p>
                     <p className="text-slate-700 dark:text-slate-300">
@@ -490,7 +548,7 @@ export default function GroupsScreen() {
                   </div>
 
                   {currentGroups.map((group) => {
-                    const avgScore = (group.students.reduce((sum, s) => sum + s.score, 0) / group.students.length).toFixed(1);
+                    const avgScore = (group.students.reduce((sum, s) => sum + s.promedio, 0) / group.students.length).toFixed(1);
                     return (
                       <div key={group.number} className="border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden">
                         <div className="bg-blue-600 text-white p-3 font-bold text-sm">
@@ -499,9 +557,9 @@ export default function GroupsScreen() {
                         <ul className="p-3 space-y-2">
                           {group.students.map((student) => (
                             <li key={student.id} className="text-xs text-slate-700 dark:text-slate-300">
-                              <strong>{student.name}</strong>
+                              <strong>{(student as any).apellidos_nombres || student.nombre || ''}</strong>
                               <div className="text-slate-500 dark:text-slate-400">
-                                Cal: {student.score}
+                                Promedio: {student.promedio}
                               </div>
                             </li>
                           ))}

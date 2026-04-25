@@ -1,633 +1,647 @@
-/**
- * NORMAS DE CONVIVENCIA 2026
- * IE Manuel Fidencio Hidalgo Flores
- * Estructura: Eje → Norma General → Conductas Observables
- * Funciones: selección múltiple de alumnos, puntuación 1-10, historial
- */
-import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  BookOpen, Shield, Heart, Wifi, WifiOff, Users, Check, X,
-  ChevronRight, ChevronDown, Plus, Trash2, Edit2, Save,
-  Search, Download, AlertTriangle, Star, BarChart3
-} from 'lucide-react';
-import FuturisticCard from '../components/FuturisticCard';
-import HologramText from '../components/HologramText';
-import { syncToTurso, isSyncedToCloud } from '../services/dataService';
+import { useState, useEffect } from 'react';
+import { Shield, Trash2, Search, ChevronDown } from 'lucide-react';
+import HeaderElegante from '../components/HeaderElegante';
 
-// ── ESTRUCTURA DEL PDF ────────────────────────────────────────────────────────
-export const EJES_CONVIVENCIA = [
-  {
-    id: 'eje-1',
-    valor: 'Respeto',
-    eje: 'Respeto y Buen Trato',
-    color: 'cyan' as const,
-    icono: '🤝',
-    normaGeneral: 'Promuevo relaciones basadas en la amabilidad, la aceptación y el reconocimiento del otro.',
-    conductas: [
-      { id: 'c1', num: 1, texto: 'Me comunico con los demás usando un lenguaje amable y respetuoso.' },
-      { id: 'c2', num: 2, texto: 'Reconozco y valoro las diferencias personales, culturales y de opinión.' },
-      { id: 'c3', num: 3, texto: 'Escucho con atención cuando otros expresan sus ideas y sentimientos.' },
-      { id: 'c4', num: 4, texto: 'Fomento un ambiente donde todos se sientan aceptados y seguros.' },
-    ]
-  },
-  {
-    id: 'eje-2',
-    valor: 'Responsabilidad',
-    eje: 'Responsabilidad y Cumplimiento',
-    color: 'lime' as const,
-    icono: '📋',
-    normaGeneral: 'Cumplo con mis deberes escolares y formativos, contribuyendo a un ambiente de orden y aprendizaje.',
-    conductas: [
-      { id: 'c5', num: 5, texto: 'Ingreso puntualmente y participo activamente en cada actividad.' },
-      { id: 'c6', num: 6, texto: 'Mantengo una presentación personal adecuada y uso correctamente el uniforme.' },
-      { id: 'c7', num: 7, texto: 'Cumplo con mis tareas, compromisos académicos y acuerdos de aula.' },
-      { id: 'c8', num: 8, texto: 'Sigo las orientaciones del docente para favorecer el aprendizaje de todos.' },
-    ]
-  },
-  {
-    id: 'eje-3',
-    valor: 'Empatía y Paz',
-    eje: 'Convivencia Pacífica',
-    color: 'magenta' as const,
-    icono: '☮️',
-    normaGeneral: 'Construyo relaciones positivas mediante el diálogo, la regulación emocional y la cooperación.',
-    conductas: [
-      { id: 'c9', num: 9, texto: 'Dialogo para resolver diferencias, buscando acuerdos que beneficien a todos.' },
-      { id: 'c10', num: 10, texto: 'Expreso mis emociones de manera adecuada y busco apoyo cuando lo necesito.' },
-      { id: 'c11', num: 11, texto: 'Construyo relaciones positivas basadas en la empatía y la cooperación.' },
-    ]
-  },
-  {
-    id: 'eje-4',
-    valor: 'Responsabilidad Digital',
-    eje: 'Convivencia Digital y Tecnología',
-    color: 'blue' as const,
-    icono: '💻',
-    normaGeneral: 'Utilizo las tecnologías de manera segura, ética y orientada al aprendizaje.',
-    conductas: [
-      { id: 'c12', num: 12, texto: 'Utilizo los dispositivos tecnológicos para aprender y trabajar de forma segura.' },
-      { id: 'c13', num: 13, texto: 'Respeto la privacidad de mis compañeros y solo registro o comparto contenido con autorización.' },
-      { id: 'c14', num: 14, texto: 'Participo en entornos digitales con responsabilidad, cordialidad y respeto.' },
-      { id: 'c15', num: 15, texto: 'Cuido los equipos tecnológicos de la institución y los uso con fines educativos.' },
-    ]
-  },
-  {
-    id: 'eje-5',
-    valor: 'Responsabilidad – Orden – Cuidado',
-    eje: 'Cuidado de los Espacios y Recursos',
-    color: 'lime' as const,
-    icono: '🌿',
-    normaGeneral: 'Protejo y conservo los ambientes y materiales de la institución como parte de mi formación.',
-    conductas: [
-      { id: 'c16', num: 16, texto: 'Mantengo mi aula y los ambientes escolares limpios y ordenados.' },
-      { id: 'c17', num: 17, texto: 'Cuido el mobiliario, materiales e infraestructura como parte de mi responsabilidad escolar.' },
-      { id: 'c18', num: 18, texto: 'Promuevo prácticas de cuidado del ambiente dentro y fuera de la institución.' },
-    ]
-  },
-  {
-    id: 'eje-6',
-    valor: 'Autocuidado – Seguridad – Bienestar',
-    eje: 'Seguridad y Bienestar',
-    color: 'cyan' as const,
-    icono: '🛡️',
-    normaGeneral: 'Protejo mi integridad física y emocional, actuando con responsabilidad en todos los espacios.',
-    conductas: [
-      { id: 'c19', num: 19, texto: 'Me desplazo con responsabilidad y prudencia dentro de la institución.' },
-      { id: 'c20', num: 20, texto: 'Practico el autocuidado y protejo mi integridad física y emocional.' },
-      { id: 'c21', num: 21, texto: 'Participo en los protocolos de seguridad siguiendo las orientaciones del personal.' },
-    ]
-  },
-];
+interface Alumno {
+  id: string;
+  apellidos_nombres: string;
+  grado: string;
+  seccion: string;
+}
 
-const LS_REGISTROS = 'ie_registros_normas';
-const GRADOS = ['1', '2', '3', '4', '5'];
-const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+interface Norma {
+  id: string;
+  num: number;
+  texto: string;
+}
+
+interface EjeConvivencia {
+  id: string;
+  eje: string;
+  icon: string;
+  color: string;
+  normaGeneral: string;
+  normas: Norma[];
+}
+
+interface RegistroInfraccion {
+  id: string;
+  alumnoId: string;
+  fecha: string;
+  bimestre: number;
+  ejeId: string;
+  normaNumerro: number;
+  normaTexto: string;
+  tipo: 'cumplimiento' | 'incumplimiento';
+  descripcion: string;
+  accion: string;
+  observaciones?: string;
+  registradoPor: string;
+  curso?: string;
+}
+
+const LS_ALUMNOS = 'ie_alumnos';
+const LS_INFRACCIONES = 'ie_infracciones_v2';
 
 function lsGet<T>(key: string, def: T): T {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch { return def; }
 }
-function lsSet(key: string, val: any) { localStorage.setItem(key, JSON.stringify(val)); }
 
-function normGrado(g: string | undefined): string {
-  if (!g) return '';
-  const s = String(g).trim();
-  const map: Record<string, string> = {
-    'primero': '1', '1°': '1', '1º': '1', 'segundo': '2', '2°': '2', '2º': '2',
-    'tercero': '3', '3°': '3', '3º': '3', 'cuarto': '4', '4°': '4', '4º': '4',
-    'quinto': '5', '5°': '5', '5º': '5',
-  };
-  return map[s.toLowerCase()] || s.replace(/[°º]/g, '').trim();
-}
-function normSeccion(s: string | undefined): string {
-  if (!s) return '';
-  return String(s).trim().replace(/^\d+/, '').replace(/[^A-Za-z]/g, '').toUpperCase();
-}
-function nombreAlumno(a: any): string {
-  return a.apellidos_nombres || a.nombre || 'Sin nombre';
+function lsSet(key: string, val: any) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.error('Error guardando:', e); }
 }
 
-interface RegistroNorma {
-  id: string;
-  alumnoId: string;
-  conductaId: string;
-  ejeId: string;
-  fecha: string;
-  cumplimiento: 'cumple' | 'no-cumple';
-  puntos: number;
-  observacion: string;
-  registradoPor: string;
-}
+const EJES_CONVIVENCIA: EjeConvivencia[] = [
+  {
+    id: 'eje-1',
+    eje: 'Respeto y Buen Trato',
+    icon: '🤝',
+    color: '#00d9ff',
+    normaGeneral: 'Promuevo relaciones basadas en la amabilidad, aceptación y reconocimiento del otro',
+    normas: [
+      { id: 'n1-1', num: 1, texto: 'Me comunico con lenguaje amable y respetuoso' },
+      { id: 'n1-2', num: 2, texto: 'Reconozco y valoro las diferencias personales y culturales' },
+      { id: 'n1-3', num: 3, texto: 'Escucho con atención las ideas y sentimientos de otros' },
+      { id: 'n1-4', num: 4, texto: 'Fomento un ambiente donde todos se sientan seguros' },
+    ]
+  },
+  {
+    id: 'eje-2',
+    eje: 'Responsabilidad y Cumplimiento',
+    icon: '📋',
+    color: '#69FF47',
+    normaGeneral: 'Cumplo con mis deberes escolares y formativos, contribuyendo a un ambiente de orden',
+    normas: [
+      { id: 'n2-1', num: 1, texto: 'Ingreso puntualmente y participo activamente' },
+      { id: 'n2-2', num: 2, texto: 'Mantengo presentación personal adecuada' },
+      { id: 'n2-3', num: 3, texto: 'Cumplo con tareas y compromisos académicos' },
+      { id: 'n2-4', num: 4, texto: 'Sigo las orientaciones del docente' },
+    ]
+  },
+  {
+    id: 'eje-3',
+    eje: 'Convivencia Pacífica',
+    icon: '☮️',
+    color: '#B388FF',
+    normaGeneral: 'Construyo relaciones positivas mediante diálogo, regulación emocional y cooperación',
+    normas: [
+      { id: 'n3-1', num: 1, texto: 'Dialogo para resolver diferencias buscando acuerdos' },
+      { id: 'n3-2', num: 2, texto: 'Expreso mis emociones de manera adecuada' },
+      { id: 'n3-3', num: 3, texto: 'Construyo relaciones basadas en empatía y cooperación' },
+    ]
+  },
+  {
+    id: 'eje-4',
+    eje: 'Responsabilidad Digital',
+    icon: '💻',
+    color: '#FF9F00',
+    normaGeneral: 'Utilizo tecnologías de manera segura, ética y orientada al aprendizaje',
+    normas: [
+      { id: 'n4-1', num: 1, texto: 'Utilizo dispositivos para aprender de forma segura' },
+      { id: 'n4-2', num: 2, texto: 'Respeto la privacidad de compañeros' },
+      { id: 'n4-3', num: 3, texto: 'Comportamiento ético y responsable en plataformas' },
+      { id: 'n4-4', num: 4, texto: 'Cuido los equipos y recursos tecnológicos' },
+    ]
+  },
+  {
+    id: 'eje-5',
+    eje: 'Cuidado de Espacios',
+    icon: '🌿',
+    color: '#FF3D5A',
+    normaGeneral: 'Mantengo y preservo los espacios, bienes y recursos de la institución',
+    normas: [
+      { id: 'n5-1', num: 1, texto: 'Mantengo orden y limpieza en espacios compartidos' },
+      { id: 'n5-2', num: 2, texto: 'Preservo bienes e infraestructura escolar' },
+      { id: 'n5-3', num: 3, texto: 'Cuido y respeto los recursos naturales' },
+    ]
+  },
+];
 
-interface User { id?: string; name?: string; email?: string; role?: string; }
+const CURSOS = ['Comunicación', 'Matemática', 'Ciencia y Tecnología', 'Historia', 'Inglés', 'Educación Física', 'Arte', 'Tutoría'];
 
-export default function NormasConvivenciaScreen({ user }: { user: User }) {
-  const [tab, setTab] = useState<'registro' | 'historial'>('registro');
-  const [ejeSeleccionado, setEjeSeleccionado] = useState<string>(EJES_CONVIVENCIA[0].id);
-  const [conductaSeleccionada, setConductaSeleccionada] = useState<string | null>(null);
+export default function NormasConvivenciaScreen() {
+  const [vista, setVista] = useState<'registro' | 'historial'>('registro');
+  const [alumnos, setAlumnos] = useState<Alumno[]>([]);
+  const [infracciones, setInfracciones] = useState<RegistroInfraccion[]>([]);
 
-  // Filtros alumnos
-  const [grado, setGrado] = useState('1');
-  const [seccion, setSeccion] = useState('A');
+  // Filtros principales
+  const [filtroGrado, setFiltroGrado] = useState('');
+  const [filtroSeccion, setFiltroSeccion] = useState('');
+  const [filtroBimestre, setFiltroBimestre] = useState('1');
+  const [filtroCurso, setFiltroCurso] = useState('');
+
+  // Formulario registro
+  const [ejeSeleccionado, setEjeSeleccionado] = useState('eje-1');
+  const [normaSeleccionada, setNormaSeleccionada] = useState<string | null>(null);
+  const [tipoRegistro, setTipoRegistro] = useState<'cumplimiento' | 'incumplimiento'>('incumplimiento');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
-  const [busqueda, setBusqueda] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [accion, setAccion] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+  const [alumnosSeleccionados, setAlumnosSeleccionados] = useState<Set<string>>(new Set());
+  const [busquedaAlumnos, setBusquedaAlumnos] = useState('');
 
-  // Alumnos
-  const [alumnos, setAlumnos] = useState<any[]>([]);
-  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
-
-  // Registro
-  const [registros, setRegistros] = useState<RegistroNorma[]>([]);
-  const [puntos, setPuntos] = useState<number>(5);
-  const [observacion, setObservacion] = useState('');
-  const [cumplimiento, setCumplimiento] = useState<'cumple' | 'no-cumple'>('cumple');
-  const [flashMsg, setFlashMsg] = useState('');
-
-  // Historial filtros
-  const [histGrado, setHistGrado] = useState('');
-  const [histSeccion, setHistSeccion] = useState('');
+  // Historial
+  const [busquedaHistorial, setBusquedaHistorial] = useState('');
+  const [guardado, setGuardado] = useState(false);
 
   useEffect(() => {
-    setAlumnos(lsGet('ie_alumnos', []));
-    setRegistros(lsGet(LS_REGISTROS, []));
+    const lista = lsGet<Alumno[]>(LS_ALUMNOS, []);
+    setAlumnos(lista);
+    const infs = lsGet<RegistroInfraccion[]>(LS_INFRACCIONES, []);
+    setInfracciones(infs);
+    if (lista.length > 0) {
+      setFiltroGrado(lista[0].grado);
+    }
   }, []);
 
-  const gradosDisponibles = useMemo(() =>
-    [...new Set(alumnos.map(a => normGrado(a.grado)).filter(Boolean))].sort(), [alumnos]);
+  const grados = [...new Set(alumnos.map(a => a.grado))].sort();
+  const secciones = filtroGrado ? [...new Set(alumnos.filter(a => a.grado === filtroGrado).map(a => a.seccion))].sort() : [];
 
-  const alumnosFiltrados = useMemo(() =>
-    alumnos
-      .filter(a =>
-        normGrado(a.grado) === grado &&
-        normSeccion(a.seccion) === seccion &&
-        (!busqueda || nombreAlumno(a).toLowerCase().includes(busqueda.toLowerCase()))
-      )
-      .sort((a, b) => nombreAlumno(a).localeCompare(nombreAlumno(b))),
-    [alumnos, grado, seccion, busqueda]
+  const alumnosFiltrados = alumnos.filter(a =>
+    (!filtroGrado || a.grado === filtroGrado) &&
+    (!filtroSeccion || a.seccion === filtroSeccion) &&
+    a.apellidos_nombres.toLowerCase().includes(busquedaAlumnos.toLowerCase())
   );
 
-  const ejeActual = EJES_CONVIVENCIA.find(e => e.id === ejeSeleccionado)!;
-  const conductaActual = ejeActual?.conductas.find(c => c.id === conductaSeleccionada);
+  const ejeActual = EJES_CONVIVENCIA.find(e => e.id === ejeSeleccionado) || EJES_CONVIVENCIA[0];
 
-  const toggleAlumno = (id: string) => {
-    const nueva = new Set(seleccionados);
-    if (nueva.has(id)) nueva.delete(id); else nueva.add(id);
-    setSeleccionados(nueva);
+  const mostrarGuardado = () => {
+    setGuardado(true);
+    setTimeout(() => setGuardado(false), 2500);
   };
 
-  const toggleTodos = () => {
-    if (seleccionados.size === alumnosFiltrados.length) {
-      setSeleccionados(new Set());
-    } else {
-      setSeleccionados(new Set(alumnosFiltrados.map(a => a.id)));
+  const registrarInfraccion = () => {
+    if (!normaSeleccionada || alumnosSeleccionados.size === 0) {
+      alert('Selecciona una norma y al menos un alumno');
+      return;
     }
-  };
 
-  const registrarNorma = () => {
-    if (!conductaSeleccionada) { setFlashMsg('⚠️ Selecciona una conducta observable'); setTimeout(() => setFlashMsg(''), 3000); return; }
-    if (seleccionados.size === 0) { setFlashMsg('⚠️ Selecciona al menos un alumno'); setTimeout(() => setFlashMsg(''), 3000); return; }
+    const norma = ejeActual.normas.find(n => n.id === normaSeleccionada);
+    if (!norma) return;
 
-    const ptsFinales = cumplimiento === 'cumple' ? Math.abs(puntos) : -Math.abs(puntos);
-    const nuevos: RegistroNorma[] = [...seleccionados].map(alumnoId => ({
-      id: `reg-${Date.now()}-${alumnoId}`,
-      alumnoId,
-      conductaId: conductaSeleccionada,
-      ejeId: ejeSeleccionado,
-      fecha,
-      cumplimiento,
-      puntos: ptsFinales,
-      observacion,
-      registradoPor: user?.email || 'docente',
-    }));
+    const todos = lsGet<RegistroInfraccion[]>(LS_INFRACCIONES, []);
+    const bim = parseInt(filtroBimestre);
 
-    const actualizados = [...registros, ...nuevos];
-    setRegistros(actualizados);
-    lsSet(LS_REGISTROS, actualizados);
-    syncToTurso('registros_normas', actualizados);
-    setFlashMsg(`✅ Registrado para ${seleccionados.size} alumno(s) — ${ptsFinales > 0 ? '+' : ''}${ptsFinales} pts`);
-    setTimeout(() => setFlashMsg(''), 4000);
-    setSeleccionados(new Set());
-    setObservacion('');
-  };
-
-  // Puntos de un alumno en la fecha actual
-  const puntosAlumnoHoy = (alumnoId: string): number =>
-    registros.filter(r => r.alumnoId === alumnoId && r.fecha === fecha)
-      .reduce((acc, r) => acc + r.puntos, 0);
-
-  // Historial: resumen por alumno
-  const historialAlumnos = useMemo(() => {
-    const filtrados = alumnos.filter(a =>
-      (!histGrado || normGrado(a.grado) === histGrado) &&
-      (!histSeccion || normSeccion(a.seccion) === histSeccion)
-    );
-    return filtrados.map(a => {
-      const regs = registros.filter(r => r.alumnoId === a.id);
-      const ptsTotales = regs.reduce((acc, r) => acc + r.puntos, 0);
-      const cumplidos = regs.filter(r => r.cumplimiento === 'cumple').length;
-      const incumplidos = regs.filter(r => r.cumplimiento === 'no-cumple').length;
-      return { alumno: a, ptsTotales, cumplidos, incumplidos, total: regs.length };
-    }).sort((a, b) => b.ptsTotales - a.ptsTotales);
-  }, [alumnos, registros, histGrado, histSeccion]);
-
-  const exportarHistorial = () => {
-    let txt = `NORMAS DE CONVIVENCIA — Resumen\n${'='.repeat(55)}\n\n`;
-    historialAlumnos.forEach((item, i) => {
-      txt += `${String(i+1).padStart(2,'0')}. ${nombreAlumno(item.alumno).padEnd(38)} | Pts: ${item.ptsTotales > 0 ? '+' : ''}${item.ptsTotales} | ✓${item.cumplidos} ✗${item.incumplidos}\n`;
+    alumnosSeleccionados.forEach(alumnoId => {
+      todos.push({
+        id: `inf-${Date.now()}-${Math.random()}`,
+        alumnoId,
+        fecha,
+        bimestre: bim,
+        ejeId: ejeSeleccionado,
+        normaNumerro: norma.num,
+        normaTexto: norma.texto,
+        tipo: tipoRegistro,
+        descripcion,
+        accion,
+        observaciones,
+        registradoPor: 'Docente',
+        curso: filtroCurso || undefined,
+      });
     });
-    const blob = new Blob([txt], {type:'text/plain'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `normas_resumen.txt`; a.click();
-    URL.revokeObjectURL(url);
+
+    lsSet(LS_INFRACCIONES, todos);
+    setInfracciones(todos);
+    setAlumnosSeleccionados(new Set());
+    setDescripcion('');
+    setAccion('');
+    setObservaciones('');
+    mostrarGuardado();
   };
 
-  const colorMap: Record<string, string> = {
-    cyan: 'text-neon-cyan border-neon-cyan bg-neon-cyan/10',
-    lime: 'text-neon-lime border-neon-lime bg-neon-lime/10',
-    magenta: 'text-neon-magenta border-neon-magenta bg-neon-magenta/10',
-    blue: 'text-blue-400 border-blue-400 bg-blue-400/10',
+  const eliminarInfraccion = (id: string) => {
+    const todos = lsGet<RegistroInfraccion[]>(LS_INFRACCIONES, []);
+    const filtrados = todos.filter(i => i.id !== id);
+    lsSet(LS_INFRACCIONES, filtrados);
+    setInfracciones(filtrados);
+    mostrarGuardado();
   };
+
+  const infraccionesAlumno = (alumnoId: string) =>
+    infracciones.filter(i => i.alumnoId === alumnoId && i.bimestre === parseInt(filtroBimestre));
+
+  const alumnosConRegistro = alumnos.filter(a => {
+    const regs = infraccionesAlumno(a.id);
+    const nombre = a.apellidos_nombres.toLowerCase();
+    return regs.length > 0 && nombre.includes(busquedaHistorial.toLowerCase());
+  });
 
   return (
-    <div className="min-h-screen bg-dark-bg text-white overflow-hidden p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6">
       <div className="fixed inset-0 -z-50">
-        <div className="absolute inset-0 bg-gradient-cyber opacity-60" />
+        <div className="absolute inset-0 bg-gradient-cyber opacity-60"></div>
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto space-y-6">
+        <HeaderElegante icon={Shield} title="EDUGEST NORMAS DE CONVIVENCIA" subtitle="Registro y seguimiento de conducta" />
 
-        {/* ── HEADER ── */}
-        <motion.div initial={{ opacity: 0, y: -30 }} animate={{ opacity: 1, y: 0 }}
-          className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tighter">
-              Normas de <HologramText>Convivencia</HologramText>
-            </h1>
-            <p className="text-white/50 font-mono tracking-widest text-xs mt-1">IE MANUEL FIDENCIO HIDALGO FLORES — 2026</p>
-          </div>
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold mt-2 ${isSyncedToCloud() ? 'border-neon-lime/50 bg-neon-lime/10 text-neon-lime' : 'border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan'}`}>
-            {isSyncedToCloud() ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-            {isSyncedToCloud() ? 'TURSO CONECTADO' : 'MODO LOCAL'}
+        {/* Pestañas */}
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
+          {[
+            { id: 'registro', label: '📝 Registrar Infracción' },
+            { id: 'historial', label: '📊 Historial de Infracciones' }
+          ].map(tab => (
+            <motion.button
+              key={tab.id}
+              onClick={() => setVista(tab.id as any)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 ${
+                vista === tab.id
+                  ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/50'
+                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+              }`}
+            >
+              {tab.label}
+            </motion.button>
+          ))}
+        </motion.div>
+
+        {/* FILTROS PRINCIPALES */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Grado</label>
+              <select
+                value={filtroGrado}
+                onChange={(e) => {
+                  setFiltroGrado(e.target.value);
+                  setFiltroSeccion('');
+                }}
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-violet-500 focus:ring-violet-500/20 text-sm"
+              >
+                <option value="">Seleccionar grado</option>
+                {grados.map(g => <option key={g} value={g}>{g}°</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Sección</label>
+              <select
+                value={filtroSeccion}
+                onChange={(e) => setFiltroSeccion(e.target.value)}
+                disabled={!filtroGrado}
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-violet-500 focus:ring-violet-500/20 text-sm disabled:opacity-50"
+              >
+                <option value="">Todas las secciones</option>
+                {secciones.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Bimestre</label>
+              <select
+                value={filtroBimestre}
+                onChange={(e) => setFiltroBimestre(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-violet-500 focus:ring-violet-500/20 text-sm"
+              >
+                <option value="1">I Bimestre</option>
+                <option value="2">II Bimestre</option>
+                <option value="3">III Bimestre</option>
+                <option value="4">IV Bimestre</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Curso</label>
+              <select
+                value={filtroCurso}
+                onChange={(e) => setFiltroCurso(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-violet-500 focus:ring-violet-500/20 text-sm"
+              >
+                <option value="">Todos los cursos</option>
+                {CURSOS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
         </motion.div>
 
-        {/* ── TABS ── */}
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { id: 'registro', label: '📝 Registrar Conducta' },
-            { id: 'historial', label: '📊 Historial / Resumen' },
-          ].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id as any)}
-              className={`px-5 py-2.5 rounded-xl font-bold text-sm border transition-all ${tab === t.id ? 'bg-neon-cyan/20 border-neon-cyan text-neon-cyan shadow-[0_0_20px_rgba(0,217,255,0.2)]' : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {/* VISTA REGISTRO */}
+        <AnimatePresence mode="wait">
+          {vista === 'registro' && (
+            <motion.div key="registro" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* ═══════════════════════════════════════
-            TAB: REGISTRO
-        ═══════════════════════════════════════ */}
-        {tab === 'registro' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* PANEL IZQUIERDO: Formulario */}
+              <motion.div className="lg:col-span-1 bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm space-y-4 h-fit max-h-[calc(100vh-300px)] overflow-y-auto">
+                <h3 className="text-lg font-bold text-white">Registrar Infracción</h3>
 
-            {/* ── COLUMNA IZQUIERDA: Ejes + Conductas ── */}
-            <div className="space-y-4">
-
-              {/* Fecha */}
-              <FuturisticCard variant="cyan" glow>
-                <div className="p-4 flex items-center gap-3">
-                  <label className="text-white/60 text-sm font-bold uppercase">Fecha:</label>
-                  <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-                    className="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-neon-cyan" />
+                {/* Seleccionar Eje */}
+                <div>
+                  <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Eje de Convivencia</label>
+                  <div className="space-y-2">
+                    {EJES_CONVIVENCIA.map(eje => (
+                      <motion.button
+                        key={eje.id}
+                        onClick={() => {
+                          setEjeSeleccionado(eje.id);
+                          setNormaSeleccionada(null);
+                        }}
+                        className={`w-full px-3 py-2 rounded-lg text-left text-sm font-semibold border-2 transition-all ${
+                          ejeSeleccionado === eje.id
+                            ? 'border-white bg-slate-700'
+                            : 'border-slate-600 bg-slate-800/30 hover:border-slate-500'
+                        }`}
+                        style={ejeSeleccionado === eje.id ? { borderColor: eje.color, color: eje.color } : {}}
+                      >
+                        {eje.icon} {eje.eje.split(' ')[0]}
+                      </motion.button>
+                    ))}
+                  </div>
                 </div>
-              </FuturisticCard>
 
-              {/* Ejes */}
-              <div className="space-y-2">
-                <p className="text-white/50 text-xs uppercase font-bold tracking-wider px-1">1. Selecciona el Eje</p>
-                {EJES_CONVIVENCIA.map((eje, idx) => {
-                  const selec = ejeSeleccionado === eje.id;
-                  return (
-                    <motion.div key={eje.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }}>
-                      <button onClick={() => { setEjeSeleccionado(eje.id); setConductaSeleccionada(null); }}
-                        className={`w-full text-left rounded-xl border transition-all p-3 ${selec ? `${colorMap[eje.color]} border-2` : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">{eje.icono}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className={`font-bold text-sm ${selec ? '' : 'text-white'}`}>{eje.eje}</p>
-                            <p className="text-white/40 text-xs truncate">{eje.valor}</p>
-                          </div>
-                          <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-transform ${selec ? 'rotate-90 text-current' : 'text-white/30'}`} />
-                        </div>
-                        {/* Norma general expandida */}
-                        {selec && (
-                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                            className="mt-3 pt-3 border-t border-current/20">
-                            <p className="text-xs italic text-current/80">"{eje.normaGeneral}"</p>
-                          </motion.div>
-                        )}
-                      </button>
+                {/* Norma General */}
+                <div className="border-t border-slate-600 pt-3">
+                  <p className="text-xs uppercase font-semibold mb-2" style={{ color: ejeActual.color }}>
+                    {ejeActual.eje}
+                  </p>
+                  <p className="text-xs text-slate-300">{ejeActual.normaGeneral}</p>
+                </div>
 
-                      {/* Conductas del eje seleccionado */}
-                      {selec && (
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="ml-4 mt-2 space-y-1.5">
-                          <p className="text-white/40 text-xs uppercase font-bold tracking-wider mb-2">2. Selecciona la conducta observable</p>
-                          {eje.conductas.map(c => {
-                            const selC = conductaSeleccionada === c.id;
-                            return (
-                              <button key={c.id} onClick={() => setConductaSeleccionada(selC ? null : c.id)}
-                                className={`w-full text-left rounded-xl border px-4 py-3 text-sm transition-all ${selC ? `${colorMap[eje.color]} border font-bold` : 'border-white/10 bg-white/5 hover:bg-white/10 text-white/80'}`}>
-                                <div className="flex items-start gap-2">
-                                  <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${selC ? 'bg-current/20' : 'bg-white/10 text-white/60'}`}>{c.num}</span>
-                                  <span className="leading-snug">{c.texto}</span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </div>
+                {/* Seleccionar Norma */}
+                <div>
+                  <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Selecciona la norma</label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {ejeActual.normas.map(norma => (
+                      <motion.button
+                        key={norma.id}
+                        onClick={() => setNormaSeleccionada(norma.id)}
+                        className={`w-full px-3 py-2 rounded-lg text-left text-sm border-2 transition-all ${
+                          normaSeleccionada === norma.id
+                            ? 'border-white bg-slate-700'
+                            : 'border-slate-600 bg-slate-800/30 hover:border-slate-500'
+                        }`}
+                        style={normaSeleccionada === norma.id ? { borderColor: ejeActual.color } : {}}
+                      >
+                        <span className="font-bold" style={{ color: ejeActual.color }}>{norma.num}.</span>
+                        <span className="text-slate-200 text-xs ml-1">{norma.texto}</span>
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
 
-            {/* ── COLUMNA DERECHA: Alumnos + Puntuación ── */}
-            <div className="space-y-4">
+                {/* Tipo Infracción */}
+                <div>
+                  <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Tipo</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { v: 'cumplimiento' as const, l: '✓ Cumplimiento', c: '#10b981' },
+                      { v: 'incumplimiento' as const, l: '✗ Incumplimiento', c: '#ef4444' }
+                    ].map(t => (
+                      <motion.button
+                        key={t.v}
+                        onClick={() => setTipoRegistro(t.v)}
+                        className={`px-3 py-2 rounded-lg text-xs font-semibold border-2 transition-all ${
+                          tipoRegistro === t.v ? 'border-white bg-slate-700' : 'border-slate-600 bg-slate-800/30'
+                        }`}
+                        style={tipoRegistro === t.v ? { borderColor: t.c, color: t.c } : {}}
+                      >
+                        {t.l}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Panel puntuación */}
-              <AnimatePresence>
-                {conductaSeleccionada && conductaActual && (
-                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                    <FuturisticCard variant={ejeActual.color} glow>
-                      <div className="p-5 space-y-4">
-                        <div>
-                          <p className="text-white/50 text-xs uppercase font-bold">Conducta seleccionada</p>
-                          <p className="text-white text-sm mt-1 leading-snug">{conductaActual.num}. {conductaActual.texto}</p>
-                        </div>
+                {/* Fecha */}
+                <div>
+                  <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Fecha</label>
+                  <input
+                    type="date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-violet-500 focus:ring-violet-500/20 text-sm"
+                  />
+                </div>
 
-                        {/* Cumplimiento */}
-                        <div>
-                          <p className="text-white/50 text-xs uppercase font-bold mb-2">¿La cumple o incumple?</p>
-                          <div className="flex gap-3">
-                            <button onClick={() => setCumplimiento('cumple')}
-                              className={`flex-1 py-3 rounded-xl font-bold text-sm border transition-all ${cumplimiento === 'cumple' ? 'bg-neon-lime/20 border-neon-lime text-neon-lime shadow-[0_0_15px_rgba(176,255,94,0.3)]' : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10'}`}>
-                              ✓ Cumple
-                            </button>
-                            <button onClick={() => setCumplimiento('no-cumple')}
-                              className={`flex-1 py-3 rounded-xl font-bold text-sm border transition-all ${cumplimiento === 'no-cumple' ? 'bg-red-500/20 border-red-500 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-white/5 border-white/20 text-white/60 hover:bg-white/10'}`}>
-                              ✗ Incumple
-                            </button>
-                          </div>
-                        </div>
+                {/* Descripción */}
+                <div>
+                  <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Descripción</label>
+                  <textarea
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    rows={3}
+                    placeholder="¿Qué sucedió?"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-violet-500 focus:ring-violet-500/20 text-xs resize-none"
+                  />
+                </div>
 
-                        {/* Puntuación 1-10 */}
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-white/50 text-xs uppercase font-bold">Puntuación (1 – 10)</p>
-                            <span className={`text-2xl font-black ${cumplimiento === 'cumple' ? 'text-neon-lime' : 'text-red-400'}`}>
-                              {cumplimiento === 'cumple' ? '+' : '-'}{puntos}
-                            </span>
-                          </div>
-                          <div className="flex gap-2 flex-wrap">
-                            {[1,2,3,4,5,6,7,8,9,10].map(n => (
-                              <button key={n} onClick={() => setPuntos(n)}
-                                className={`w-10 h-10 rounded-xl font-bold text-sm transition-all ${puntos === n ? (cumplimiento === 'cumple' ? 'bg-neon-lime text-black shadow-[0_0_10px_#b0ff5e]' : 'bg-red-500 text-white shadow-[0_0_10px_#ef4444]') : 'bg-white/10 text-white/60 hover:bg-white/20'}`}>
-                                {n}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                {/* Acción */}
+                <div>
+                  <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Acción Tomada</label>
+                  <textarea
+                    value={accion}
+                    onChange={(e) => setAccion(e.target.value)}
+                    rows={2}
+                    placeholder="¿Cómo se resolvió?"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-violet-500 focus:ring-violet-500/20 text-xs resize-none"
+                  />
+                </div>
 
-                        {/* Observación */}
-                        <div>
-                          <label className="text-white/50 text-xs uppercase font-bold block mb-1">Observación (opcional)</label>
-                          <input type="text" value={observacion} onChange={e => setObservacion(e.target.value)}
-                            placeholder="Descripción breve..."
-                            className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-neon-cyan placeholder-white/30" />
-                        </div>
+                {/* Observaciones */}
+                <div>
+                  <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Observaciones</label>
+                  <textarea
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    rows={2}
+                    placeholder="Notas adicionales..."
+                    className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-violet-500 focus:ring-violet-500/20 text-xs resize-none"
+                  />
+                </div>
 
-                        {/* Botón registrar */}
-                        <button onClick={registrarNorma}
-                          className={`w-full py-3 rounded-xl font-bold text-sm border transition-all flex items-center justify-center gap-2 ${seleccionados.size > 0 ? 'bg-neon-cyan/20 hover:bg-neon-cyan/30 border-neon-cyan text-neon-cyan' : 'bg-white/5 border-white/20 text-white/40 cursor-not-allowed'}`}>
-                          <Save className="w-4 h-4" />
-                          Registrar para {seleccionados.size} alumno{seleccionados.size !== 1 ? 's' : ''}
-                        </button>
+                {/* Botón Registrar */}
+                <motion.button
+                  onClick={registrarInfraccion}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold rounded-lg hover:opacity-90 transition-all"
+                >
+                  📤 Registrar {alumnosSeleccionados.size > 0 ? `(${alumnosSeleccionados.size})` : ''}
+                </motion.button>
 
-                        {/* Flash message */}
-                        {flashMsg && (
-                          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="text-center text-sm font-bold text-neon-lime">
-                            {flashMsg}
-                          </motion.p>
-                        )}
-                      </div>
-                    </FuturisticCard>
+                {guardado && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full px-4 py-2 bg-emerald-900/30 border border-emerald-600 text-emerald-100 font-semibold text-sm rounded-lg text-center">
+                    ✓ Guardado
                   </motion.div>
                 )}
-              </AnimatePresence>
+              </motion.div>
 
-              {/* Selector de alumnos */}
-              <FuturisticCard variant="lime" glow>
-                <div className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-white/50 text-xs uppercase font-bold">3. Selecciona alumno(s)</p>
-                    <span className="text-neon-lime text-xs font-bold">{seleccionados.size} seleccionado(s)</span>
-                  </div>
-
-                  {/* Filtros */}
-                  <div className="flex flex-wrap gap-2">
-                    <select value={grado} onChange={e => setGrado(e.target.value)}
-                      className="bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-neon-lime">
-                      {(gradosDisponibles.length > 0 ? gradosDisponibles : GRADOS).map(g => (
-                        <option key={g} value={g} className="bg-slate-800">{g}°</option>
-                      ))}
-                    </select>
-                    <select value={seccion} onChange={e => setSeccion(e.target.value)}
-                      className="bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-neon-lime">
-                      {SECCIONES.map(s => (
-                        <option key={s} value={s} className="bg-slate-800">Sec. {s}</option>
-                      ))}
-                    </select>
-                    <div className="flex items-center gap-1 flex-1 min-w-[120px]">
-                      <Search className="w-3.5 h-3.5 text-white/40 flex-shrink-0" />
-                      <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-                        placeholder="Buscar..." className="flex-1 bg-white/10 border border-white/20 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-neon-lime placeholder-white/30" />
-                    </div>
-                  </div>
-
-                  {/* Seleccionar todos */}
-                  {alumnosFiltrados.length > 0 && (
-                    <button onClick={toggleTodos}
-                      className="w-full flex items-center justify-between px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all">
-                      <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 ${seleccionados.size === alumnosFiltrados.length && alumnosFiltrados.length > 0 ? 'bg-neon-lime border-neon-lime text-black' : 'border-white/30'}`}>
-                        {seleccionados.size === alumnosFiltrados.length && alumnosFiltrados.length > 0 && <span className="text-[10px] font-black">✓</span>}
-                      </div>
-                      <span className="text-white/70 text-xs flex-1 text-left ml-2">Seleccionar todos ({alumnosFiltrados.length})</span>
-                    </button>
-                  )}
-
-                  {/* Lista alumnos */}
-                  <div className="space-y-1 max-h-72 overflow-y-auto">
-                    {alumnosFiltrados.length === 0 && (
-                      <div className="text-center py-6">
-                        <p className="text-white/40 text-sm">Sin alumnos en {grado}° sección {seccion}</p>
-                        {alumnos.length === 0 && (
-                          <p className="text-yellow-400/70 text-xs mt-2">No hay alumnos en el sistema. Ve a Gestión → Alumnos.</p>
-                        )}
-                      </div>
-                    )}
-                    {alumnosFiltrados.map(alumno => {
-                      const sel = seleccionados.has(alumno.id);
-                      const pts = puntosAlumnoHoy(alumno.id);
-                      return (
-                        <button key={alumno.id} onClick={() => toggleAlumno(alumno.id)}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-left ${sel ? 'bg-neon-lime/10 border border-neon-lime/30' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}>
-                          <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 ${sel ? 'bg-neon-lime border-neon-lime text-black' : 'border-white/30'}`}>
-                            {sel && <span className="text-[10px] font-black">✓</span>}
-                          </div>
-                          <span className="flex-1 text-white text-xs font-medium truncate">{nombreAlumno(alumno)}</span>
-                          {pts !== 0 && (
-                            <span className={`text-xs font-bold flex-shrink-0 ${pts > 0 ? 'text-neon-lime' : 'text-red-400'}`}>
-                              {pts > 0 ? '+' : ''}{pts}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </FuturisticCard>
-            </div>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════
-            TAB: HISTORIAL
-        ═══════════════════════════════════════ */}
-        {tab === 'historial' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-
-            {/* Filtros historial */}
-            <FuturisticCard variant="cyan" glow>
-              <div className="p-4 flex flex-wrap items-center gap-4">
-                <select value={histGrado} onChange={e => setHistGrado(e.target.value)}
-                  className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-neon-cyan">
-                  <option value="" className="bg-slate-800">Todos los grados</option>
-                  {(gradosDisponibles.length > 0 ? gradosDisponibles : GRADOS).map(g => (
-                    <option key={g} value={g} className="bg-slate-800">{g}°</option>
-                  ))}
-                </select>
-                <select value={histSeccion} onChange={e => setHistSeccion(e.target.value)}
-                  className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-neon-cyan">
-                  <option value="" className="bg-slate-800">Todas las secciones</option>
-                  {SECCIONES.map(s => <option key={s} value={s} className="bg-slate-800">Sección {s}</option>)}
-                </select>
-                <button onClick={exportarHistorial}
-                  className="ml-auto flex items-center gap-2 px-4 py-2 bg-neon-cyan/20 hover:bg-neon-cyan/30 border border-neon-cyan text-neon-cyan font-bold text-xs rounded-xl transition-all">
-                  <Download className="w-4 h-4" /> Exportar Resumen
-                </button>
-              </div>
-            </FuturisticCard>
-
-            {/* Tabla historial */}
-            <FuturisticCard variant="lime" glow>
-              <div className="p-5">
-                <h3 className="text-white font-bold uppercase tracking-wider mb-4 flex items-center gap-2 text-sm">
-                  <BarChart3 className="w-4 h-4 text-neon-lime" /> Resumen de Conducta por Alumno
+              {/* PANEL DERECHO: Lista de Alumnos */}
+              <motion.div className="lg:col-span-2 bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm flex flex-col h-[calc(100vh-300px)]">
+                <h3 className="text-lg font-bold text-white mb-4">
+                  👥 Alumnos ({alumnosFiltrados.length})
                 </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-white/10 text-white/50 text-xs uppercase">
-                        <th className="px-3 py-2 text-left">#</th>
-                        <th className="px-3 py-2 text-left">Alumno</th>
-                        <th className="px-3 py-2 text-center">Grado</th>
-                        <th className="px-3 py-2 text-center text-neon-lime">✓ Cumple</th>
-                        <th className="px-3 py-2 text-center text-red-400">✗ Incumple</th>
-                        <th className="px-3 py-2 text-center">Puntos</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {historialAlumnos.length === 0 && (
-                        <tr><td colSpan={6} className="text-center text-white/40 py-8">Sin registros aún</td></tr>
-                      )}
-                      {historialAlumnos.map((item, i) => (
-                        <tr key={item.alumno.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                          <td className="px-3 py-2.5 text-white/40">{i+1}</td>
-                          <td className="px-3 py-2.5 text-white font-medium">{nombreAlumno(item.alumno)}</td>
-                          <td className="px-3 py-2.5 text-center text-white/50 text-xs">{normGrado(item.alumno.grado)}°{normSeccion(item.alumno.seccion)}</td>
-                          <td className="px-3 py-2.5 text-center">
-                            <span className="px-2 py-1 rounded-full bg-neon-lime/20 text-neon-lime text-xs font-bold">{item.cumplidos}</span>
-                          </td>
-                          <td className="px-3 py-2.5 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${item.incumplidos > 0 ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-white/40'}`}>{item.incumplidos}</span>
-                          </td>
-                          <td className="px-3 py-2.5 text-center">
-                            <span className={`font-black text-sm ${item.ptsTotales > 0 ? 'text-neon-lime' : item.ptsTotales < 0 ? 'text-red-400' : 'text-white/40'}`}>
-                              {item.ptsTotales > 0 ? '+' : ''}{item.ptsTotales}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </FuturisticCard>
 
-            {/* Últimos registros recientes */}
-            {registros.length > 0 && (
-              <FuturisticCard variant="magenta" glow>
-                <div className="p-5">
-                  <h3 className="text-white font-bold uppercase tracking-wider mb-4 text-sm flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-neon-magenta" /> Últimos 15 Registros
-                  </h3>
-                  <div className="space-y-2">
-                    {[...registros].reverse().slice(0, 15).map(reg => {
-                      const alumno = alumnos.find(a => a.id === reg.alumnoId);
-                      const eje = EJES_CONVIVENCIA.find(e => e.id === reg.ejeId);
-                      const conducta = eje?.conductas.find(c => c.id === reg.conductaId);
-                      return (
-                        <div key={reg.id} className="flex items-center gap-3 px-4 py-2.5 bg-white/5 rounded-xl">
-                          <span className={`text-xs font-black flex-shrink-0 w-10 text-center ${reg.puntos > 0 ? 'text-neon-lime' : 'text-red-400'}`}>
-                            {reg.puntos > 0 ? '+' : ''}{reg.puntos}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white text-xs font-medium truncate">{alumno ? nombreAlumno(alumno) : reg.alumnoId}</p>
-                            <p className="text-white/40 text-xs truncate">{eje?.icono} {conducta?.num}. {conducta?.texto}</p>
-                          </div>
-                          <span className="text-white/30 text-xs flex-shrink-0">{reg.fecha}</span>
-                        </div>
-                      );
-                    })}
+                {/* Búsqueda */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Buscar alumno..."
+                      value={busquedaAlumnos}
+                      onChange={(e) => setBusquedaAlumnos(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-violet-500 focus:ring-violet-500/20 text-sm"
+                    />
                   </div>
                 </div>
-              </FuturisticCard>
-            )}
-          </motion.div>
-        )}
+
+                {/* Botones Toggle */}
+                <div className="flex gap-2 mb-4">
+                  <motion.button
+                    onClick={() => {
+                      if (alumnosSeleccionados.size === alumnosFiltrados.length) {
+                        setAlumnosSeleccionados(new Set());
+                      } else {
+                        setAlumnosSeleccionados(new Set(alumnosFiltrados.map(a => a.id)));
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600 text-sm font-semibold"
+                  >
+                    {alumnosSeleccionados.size === alumnosFiltrados.length ? '☑ Deseleccionar todos' : '☐ Seleccionar todos'}
+                  </motion.button>
+                </div>
+
+                {/* Lista Scrollable */}
+                <div className="flex-1 overflow-y-auto border-t border-slate-700">
+                  <AnimatePresence>
+                    {alumnosFiltrados.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">
+                        No hay alumnos en esta sección
+                      </div>
+                    ) : (
+                      alumnosFiltrados.map((alumno, idx) => {
+                        const isSelected = alumnosSeleccionados.has(alumno.id);
+                        return (
+                          <motion.div
+                            key={alumno.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.02 }}
+                            onClick={() => {
+                              const newSet = new Set(alumnosSeleccionados);
+                              if (newSet.has(alumno.id)) {
+                                newSet.delete(alumno.id);
+                              } else {
+                                newSet.add(alumno.id);
+                              }
+                              setAlumnosSeleccionados(newSet);
+                            }}
+                            className={`px-4 py-3 border-b border-slate-700 cursor-pointer transition-all ${
+                              isSelected ? 'bg-violet-600/20' : 'hover:bg-slate-700/30'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                isSelected ? 'bg-violet-600 border-violet-400' : 'border-slate-600'
+                              }`}>
+                                {isSelected && <span className="text-white text-xs font-bold">✓</span>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`font-semibold truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                                  {alumno.apellidos_nombres}
+                                </p>
+                                <p className="text-xs text-slate-400">{alumno.grado}° - Sección {alumno.seccion}</p>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* VISTA HISTORIAL */}
+        <AnimatePresence mode="wait">
+          {vista === 'historial' && (
+            <motion.div key="historial" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+              {/* Búsqueda */}
+              <div className="relative">
+                <Search className="absolute left-4 top-3 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar alumno..."
+                  value={busquedaHistorial}
+                  onChange={(e) => setBusquedaHistorial(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 rounded-lg bg-slate-800/50 border border-slate-700 text-white focus:border-violet-500 focus:ring-violet-500/20"
+                />
+              </div>
+
+              {/* Historial por Alumno */}
+              <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+                {alumnosConRegistro.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 bg-slate-800/50 border border-slate-700 rounded-lg">
+                    No hay registros de conducta
+                  </div>
+                ) : (
+                  alumnosConRegistro.map(alumno => {
+                    const registros = infraccionesAlumno(alumno.id);
+                    const cumplimientos = registros.filter(r => r.tipo === 'cumplimiento').length;
+                    const incumplimientos = registros.filter(r => r.tipo === 'incumplimiento').length;
+
+                    return (
+                      <details key={alumno.id} className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden">
+                        <summary className="px-6 py-4 cursor-pointer hover:bg-slate-700/30 transition-colors flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="font-bold text-white">{alumno.apellidos_nombres}</p>
+                            <p className="text-xs text-slate-400">{alumno.grado}° - Sección {alumno.seccion}</p>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-emerald-400">✓ {cumplimientos}</span>
+                            <span className="text-red-400">✗ {incumplimientos}</span>
+                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                          </div>
+                        </summary>
+
+                        <div className="border-t border-slate-700 divide-y divide-slate-700">
+                          {registros.map(reg => (
+                            <div key={reg.id} className="px-6 py-4 bg-slate-800/30 space-y-2">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                      reg.tipo === 'cumplimiento' ? 'bg-emerald-600/30 text-emerald-300' : 'bg-red-600/30 text-red-300'
+                                    }`}>
+                                      {reg.tipo === 'cumplimiento' ? '✓ Cumplió' : '✗ Incumplió'}
+                                    </span>
+                                    <span className="text-xs text-slate-400">{reg.fecha}</span>
+                                  </div>
+                                  <p className="text-sm text-slate-200">
+                                    <span style={{ color: EJES_CONVIVENCIA.find(e => e.id === reg.ejeId)?.color }}>
+                                      {reg.ejeId}: {reg.normaNumerro}
+                                    </span>
+                                    {' - '}
+                                    {reg.normaTexto}
+                                  </p>
+                                  <p className="text-xs text-slate-400 mt-1"><strong>Descripción:</strong> {reg.descripcion}</p>
+                                  <p className="text-xs text-slate-400"><strong>Acción:</strong> {reg.accion}</p>
+                                  {reg.observaciones && <p className="text-xs text-slate-400"><strong>Obs:</strong> {reg.observaciones}</p>}
+                                  {reg.curso && <p className="text-xs text-slate-400"><strong>Curso:</strong> {reg.curso}</p>}
+                                </div>
+                                <motion.button
+                                  onClick={() => eliminarInfraccion(reg.id)}
+                                  whileHover={{ scale: 1.1 }}
+                                  className="px-2 py-1 rounded bg-red-900/30 text-red-300 hover:bg-red-900/50 text-xs font-semibold flex-shrink-0"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </motion.button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

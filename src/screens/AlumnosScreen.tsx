@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Phone } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Phone, Users } from 'lucide-react';
 import { guardarAlumnos } from '../services/dataService';
+import HeaderElegante from '../components/HeaderElegante';
 
 interface Apoderado {
   apellidos_nombres: string;
@@ -32,54 +33,25 @@ const GRADOS = ['1°', '2°', '3°', '4°', '5°'];
 const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 const SEXOS = ['Masculino', 'Femenino'];
 
-// ── API helper ────────────────────────────────────────────────────────────────
-function getToken() { return localStorage.getItem('auth_token') || ''; }
-
-async function api(path: string, method = 'GET', body?: object) {
-  // En desarrollo local → localStorage; en producción → API real
-  if (!import.meta.env.PROD) {
-    return localApi(path, method, body);
-  }
-  const res = await fetch(path, {
-    method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error');
-  return data;
-}
-
-// ── Fallback localStorage (desarrollo local) ──────────────────────────────────
+// ── localStorage directo (siempre, sin depender de backend) ──────────────────
 const LS_KEY = 'ie_alumnos';
+
 function lsCargar(): Alumno[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; }
-}
-function lsGuardar(data: Alumno[]) { 
-  localStorage.setItem(LS_KEY, JSON.stringify(data));
-  guardarAlumnos(data); // Sincronizar con Turso
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch { return []; }
 }
 
-function localApi(path: string, method: string, body?: object): any {
-  const todos = lsCargar();
-  if (method === 'GET') return todos;
-  if (method === 'POST') {
-    const b = body as any;
-    if (todos.some(a => a.dni === b.dni)) throw new Error('DNI ya registrado');
-    const nuevo = { ...b, id: 'al-' + Date.now() };
-    lsGuardar([...todos, nuevo]);
-    return { ok: true, id: nuevo.id };
-  }
-  if (method === 'PUT') {
-    const id = path.split('id=')[1];
-    const idx = todos.findIndex(a => a.id === id);
-    if (idx >= 0) { todos[idx] = { ...todos[idx], ...(body as any) }; lsGuardar(todos); }
-    return { ok: true };
-  }
-  if (method === 'DELETE') {
-    const id = path.split('id=')[1];
-    lsGuardar(todos.filter(a => a.id !== id));
-    return { ok: true };
+function lsGuardar(data: Alumno[]) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+    guardarAlumnos(data); // Sincronizar con Turso si está en producción
+  } catch (e) {
+    console.error('Error guardando alumnos:', e);
+    throw new Error('No se pudo guardar. Verifica el espacio del navegador.');
   }
 }
 
@@ -91,27 +63,27 @@ function calcularEdad(fecha: string): number {
   return edad;
 }
 
-const inputCls = "w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-green-500 text-sm";
+const inputCls = "w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-colors text-sm font-medium";
 
 function ApoderadoForm({ label, data, onChange }: { label: string; data: Apoderado; onChange: (d: Apoderado) => void }) {
   return (
-    <div className="bg-slate-700/50 rounded-xl p-4 space-y-3">
-      <p className="text-xs font-bold text-slate-300 uppercase tracking-wide">{label}</p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-5 space-y-4">
+      <p className="text-xs font-bold text-cyan-300 uppercase tracking-widest">{label}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="sm:col-span-3">
-          <label className="block text-xs text-slate-400 mb-1">Apellidos y Nombres</label>
+          <label className="block text-xs text-slate-300 mb-2 font-semibold">Apellidos y Nombres</label>
           <input type="text" value={data.apellidos_nombres}
             onChange={e => onChange({ ...data, apellidos_nombres: e.target.value })}
             placeholder="GARCÍA TORRES, María Elena" className={inputCls} />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">DNI</label>
+          <label className="block text-xs text-slate-300 mb-2 font-semibold">DNI</label>
           <input type="text" maxLength={8} value={data.dni}
             onChange={e => onChange({ ...data, dni: e.target.value.replace(/\D/g, '') })}
             placeholder="12345678" className={inputCls} />
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">N° Celular</label>
+          <label className="block text-xs text-slate-300 mb-2 font-semibold">N° Celular</label>
           <input type="text" maxLength={9} value={data.celular}
             onChange={e => onChange({ ...data, celular: e.target.value.replace(/\D/g, '') })}
             placeholder="987654321" className={inputCls} />
@@ -151,11 +123,10 @@ export default function AlumnosScreen() {
     setMsg({ tipo, texto }); setTimeout(() => setMsg(null), 3500);
   };
 
-  const cargar = async () => {
+  const cargar = () => {
     setCargando(true);
     try {
-      const data = await api('/api/alumnos');
-      const lista = Array.isArray(data) ? data : [];
+      const lista = lsCargar();
       setAlumnos(lista.map((a: any) => ({
         ...a,
         madre_nombres: a.madre_nombres || a.madre?.apellidos_nombres || '',
@@ -165,8 +136,11 @@ export default function AlumnosScreen() {
         padre_dni:     a.padre_dni     || a.padre?.dni || '',
         padre_celular: a.padre_celular || a.padre?.celular || '',
       })));
-    } catch { mostrar('err', 'Error al cargar alumnos'); }
-    finally { setCargando(false); }
+    } catch (e: any) {
+      mostrar('err', 'Error al cargar alumnos: ' + e.message);
+    } finally {
+      setCargando(false);
+    }
   };
 
   useEffect(() => { cargar(); }, []);
@@ -177,27 +151,34 @@ export default function AlumnosScreen() {
       return mostrar('err', 'Completa los campos obligatorios');
     setGuardando(true);
     try {
+      const todos = lsCargar();
       const payload = { ...form, edad: calcularEdad(form.fecha_nacimiento) };
       if (editando) {
-        await api(`/api/alumnos?id=${editando.id}`, 'PUT', payload);
+        const idx = todos.findIndex(a => a.id === editando.id);
+        if (idx >= 0) todos[idx] = { ...todos[idx], ...payload };
+        else todos.push({ ...payload, id: editando.id });
+        lsGuardar(todos);
         mostrar('ok', 'Alumno actualizado');
       } else {
-        await api('/api/alumnos', 'POST', payload);
+        if (todos.some(a => a.dni === form.dni)) throw new Error('DNI ya registrado');
+        const nuevo = { ...payload, id: 'al-' + Date.now() };
+        lsGuardar([...todos, nuevo]);
         mostrar('ok', 'Alumno registrado');
       }
       setShowForm(false); setEditando(null); setForm(emptyForm);
-      await cargar();
+      cargar();
     } catch (e: any) { mostrar('err', e.message); }
     finally { setGuardando(false); }
   };
 
-  const handleEliminar = async (id: string) => {
+  const handleEliminar = (id: string) => {
     if (!confirm('¿Eliminar este alumno?')) return;
     setEliminando(id);
     try {
-      await api(`/api/alumnos?id=${id}`, 'DELETE');
+      const todos = lsCargar();
+      lsGuardar(todos.filter(a => a.id !== id));
       mostrar('ok', 'Alumno eliminado');
-      await cargar();
+      cargar();
     } catch (e: any) { mostrar('err', e.message); }
     finally { setEliminando(null); }
   };
@@ -255,6 +236,23 @@ export default function AlumnosScreen() {
       const gradoMap: Record<string, string> = {
         'PRIMERO': '1°', 'SEGUNDO': '2°', 'TERCERO': '3°',
         'CUARTO': '4°', 'QUINTO': '5°', 'SEXTO': '6°',
+        '1': '1°', '2': '2°', '3': '3°', '4': '4°', '5': '5°', '6': '6°',
+      };
+
+      const normalizarGrado = (val: string): string => {
+        const v = val.trim().toUpperCase();
+        // Buscar en el mapa directo
+        if (gradoMap[v]) return gradoMap[v];
+        // Si ya tiene el formato correcto (ej: "1°", "2°")
+        if (/^\d°$/.test(v)) return v;
+        // Extraer solo el número (ej: "1 A", "1°A")
+        const match = v.match(/^(\d)/);
+        if (match) return gradoMap[match[1]] || val;
+        // Buscar por inicio de palabra (PRIMER, TERCER...)
+        for (const [key, mapped] of Object.entries(gradoMap)) {
+          if (v.startsWith(key)) return mapped;
+        }
+        return val;
       };
 
       const rows = dataRows.map((r: any[]) => ({
@@ -262,8 +260,8 @@ export default function AlumnosScreen() {
         dni:               colVal(r, 'N° DNI DEL ALUMNO', 'DNI DEL ALUMNO', 'DNI'),
         fecha_nacimiento:  toDate(r[headers.findIndex(h => h.includes('NACIMIENTO'))]),
         sexo:              colVal(r, 'SEXO'),
-        grado:             gradoMap[colVal(r, 'GRADO DE ESTUDIOS', 'GRADO').toUpperCase()] || colVal(r, 'GRADO DE ESTUDIOS', 'GRADO'),
-        seccion:           colVal(r, 'SECCI').replace(/^\d+/, '') || colVal(r, 'SECCI'),
+        grado:             normalizarGrado(colVal(r, 'GRADO DE ESTUDIOS', 'GRADO')),
+        seccion:           (colVal(r, 'SECCI').replace(/^\d+\s*/, '').trim() || colVal(r, 'SECCI').trim()).toUpperCase(),
         madre: {
           apellidos_nombres: colVal(r, 'NOMBRES DE LA MADRE', 'MADRE'),
           dni:               colVal(r, 'DNI MADRE'),
@@ -281,18 +279,26 @@ export default function AlumnosScreen() {
     } catch { mostrar('err', 'Error leyendo el archivo Excel'); }
   };
 
-  const handleImportar = async () => {
+  const handleImportar = () => {
     setImportando(true);
     let ok = 0, err = 0;
-    for (const r of importRows) {
-      try {
-        await api('/api/alumnos', 'POST', { ...r, edad: calcularEdad(r.fecha_nacimiento) });
-        ok++;
-      } catch { err++; }
+    try {
+      const todos = lsCargar();
+      for (const r of importRows) {
+        try {
+          if (todos.some((a: Alumno) => a.dni === r.dni)) { err++; continue; }
+          const nuevo = { ...r, id: 'al-' + Date.now() + '-' + ok, edad: calcularEdad(r.fecha_nacimiento) };
+          todos.push(nuevo);
+          ok++;
+        } catch { err++; }
+      }
+      lsGuardar(todos);
+    } catch (e: any) {
+      mostrar('err', 'Error al importar: ' + e.message);
     }
     setImportResult({ ok, err });
     setImportando(false);
-    await cargar();
+    cargar();
   };
 
   const descargarPlantilla = async () => {
@@ -318,33 +324,35 @@ export default function AlumnosScreen() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-green-500/20">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-3xl font-black text-white">👨‍🎓 Alumnos</h1>
-            <p className="text-green-400/70 text-sm mt-0.5">{alumnos.length} alumnos registrados</p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={cargar} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
-              <RefreshCw size={14} /> Actualizar
-            </button>
-            <button onClick={descargarPlantilla} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
-              <Download size={14} /> Plantilla Excel
-            </button>
-            <label className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm cursor-pointer">
-              <Upload size={14} /> Importar Excel
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleArchivo} />
-            </label>
-            <button onClick={() => { setEditando(null); setForm(emptyForm); setShowForm(!showForm); }}
-              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg text-sm hover:opacity-90">
-              <Plus size={16} /> Nuevo Alumno
-            </button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden p-6">
+      {/* Fondo animado */}
+      <div className="fixed inset-0 -z-50">
+        <div className="absolute inset-0 bg-gradient-cyber opacity-60"></div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-5">
+      <div className="relative z-10 max-w-7xl mx-auto space-y-8">
+        <HeaderElegante
+          icon={Users}
+          title="EDUGEST ALUMNOS"
+          subtitle={`${alumnos.length} alumnos registrados`}
+        >
+          <button onClick={cargar} className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors">
+            <RefreshCw size={14} /> Actualizar
+          </button>
+          <button onClick={descargarPlantilla} className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors">
+            <Download size={14} /> Plantilla Excel
+          </button>
+          <label className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors shadow-lg hover:shadow-emerald-500/40">
+            <Upload size={14} /> Importar Excel
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleArchivo} />
+          </label>
+          <button onClick={() => { setEditando(null); setForm(emptyForm); setShowForm(!showForm); }}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-lg text-sm hover:from-cyan-400 hover:to-blue-500 transition-all shadow-lg hover:shadow-cyan-500/40">
+            <Plus size={16} /> Nuevo Alumno
+          </button>
+        </HeaderElegante>
+
+        <div className="space-y-5">
         <AnimatePresence>
           {msg && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -419,14 +427,14 @@ export default function AlumnosScreen() {
 
         {/* Formulario */}
         {showForm && (
-          <div className="bg-slate-800 border border-green-500/30 rounded-xl p-6 space-y-5">
-            <h2 className="text-lg font-bold text-white">{editando ? '✏️ Editar Alumno' : '➕ Nuevo Alumno'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-cyan-500/30 rounded-xl p-7 space-y-6">
+            <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-300">{editando ? '✏️ Editar Alumno' : '➕ Nuevo Alumno'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Datos del Alumno</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <p className="text-xs font-bold text-cyan-300 uppercase tracking-widest mb-4">Datos del Alumno</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   <div className="sm:col-span-2">
-                    <label className="block text-xs text-slate-400 mb-1">Apellidos y Nombres <span className="text-red-400">*</span></label>
+                    <label className="block text-xs text-slate-300 mb-2 font-semibold">Apellidos y Nombres <span className="text-red-400">*</span></label>
                     <input type="text" value={form.apellidos_nombres} onChange={e => setForm({ ...form, apellidos_nombres: e.target.value })} placeholder="MENDEZ FLORES, Carlos Alberto" className={inputCls} />
                   </div>
                   <div>
@@ -434,7 +442,7 @@ export default function AlumnosScreen() {
                     <input type="text" maxLength={8} value={form.dni} onChange={e => setForm({ ...form, dni: e.target.value.replace(/\D/g, '') })} placeholder="75123456" className={inputCls} />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Fecha de Nacimiento <span className="text-red-400">*</span></label>
+                    <label className="block text-xs text-slate-300 mb-2 font-semibold">Fecha de Nacimiento <span className="text-red-400">*</span></label>
                     <input type="date" value={form.fecha_nacimiento} onChange={e => setForm({ ...form, fecha_nacimiento: e.target.value })} className={inputCls} />
                   </div>
                   <div>
@@ -482,15 +490,15 @@ export default function AlumnosScreen() {
         {/* Filtros */}
         <div className="flex gap-3 flex-wrap">
           <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
             <input type="text" placeholder="Buscar por nombre, DNI o apoderado..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-green-500 text-sm" />
+              className="w-full pl-11 pr-4 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-colors text-sm font-medium" />
           </div>
-          <select value={filtroGrado} onChange={e => setFiltroGrado(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-green-500">
+          <select value={filtroGrado} onChange={e => setFiltroGrado(e.target.value)} className="bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white text-sm font-medium focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-colors">
             <option value="">Todos los grados</option>
             {GRADOS.map(g => <option key={g} value={g}>{g} Grado</option>)}
           </select>
-          <select value={filtroSeccion} onChange={e => setFiltroSeccion(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-green-500">
+          <select value={filtroSeccion} onChange={e => setFiltroSeccion(e.target.value)} className="bg-slate-800 border border-slate-600 rounded-lg px-4 py-2.5 text-white text-sm font-medium focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-colors">
             <option value="">Todas las secciones</option>
             {SECCIONES.map(s => <option key={s} value={s}>Sección {s}</option>)}
           </select>
@@ -570,6 +578,7 @@ export default function AlumnosScreen() {
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

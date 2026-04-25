@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { MessageSquare, Send, Search, User, Clock, CheckCheck, X } from 'lucide-react';
 import { useState } from 'react';
 import { User as UserType } from '../types';
+import HeaderElegante from '../components/HeaderElegante';
 
 interface MessagingScreenProps {
   user: UserType;
@@ -55,20 +56,11 @@ export default function MessagingScreen({ user }: MessagingScreenProps) {
 
   return (
     <div className="min-h-screen p-6 pb-24">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-neon-cyan/20 rounded-lg neon-border-cyan">
-            <MessageSquare className="w-8 h-8 text-neon-cyan" />
-          </div>
-          <div>
-            <h1 className="text-4xl font-bold tracking-tighter uppercase">
-              <span className="text-neon-cyan neon-text-cyan">Mensajes</span>
-            </h1>
-            <p className="text-xs text-white/75 font-mono tracking-widest">COMUNICACIÓN DIRECTA</p>
-          </div>
-        </div>
-      </motion.div>
+      <HeaderElegante
+        icon={MessageSquare}
+        title="EDUGEST MENSAJES"
+        subtitle="Comunicación directa entre usuarios"
+      />
 
       {/* Main Container */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-180px)]">

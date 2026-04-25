@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistemita - Gestión Educativa Integral</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --secondary: #764ba2;
+            --success: #48bb78;
+            --warning: #ed8936;
+            --danger: #f56565;
+            --dark: #2d3748;
+            --light: #f7fafc;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            overflow-x: hidden;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* HEADER & NAVEGACIÓN */
+        /* ═══════════════════════════════════════════════════════════════ */
+
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo span {
+            font-size: 28px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .nav-right {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-outline {
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            background: transparent;
+        }
+
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* HERO SECTION */
+        /* ═══════════════════════════════════════════════════════════════ */
+
+        .hero {
+            margin-top: 70px;
+            min-height: calc(100vh - 70px);
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.95), rgba(118, 75, 162, 0.95)), 
+                        url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600"><path fill="rgba(255,255,255,0.05)" d="M0 300 Q300 200 600 300 T1200 300 L1200 600 L0 600 Z"/></svg>');
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="white" opacity="0.1"/><circle cx="80" cy="40" r="3" fill="white" opacity="0.1"/><circle cx="40" cy="70" r="2" fill="white" opacity="0.1"/></svg>');
+            opacity: 0.3;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            color: white;
+            max-width: 800px;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-white {
+            background: white;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .btn-white:hover {
+            background: var(--light);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .btn-transparent {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+        }
+
+        .btn-transparent:hover {
+            background: white;
+            color: var(--primary);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* SELECCIÓN DE PERFIL MODAL */
+        /* ═══════════════════════════════════════════════════════════════ */
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 3rem;
+            max-width: 600px;
+            width: 90%;
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-content h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+            color: var(--dark);
+        }
+
+        .profiles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .profile-card {
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .profile-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+            transform: translateY(-5px);
+        }
+
+        .profile-card.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .profile-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .profile-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .profile-card p {
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+        }
+
+        .btn-cancel {
+            background: var(--light);
+            color: var(--dark);
+            border: none;
+        }
+
+        .btn-cancel:hover {
+            background: var(--border);
+        }
+
+        .btn-confirm {
+            background: var(--primary);
+            color: white;
+            border: none;
+        }
+
+        .btn-confirm:hover {
+            background: var(--primary-dark);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* STATS SECTION */
+        /* ═══════════════════════════════════════════════════════════════ */
+
+        .stats {
+            background: white;
+            padding: 3rem 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            transform: translateY(-50px);
+            position: relative;
+            z-index: 20;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-label {
+            color: var(--dark);
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* FEATURES SECTION */
+        /* ═══════════════════════════════════════════════════════════════ */
+
+        .features {
+            padding: 4rem 2rem;
+            background: var(--light);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            color: var(--dark);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .feature-card h3 {
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+
+        .feature-card p {
+            color: #718096;
+            line-height: 1.6;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* FOOTER */
+        /* ═══════════════════════════════════════════════════════════════ */
+
+        footer {
+            background: var(--dark);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            text-align: left;
+            margin-bottom: 2rem;
+        }
+
+        .footer-section h4 {
+            margin-bottom: 1rem;
+        }
+
+        .footer-section ul {
+            list-style: none;
+        }
+
+        .footer-section a {
+            color: #cbd5e0;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer-section a:hover {
+            color: white;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #4a5568;
+            padding-top: 2rem;
+            text-align: center;
+            color: #cbd5e0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════ */
+        /* RESPONSIVE */
+        /* ═══════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .stats {
+                transform: translateY(-30px);
+                margin: 0 1rem;
+            }
+
+            .modal-content {
+                padding: 2rem;
+            }
+
+            .profiles-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header>
+        <nav>
+            <div class="logo">
+                <span>📚</span>
+                <span>Sistemita</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#inicio">Inicio</a></li>
+                <li><a href="#features">Características</a></li>
+                <li><a href="#estadisticas">Estadísticas</a></li>
+                <li><a href="#contacto">Contacto</a></li>
+            </ul>
+            <div class="nav-right">
+                <button class="btn btn-outline" onclick="openProfileModal()">Seleccionar Perfil</button>
+                <button class="btn btn-primary" onclick="irAlSistema()">Ingresar</button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="hero" id="inicio">
+        <div class="hero-content">
+            <h1>Gestión Educativa Integral</h1>
+            <p>Plataforma completa para docentes, directores y administradores educativos</p>
+            <div class="hero-buttons">
+                <button class="btn btn-white" onclick="openProfileModal()">Comenzar</button>
+                <button class="btn btn-transparent">Más de nosotros</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ESTADÍSTICAS -->
+    <section class="stats" id="estadisticas">
+        <div class="stat-card">
+            <div class="stat-icon">👨‍🏫</div>
+            <div class="stat-number">+2.5K</div>
+            <div class="stat-label">Docentes Activos</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">👨‍🎓</div>
+            <div class="stat-number">+50K</div>
+            <div class="stat-label">Estudiantes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">🏫</div>
+            <div class="stat-number">+750</div>
+            <div class="stat-label">Calificativos Cargados</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">⭐</div>
+            <div class="stat-number">4.9</div>
+            <div class="stat-label">Calificación Promedio</div>
+        </div>
+    </section>
+
+    <!-- CARACTERÍSTICAS -->
+    <section class="features" id="features">
+        <h2 class="section-title">Nuestras Características</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Calificativos en Línea</h3>
+                <p>Carga, gestiona y visualiza calificativos de múltiples competencias en tiempo real.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">👥</div>
+                <h3>Gestión de Usuarios</h3>
+                <p>Administra docentes, estudiantes y padres con roles y permisos personalizados.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📋</div>
+                <h3>Reportes Detallados</h3>
+                <p>Genera reportes por estudiante, grado, sección y competencia automáticamente.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Interfaz Intuitiva</h3>
+                <p>Diseño moderno y responsive que funciona en cualquier dispositivo.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Seguridad</h3>
+                <p>Protección de datos con autenticación segura y encriptación de información.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Rendimiento</h3>
+                <p>Carga rápida y navegación fluida incluso con miles de registros.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- MODAL DE SELECCIÓN DE PERFIL -->
+    <div class="modal" id="profileModal">
+        <div class="modal-content">
+            <h2>Selecciona tu Perfil</h2>
+            <div class="profiles-grid">
+                <div class="profile-card" onclick="selectProfile('docente')">
+                    <div class="profile-icon">👨‍🏫</div>
+                    <h3>Docente</h3>
+                    <p>Acceso a calificativos y estudiantes</p>
+                </div>
+                <div class="profile-card" onclick="selectProfile('director')">
+                    <div class="profile-icon">👔</div>
+                    <h3>Director</h3>
+                    <p>Gestión de docentes y reportes</p>
+                </div>
+                <div class="profile-card" onclick="selectProfile('admin')">
+                    <div class="profile-icon">⚙️</div>
+                    <h3>Administrador</h3>
+                    <p>Control total del sistema</p>
+                </div>
+                <div class="profile-card" onclick="selectProfile('padre')">
+                    <div class="profile-icon">👨‍👩‍👧</div>
+                    <h3>Apoderado</h3>
+                    <p>Seguimiento de estudiante</p>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" onclick="closeProfileModal()">Cancelar</button>
+                <button class="btn btn-confirm" onclick="confirmProfile()" id="confirmBtn" disabled>Continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer id="contacto">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>Sistemita</h4>
+                <p>Plataforma educativa líder en gestión de calificativos y seguimiento académico.</p>
+            </div>
+            <div class="footer-section">
+                <h4>Producto</h4>
+                <ul>
+                    <li><a href="#">Características</a></li>
+                    <li><a href="#">Precios</a></li>
+                    <li><a href="#">Seguridad</a></li>
+                    <li><a href="#">Blog</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Empresa</h4>
+                <ul>
+                    <li><a href="#">Acerca de</a></li>
+                    <li><a href="#">Contacto</a></li>
+                    <li><a href="#">Privacidad</a></li>
+                    <li><a href="#">Términos</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Sistemita. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script>
+        let selectedProfile = null;
+
+        function openProfileModal() {
+            document.getElementById('profileModal').classList.add('active');
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profileModal').classList.remove('active');
+            selectedProfile = null;
+            updateProfileCards();
+        }
+
+        function selectProfile(profile) {
+            selectedProfile = profile;
+            updateProfileCards();
+            document.getElementById('confirmBtn').disabled = false;
+        }
+
+        function updateProfileCards() {
+            document.querySelectorAll('.profile-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            if (selectedProfile) {
+                event.target.closest('.profile-card').classList.add('active');
+            }
+        }
+
+        function confirmProfile() {
+            if (selectedProfile) {
+                // Guardar el perfil seleccionado
+                localStorage.setItem('userProfile', selectedProfile);
+                // Redirigir al sistema
+                irAlSistema();
+            }
+        }
+
+        function irAlSistema() {
+            if (selectedProfile) {
+                localStorage.setItem('userProfile', selectedProfile);
+            }
+            // Redirigir a tu aplicación (ajusta la URL según sea necesario)
+            window.location.href = '/index.html'; // O donde sea que esté tu sistema
+        }
+
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('profileModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeProfileModal();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { guardarDocentes } from '../services/dataService';
+import HeaderElegante from '../components/HeaderElegante';
 
 interface Docente {
   id: string;
@@ -22,45 +23,24 @@ const CARGOS = [
   'Docente de Arte', 'Docente de Inglés', 'Psicólogo(a)', 'Otro'
 ];
 
-// ── API (Turso en prod, localStorage en local) ────────────────────────────────
+// ── localStorage directo ──────────────────────────────────────────────────────
 const LS_DOCENTES = 'ie_docentes';
-function getToken() { return localStorage.getItem('auth_token') || ''; }
 function lsCargar(): Docente[] {
-  try { return JSON.parse(localStorage.getItem(LS_DOCENTES) || '[]'); } catch { return []; }
+  try {
+    const raw = localStorage.getItem(LS_DOCENTES);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch { return []; }
 }
-function lsGuardar(lista: Docente[]) { 
-  localStorage.setItem(LS_DOCENTES, JSON.stringify(lista));
-  guardarDocentes(lista); // Sincronizar con Turso
-}
-
-async function api(path: string, method = 'GET', body?: object): Promise<any> {
-  if (!import.meta.env.PROD) {
-    const todos = lsCargar();
-    if (method === 'GET') return todos;
-    if (method === 'POST') {
-      const b = body as any;
-      if (todos.some(d => d.dni === b.dni)) throw new Error('DNI ya registrado');
-      const nuevo = { ...b, id: 'doc-' + Date.now() };
-      lsGuardar([...todos, nuevo]); return { ok: true };
-    }
-    if (method === 'PUT') {
-      const id = path.split('id=')[1];
-      lsGuardar(todos.map(d => d.id === id ? { ...d, ...(body as any) } : d)); return { ok: true };
-    }
-    if (method === 'DELETE') {
-      const id = path.split('id=')[1];
-      lsGuardar(todos.filter(d => d.id !== id)); return { ok: true };
-    }
-    return {};
+function lsGuardar(lista: Docente[]) {
+  try {
+    localStorage.setItem(LS_DOCENTES, JSON.stringify(lista));
+    guardarDocentes(lista);
+  } catch (e) {
+    console.error('Error guardando docentes:', e);
+    throw new Error('No se pudo guardar. Verifica el espacio del navegador.');
   }
-  const res = await fetch(path, {
-    method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error');
-  return data;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -103,41 +83,45 @@ export default function DocentesScreen() {
     setTimeout(() => setMsg(null), 3500);
   };
 
-  const cargar = async () => {
+  const cargar = () => {
     setCargando(true);
     try {
-      const data = await api('/api/docentes');
-      setDocentes(Array.isArray(data) ? data : []);
-    } catch { mostrar('err', 'Error al cargar docentes'); }
-    finally { setCargando(false); }
+      setDocentes(lsCargar());
+    } catch (e: any) {
+      mostrar('err', 'Error al cargar docentes: ' + e.message);
+    } finally {
+      setCargando(false);
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.apellidos_nombres || !form.dni || !form.genero || !form.fecha_nacimiento)
       return mostrar('err', 'Completa los campos obligatorios');
     setGuardando(true);
     try {
+      const todos = lsCargar();
       if (editando) {
-        await api(`/api/docentes?id=${editando.id}`, 'PUT', form);
+        lsGuardar(todos.map(d => d.id === editando.id ? { ...d, ...form } : d));
         mostrar('ok', 'Docente actualizado');
       } else {
-        await api('/api/docentes', 'POST', form);
+        if (todos.some(d => d.dni === form.dni)) throw new Error('DNI ya registrado');
+        lsGuardar([...todos, { ...form, id: 'doc-' + Date.now() }]);
         mostrar('ok', 'Docente registrado');
       }
       setShowForm(false); setEditando(null); setForm(emptyForm);
-      await cargar();
+      cargar();
     } catch (err: any) { mostrar('err', err.message); }
     finally { setGuardando(false); }
   };
 
-  const handleEliminar = async (id: string) => {
+  const handleEliminar = (id: string) => {
     if (!confirm('¿Eliminar este docente?')) return;
     setEliminando(id);
     try {
-      await api(`/api/docentes?id=${id}`, 'DELETE');
+      lsGuardar(lsCargar().filter(d => d.id !== id));
       mostrar('ok', 'Docente eliminado');
-      await cargar();
+      cargar();
     } catch (err: any) { mostrar('err', err.message); }
     finally { setEliminando(null); }
   };
@@ -200,19 +184,24 @@ export default function DocentesScreen() {
     } catch { mostrar('err', 'Error leyendo el archivo Excel'); }
   };
 
-  const handleImportar = async () => {
+  const handleImportar = () => {
     setImportando(true);
     let ok = 0, err = 0;
-    for (const r of importRows) {
-      if (!r.apellidos_nombres || !r.dni) { err++; continue; }
-      try {
-        await api('/api/docentes', 'POST', { ...emptyForm, ...r });
+    try {
+      const todos = lsCargar();
+      for (const r of importRows) {
+        if (!r.apellidos_nombres || !r.dni) { err++; continue; }
+        if (todos.some(d => d.dni === r.dni)) { err++; continue; }
+        todos.push({ ...emptyForm, ...r, id: 'doc-' + Date.now() + '-' + ok });
         ok++;
-      } catch { err++; }
+      }
+      lsGuardar(todos);
+    } catch (e: any) {
+      mostrar('err', 'Error al importar: ' + e.message);
     }
     setImportResult({ ok, err });
     setImportando(false);
-    await cargar();
+    cargar();
   };
 
   const descargarPlantilla = async () => {
@@ -253,14 +242,17 @@ export default function DocentesScreen() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <HeaderElegante
+          icon={BookOpen}
+          title="EDUGEST DOCENTES"
+          subtitle={`${docentes.length} docentes registrados en el sistema`}
+        />
+      </div>
 
       {/* Header */}
       <div className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-blue-500/20">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-3xl font-black text-white">👨‍🏫 Docentes</h1>
-            <p className="text-blue-400/70 text-sm mt-0.5">{docentes.length} docentes registrados</p>
-          </div>
           <div className="flex gap-2 flex-wrap">
             <button onClick={cargar} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
               <RefreshCw size={14} /> Actualizar

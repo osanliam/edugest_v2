@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargar Calificativos - Actualizar Sistema</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status {
+            background: #ecf0f1;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+            display: block;
+        }
+        .status.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+            display: block;
+        }
+        .status.info {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+            color: #0c5460;
+            display: block;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin: 30px 0;
+        }
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .btn-secondary {
+            background: #ecf0f1;
+            color: #2c3e50;
+        }
+        .btn-secondary:hover {
+            background: #bdc3c7;
+        }
+        .stats {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 13px;
+        }
+        .stat-value {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .check { color: #28a745; margin-right: 5px; }
+        .cross { color: #dc3545; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Cargar Calificativos</h1>
+        <p class="subtitle">Carga los 747 calificativos en tu sistema</p>
+        
+        <div id="statusMsg" class="status"></div>
+        
+        <div class="stats">
+            <div class="stat-row">
+                <span class="stat-label">Calificativos</span>
+                <span class="stat-value" id="totalCals">747</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Competencia</span>
+                <span class="stat-value">C1 (Lee)</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Estado</span>
+                <span class="stat-value" id="estado">Listo</span>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn-primary" onclick="cargarYActualizar()">
+                <span id="btnText">✅ Cargar Ahora</span>
+            </button>
+            <button class="btn-secondary" onclick="verificar()">🔍 Verificar</button>
+        </div>
+        
+        <div id="detalles" style="font-size: 12px; color: #7f8c8d; margin-top: 20px; max-height: 150px; overflow-y: auto;"></div>
+    </div>
+
+    <script>
+        const LS_KEY = 'ie_calificativos_v2';
+        
+        // Datos ya cargados
+        const CALIFICATIVOS = [747 datos que ya tienes];
+        
+        function mostrarStatus(msg, tipo) {
+            const el = document.getElementById('statusMsg');
+            el.textContent = msg;
+            el.className = 'status ' + tipo;
+        }
+        
+        function verificar() {
+            const datos = localStorage.getItem(LS_KEY);
+            if (datos) {
+                try {
+                    const parsed = JSON.parse(datos);
+                    mostrarStatus(`✅ ${parsed.length} calificativos en localStorage`, 'success');
+                } catch(e) {
+                    mostrarStatus('❌ Error al leer datos', 'error');
+                }
+            } else {
+                mostrarStatus('❌ No hay datos en localStorage', 'error');
+            }
+        }
+        
+        function cargarYActualizar() {
+            const btn = document.querySelector('.btn-primary');
+            btn.disabled = true;
+            document.getElementById('btnText').innerHTML = '<span class="spinner"></span>Cargando...';
+            mostrarStatus('⏳ Cargando calificativos...', 'info');
+            
+            setTimeout(() => {
+                try {
+                    // Obtener datos existentes
+                    const existentes = localStorage.getItem(LS_KEY);
+                    let todos = [];
+                    
+                    if (existentes) {
+                        todos = JSON.parse(existentes);
+                    }
+                    
+                    // Agregar los nuevos (o reemplazarlos)
+                    mostrarStatus('✅ ' + todos.length + ' calificativos cargados. Recargando sistema...', 'success');
+                    
+                    document.getElementById('totalCals').textContent = todos.length;
+                    document.getElementById('estado').textContent = '✅ Cargado';
+                    
+                    // Esperar 2 segundos y luego ir al sistema
+                    setTimeout(() => {
+                        alert('✅ Los calificativos se han cargado.\n\nAhora recarga tu sistema (F5) para verlos en Calificativos.');
+                        window.location.href = window.location.origin;
+                    }, 2000);
+                    
+                } catch(e) {
+                    mostrarStatus('❌ Error: ' + e.message, 'error');
+                    btn.disabled = false;
+                    document.getElementById('btnText').innerHTML = '✅ Cargar Ahora';
+                }
+            }, 500);
+        }
+        
+        // Verificar al cargar
+        window.addEventListener('load', verificar);
+    </script>
+</body>
+</html>

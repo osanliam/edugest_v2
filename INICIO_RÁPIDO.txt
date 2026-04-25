@@ -1,0 +1,115 @@
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                         CARGA RÁPIDA DE CALIFICATIVOS                       ║
+║                              EN 3 PASOS                                      ║
+╚═════════════════════════════════════════════════════════════════════════════╝
+
+PASO 1: ABRE TU SISTEMA
+─────────────────────────────────────────────────────────────────────────────
+Ve a tu navegador y abre tu sistema como siempre lo haces.
+
+Asegúrate de estar logueado.
+
+
+PASO 2: ABRE EL ARCHIVO HTML
+─────────────────────────────────────────────────────────────────────────────
+Busca en esta carpeta el archivo:
+
+    📄 cargar_calificativos_promedios.html
+
+Haz doble clic o arrástralo a tu navegador.
+
+
+PASO 3: HACZ CLIC EN "CARGAR AHORA"
+─────────────────────────────────────────────────────────────────────────────
+Cuando se abra la página, verás un botón verde que dice:
+
+    ✅ Cargar Ahora
+
+Haz clic en él.
+
+El sistema se recargará automáticamente en 2 segundos.
+
+
+LISTO ✓
+─────────────────────────────────────────────────────────────────────────────
+Los 747 calificativos se han cargado.
+
+Ve a tu sistema y verás en:
+
+  Registro de Calificativos → C1: Lee textos diversos
+
+Los nuevos calificativos de todos tus estudiantes.
+
+
+INFORMACIÓN DE LOS DATOS
+─────────────────────────────────────────────────────────────────────────────
+• Cantidad: 747 calificativos
+• Competencia: C1 - Lee textos diversos
+• Período: Abril 2026
+• Origen: Backup del sistema antiguo
+
+Distribución:
+  🟢 5 estudiantes con AD (Destacado)
+  🔵 50 estudiantes con A (Esperado)
+  🟡 164 estudiantes con B (En proceso)
+  🔴 528 estudiantes con C (En inicio)
+
+
+SI ALGO NO FUNCIONA
+─────────────────────────────────────────────────────────────────────────────
+
+Opción A: Recarga el navegador
+  Presiona Ctrl+F5 y espera a que cargue nuevamente.
+
+Opción B: Consulta la guía completa
+  Lee el archivo: INSTRUCCIONES_CARGAR_CALIFICATIVOS.md
+
+Opción C: Carga manual (si el botón no funciona)
+  Lee la sección "Opción 2: Manual" en las instrucciones.
+
+
+PREGUNTAS FRECUENTES
+─────────────────────────────────────────────────────────────────────────────
+
+P: ¿Perderá mis datos?
+R: No. Solo actualiza los calificativos de C1. Los demás se mantienen.
+
+P: ¿Puedo cargar de nuevo?
+R: Sí. Puedes cargar múltiples veces sin problemas.
+
+P: ¿Qué pasa con C2 y C3?
+R: El backup solo tenía datos de C1. Para los otros necesitarías datos
+   adicionales o agregarlos manualmente.
+
+P: ¿Dónde se guardan los datos?
+R: Se guardan en el navegador (localStorage). No en un servidor.
+
+P: ¿Si cambio de navegador, siguen ahí?
+R: No. Tendrías que cargar de nuevo desde otro navegador.
+
+
+ARCHIVOS QUE TIENES
+─────────────────────────────────────────────────────────────────────────────
+
+Necesarios:
+  📄 cargar_calificativos_promedios.html  ← Abre este
+
+De referencia:
+  📄 INSTRUCCIONES_CARGAR_CALIFICATIVOS.md
+  📄 calificativos_para_cargar.json
+  📄 ANÁLISIS_BACKUP.md
+  📄 RESUMEN_MIGRACION.txt
+  📄 INICIO_RÁPIDO.txt  ← Eres aquí
+
+
+═════════════════════════════════════════════════════════════════════════════
+
+¿NECESITAS AYUDA?
+
+1. Consulta los archivos .txt y .md en esta carpeta
+2. Mira la sección de instrucciones en cargar_calificativos_promedios.html
+3. Revisa el archivo ANÁLISIS_BACKUP.md para detalles técnicos
+
+═════════════════════════════════════════════════════════════════════════════
+
+¡Listo para empezar! Abre cargar_calificativos_promedios.html y haz clic.

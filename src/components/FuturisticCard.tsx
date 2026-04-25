@@ -20,29 +20,29 @@ export default function FuturisticCard({
 }: FuturisticCardProps) {
   const variantStyles = {
     cyan: {
-      border: 'border-cyan-400/50',
+      border: 'border-cyan-600',
       shadow: 'shadow-glow-cyan',
-      bg: 'bg-gradient-to-br from-cyan-950/40 to-cyan-900/20',
+      bg: 'bg-gradient-to-br from-slate-800 to-slate-900 border-cyan-600/70',
     },
     magenta: {
-      border: 'border-fuchsia-400/50',
+      border: 'border-fuchsia-600',
       shadow: 'shadow-glow-magenta',
-      bg: 'bg-gradient-to-br from-fuchsia-950/40 to-fuchsia-900/20',
+      bg: 'bg-gradient-to-br from-slate-800 to-slate-900 border-fuchsia-600/70',
     },
     lime: {
-      border: 'border-lime-300/50',
+      border: 'border-lime-600',
       shadow: 'shadow-glow-lime',
-      bg: 'bg-gradient-to-br from-lime-950/40 to-lime-900/20',
+      bg: 'bg-gradient-to-br from-slate-800 to-slate-900 border-lime-600/70',
     },
     blue: {
-      border: 'border-blue-400/50',
+      border: 'border-blue-600',
       shadow: 'shadow-glow-blue',
-      bg: 'bg-gradient-to-br from-blue-950/40 to-blue-900/20',
+      bg: 'bg-gradient-to-br from-slate-800 to-slate-900 border-blue-600/70',
     },
     glass: {
-      border: 'border-white/20',
+      border: 'border-slate-600',
       shadow: 'shadow-glass',
-      bg: 'bg-white/8',
+      bg: 'bg-gradient-to-br from-slate-800 to-slate-900',
     },
   };
 
@@ -56,7 +56,7 @@ export default function FuturisticCard({
       transition={{ duration: 0.3 }}
       className={`
         relative backdrop-blur-xl rounded-2xl
-        border ${style.border}
+        border-2 ${style.border}
         ${glow ? style.shadow : ''}
         ${style.bg}
         overflow-hidden

@@ -3,17 +3,21 @@ import { loadSystemData } from './services/dataService';
 import LoginScreen from './screens/LoginScreen';
 import AdminPanelScreen from './screens/AdminPanelScreen';
 import AdminPanelScreenModern from './screens/AdminPanelScreenModern';
+import AdminPanelScreenModern_v2 from './screens/AdminPanelScreenModern_v2';
 import DashboardScreen from './screens/DashboardScreen';
 import DashboardUltraModern from './screens/DashboardUltraModern';
 import VirtualClassroomScreen from './screens/VirtualClassroomScreen';
 import VirtualClassroomScreenModern from './screens/VirtualClassroomScreenModern';
+import VirtualClassroomScreenModern_v2 from './screens/VirtualClassroomScreenModern_v2';
 import MessagingScreen from './screens/MessagingScreen';
 import ReportsScreen from './screens/ReportsScreen';
 import ReportsScreenModern from './screens/ReportsScreenModern';
+import ReportsScreenModern_v2 from './screens/ReportsScreenModern_v2';
 import DirectorDashboard from './screens/DirectorDashboard';
 import DirectorDashboardModern from './screens/DirectorDashboardModern';
 import SubdirectorDashboard from './screens/SubdirectorDashboard';
 import CommunityScreen from './screens/CommunityScreen';
+import CommunityScreenModern from './screens/CommunityScreenModern';
 import TeachersScreen from './screens/TeachersScreen';
 import TeachersScreenModern from './screens/TeachersScreenModern';
 import StudentsScreen from './screens/StudentsScreen';
@@ -23,9 +27,12 @@ import GradesScreen from './screens/GradesScreen';
 import GradesScreenModern from './screens/GradesScreenModern';
 import ScheduleScreen from './screens/ScheduleScreen';
 import ScheduleScreenModern from './screens/ScheduleScreenModern';
+import ScheduleScreenModern_v2 from './screens/ScheduleScreenModern_v2';
 import AttendanceScreen from './screens/AttendanceScreen';
 import AttendanceScreenModern from './screens/AttendanceScreenModern';
+import AttendanceScreenModern_v2 from './screens/AttendanceScreenModern_v2';
 import NormasConvivenciaScreen from './screens/NormasConvivenciaScreen';
+import NormasConvivenciaModerno from './screens/NormasConvivenciaModerno';
 import ConductRulesScreen from './screens/ConductRulesScreen';
 import CalificativosScreen from './screens/CalificativosScreen';
 import ReporteAlumnoScreen from './screens/ReporteAlumnoScreen';
@@ -171,14 +178,14 @@ export default function App() {
       {currentScreen === 'inicio-modern' && <DashboardUltraModern />}
       {currentScreen !== 'inicio-modern' && (
         <MainLayoutModern key={`layout-${user.id}`} user={user} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onNavigate={setCurrentScreen} currentScreen={currentScreen}>
-          {currentScreen === 'panel-admin'         && <AdminPanelScreenModern />}
+          {currentScreen === 'panel-admin'         && <AdminPanelScreenModern_v2 />}
           {currentScreen === 'inicio'              && <DashboardScreen user={user} />}
-          {currentScreen === 'aula-virtual'        && <VirtualClassroomScreenModern />}
+          {currentScreen === 'aula-virtual'        && <VirtualClassroomScreenModern_v2 />}
           {currentScreen === 'mensajes'            && <MessagingScreen user={user} />}
-          {currentScreen === 'informes'            && <ReportsScreenModern user={user} />}
+          {currentScreen === 'informes'            && <ReportsScreenModern_v2 user={user} />}
           {currentScreen === 'panel-director'      && <DirectorDashboardModern user={user} />}
           {currentScreen === 'panel-subdirector'   && <SubdirectorDashboard user={user} />}
-          {currentScreen === 'comunidad'           && <CommunityScreen user={user} />}
+          {currentScreen === 'comunidad'           && <CommunityScreenModern user={user} />}
           {currentScreen === 'profesores'          && <TeachersScreenModern user={user} />}
           {currentScreen === 'estudiantes'         && <StudentsScreenModern user={user} />}
           {currentScreen === 'dashboard-estudiante'&& <StudentDashboard user={user} />}
@@ -188,9 +195,9 @@ export default function App() {
           {currentScreen === 'gestion-alumnos'     && <AlumnosScreen />}
           {currentScreen === 'calificativos'       && <CalificativosScreen user={user} />}
           {currentScreen === 'configuracion'       && <ConfiguracionScreen />}
-          {currentScreen === 'horario'             && <ScheduleScreenModern user={user} />}
-          {currentScreen === 'asistencia'          && <AttendanceScreenModern user={user} />}
-          {currentScreen === 'normas-convivencia'  && <NormasConvivenciaScreen user={user} />}
+          {currentScreen === 'horario'             && <ScheduleScreenModern_v2 user={user} />}
+          {currentScreen === 'asistencia'          && <AttendanceScreen />}
+          {currentScreen === 'normas-convivencia'  && <NormasConvivenciaScreen />}
           {currentScreen === 'reporte-alumno'     && <ReporteAlumnoScreen user={user} />}
           {currentScreen === 'grupos'              && <GroupsScreen />}
         </MainLayoutModern>

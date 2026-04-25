@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Edit2, Search, Eye, EyeOff, Upload, Download, X, Check, AlertCircle, RefreshCw, UserX, UserCheck, Key } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, Eye, EyeOff, Upload, Download, X, Check, AlertCircle, RefreshCw, UserX, UserCheck, Key, Users } from 'lucide-react';
 import { guardarUsuarios } from '../services/dataService';
+import HeaderElegante from '../components/HeaderElegante';
 
 interface Usuario {
   id: string;
@@ -501,43 +502,44 @@ const importarDatosCompletos = () => {
   const inputCls = "w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-sm";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-
-      {/* Header */}
-      <div className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-purple-500/20">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-3xl font-black text-white">👥 Gestión de Usuarios</h1>
-            <p className="text-purple-400/70 text-sm mt-0.5">{usuarios.length} usuarios · {docentes.length} docentes</p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={cargar} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
-              <RefreshCw size={14} /> Actualizar
-            </button>
-<button onClick={exportarDatosCompletos} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
-              <Download size={16} /> Respaldo
-            </button>
-            <button onClick={importarDatosCompletos} className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm">
-              <Upload size={16} /> Restaurar
-            </button>
-            <button onClick={importarSoloNotas} className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-sm">
-              <Upload size={16} /> Solo Notas</button>
-            <button onClick={descargarPlantilla} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
-              <Upload size={16} /> Plantilla
-            </button>
-            <button onClick={() => { setShowForm(true); setEditando(null); setForm(emptyForm); }}
-              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold rounded-lg text-sm hover:opacity-90">
-              <Plus size={16} /> Nuevo Usuario
-            </button>
-            <label className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm cursor-pointer">
-              <Upload size={14} /> Importar
-              <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleArchivo} />
-            </label>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 overflow-hidden">
+      {/* Fondo animado */}
+      <div className="fixed inset-0 -z-50">
+        <div className="absolute inset-0 bg-gradient-cyber opacity-60"></div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+      <div className="relative z-10 max-w-full">
+        <HeaderElegante
+          icon={Users}
+          title="EDUGEST GESTIONAR USUARIOS"
+          subtitle={`${usuarios.length} usuarios · ${docentes.length} docentes`}
+        >
+          <button onClick={cargar} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
+            <RefreshCw size={14} /> Actualizar
+          </button>
+          <button onClick={exportarDatosCompletos} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
+            <Download size={16} /> Respaldo
+          </button>
+          <button onClick={importarDatosCompletos} className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm">
+            <Upload size={16} /> Restaurar
+          </button>
+          <button onClick={importarSoloNotas} className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-sm">
+            <Upload size={16} /> Solo Notas
+          </button>
+          <button onClick={descargarPlantilla} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
+            <Upload size={16} /> Plantilla
+          </button>
+          <button onClick={() => { setShowForm(true); setEditando(null); setForm(emptyForm); }}
+            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold rounded-lg text-sm hover:opacity-90">
+            <Plus size={16} /> Nuevo Usuario
+          </button>
+          <label className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm cursor-pointer">
+            <Upload size={14} /> Importar
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleArchivo} />
+          </label>
+        </HeaderElegante>
+
+        <div className="space-y-6">
 
         {/* Stats */}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
@@ -855,6 +857,7 @@ const importarDatosCompletos = () => {
             })}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

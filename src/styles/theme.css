@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colores primarios elegantes y sofisticados */
+  --color-primary: #6366f1;          /* Indigo profundo */
+  --color-primary-light: #818cf8;    /* Indigo claro */
+  --color-primary-dark: #4f46e5;     /* Indigo oscuro */
+
+  /* Colores secundarios vibrantes */
+  --color-secondary: #ec4899;        /* Rosa vibrante */
+  --color-accent: #06b6d4;           /* Cyan brillante */
+  --color-accent-emerald: #10b981;   /* Verde esmeralda */
+  --color-accent-amber: #f59e0b;     /* Ámbar dorado */
+
+  /* Colores de estado */
+  --color-success: #10b981;          /* Verde éxito */
+  --color-warning: #f59e0b;          /* Ámbar advertencia */
+  --color-danger: #ef4444;           /* Rojo error */
+  --color-info: #3b82f6;             /* Azul información */
+
+  /* Fondos neutrales sofisticados */
+  --color-bg-primary: #0f172a;       /* Azul noche profundo */
+  --color-bg-secondary: #1e293b;     /* Pizarra oscura */
+  --color-bg-tertiary: #334155;      /* Pizarra media */
+
+  /* Superficies con efecto glass */
+  --color-glass-light: rgba(15, 23, 42, 0.8);
+  --color-glass-card: rgba(30, 41, 59, 0.7);
+
+  /* Textos */
+  --color-text-primary: #f1f5f9;     /* Blanco cálido */
+  --color-text-secondary: #cbd5e1;   /* Gris claro */
+  --color-text-tertiary: #94a3b8;    /* Gris medio */
+
+  --font-elegant: "Plus Jakarta Sans", sans-serif;
+  --font-modern: "Manrope", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-900 text-slate-100;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #1a1f3a 100%);
+    font-family: var(--font-modern);
+    color: var(--color-text-primary);
+  }
+
+  /* Estilos de headers elegantes */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-elegant);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  h1 {
+    @apply text-4xl lg:text-5xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent;
+  }
+
+  h2 {
+    @apply text-3xl font-bold text-slate-100;
+  }
+
+  h3 {
+    @apply text-xl font-bold text-slate-100;
+  }
+
+  /* Botones elegantes */
+  button {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-lg shadow-lg hover:shadow-xl;
+  }
+
+  .btn-secondary {
+    @apply bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 text-slate-100 font-semibold py-2 px-6 rounded-lg;
+  }
+
+  /* Cards con glass morphism mejorado */
+  .glass-card {
+    @apply bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
+  }
+
+  .glass-card-elevated {
+    @apply glass-card border-slate-600/30 shadow-2xl;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+  }
+
+  /* Glow effects elegantes */
+  .glow-indigo {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3), inset 0 0 10px rgba(99, 102, 241, 0.1);
+  }
+
+  .glow-pink {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.3), inset 0 0 10px rgba(236, 72, 153, 0.1);
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.3), inset 0 0 10px rgba(6, 182, 212, 0.1);
+  }
+
+  /* Animaciones suaves */
+  @keyframes gradient-shift {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite;
+  }
+
+  /* Transiciones elegantes */
+  .transition-elegant {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Bordes elegantes */
+  .border-elegant {
+    border: 1px solid;
+    @apply border-slate-700/50;
+  }
+
+  /* Scrollbars personalizadas */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-900/50;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-600/50 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-500;
+  }
+}
+
+/* Utility classes para módulos */
+.module-header {
+  @apply flex items-center justify-between py-6 px-8 border-b border-slate-700/30;
+}
+
+.module-icon {
+  @apply w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg;
+}
+
+.module-title {
+  @apply text-2xl font-bold text-slate-100 flex items-center gap-3;
+}
+
+.card-stat {
+  @apply p-6 rounded-xl bg-slate-800/40 border border-slate-700/50 hover:border-slate-600/50 transition-elegant;
+}
+
+.card-stat h4 {
+  @apply text-sm font-medium text-slate-400 uppercase tracking-wide;
+}
+
+.card-stat .value {
+  @apply text-3xl font-bold text-slate-100 mt-2;
+}
+
+.card-stat .delta {
+  @apply text-xs text-slate-400 mt-2;
+}
+
+.text-gradient {
+  @apply bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent;
+}

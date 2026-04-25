@@ -1,249 +1,456 @@
-import { motion } from 'motion/react';
-import { useState } from 'react';
-import { CheckCircle, XCircle, Clock, Calendar, BarChart3, TrendingUp, AlertCircle } from 'lucide-react';
-import { User as UserType } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { useState, useEffect } from 'react';
+import { Clock, Eye, EyeOff } from 'lucide-react';
+import HeaderElegante from '../components/HeaderElegante';
 
-interface AttendanceScreenProps {
-  user: UserType;
-}
+type EstadoAsistencia = 'asistio' | 'falto' | 'retrasado' | 'justifico' | 'permiso';
 
-interface AttendanceRecord {
+interface Alumno {
   id: string;
-  date: string;
-  course: string;
-  status: 'present' | 'absent' | 'late';
-  time: string;
-  instructor: string;
+  apellidos_nombres: string;
+  grado: string;
+  seccion: string;
 }
 
-const attendanceData: AttendanceRecord[] = [
-  { id: '1', date: '2024-04-15', course: 'Matemáticas', status: 'present', time: '08:05', instructor: 'Prof. García' },
-  { id: '2', date: '2024-04-15', course: 'Lenguaje', status: 'present', time: '09:00', instructor: 'Prof. López' },
-  { id: '3', date: '2024-04-15', course: 'Ciencias', status: 'late', time: '10:45', instructor: 'Prof. Rodríguez' },
-  { id: '4', date: '2024-04-16', course: 'Historia', status: 'present', time: '08:00', instructor: 'Prof. Martínez' },
-  { id: '5', date: '2024-04-16', course: 'Inglés', status: 'present', time: '09:05', instructor: 'Prof. Silva' },
-  { id: '6', date: '2024-04-16', course: 'Matemáticas', status: 'absent', time: '-', instructor: 'Prof. García' },
-  { id: '7', date: '2024-04-17', course: 'Física', status: 'present', time: '08:00', instructor: 'Prof. Sánchez' },
-  { id: '8', date: '2024-04-17', course: 'Lenguaje', status: 'present', time: '09:00', instructor: 'Prof. López' },
-  { id: '9', date: '2024-04-17', course: 'Educación Física', status: 'present', time: '10:30', instructor: 'Prof. Torres' },
-  { id: '10', date: '2024-04-18', course: 'Matemáticas', status: 'present', time: '08:00', instructor: 'Prof. García' },
-];
+interface RegistroAsistencia {
+  id?: string;
+  alumnoId: string;
+  fecha: string;
+  estado: EstadoAsistencia;
+  bimestre: number;
+  horaRegistro?: string;
+}
 
-const getStatusIcon = (status: 'present' | 'absent' | 'late') => {
-  switch (status) {
-    case 'present':
-      return <CheckCircle className="w-5 h-5 text-neon-lime" />;
-    case 'absent':
-      return <XCircle className="w-5 h-5 text-red-500" />;
-    case 'late':
-      return <Clock className="w-5 h-5 text-yellow-500" />;
-  }
-};
+interface RegistroRefuerzo {
+  alumnoId: string;
+  fecha: string;
+  bimestre: number;
+  participa: boolean;
+}
 
-const getStatusColor = (status: 'present' | 'absent' | 'late') => {
-  switch (status) {
-    case 'present':
-      return 'bg-neon-lime/20 text-neon-lime border-neon-lime/50';
-    case 'absent':
-      return 'bg-red-500/20 text-red-200 border-red-500/50';
-    case 'late':
-      return 'bg-yellow-500/20 text-yellow-200 border-yellow-500/50';
-  }
-};
+const LS_ALUMNOS = 'ie_alumnos';
+const LS_ASISTENCIA_REGISTRO = 'ie_asistencia_registro_v2';
+const LS_REFUERZO_REGISTRO = 'ie_refuerzo_registro_v2';
 
-const getStatusLabel = (status: 'present' | 'absent' | 'late') => {
-  switch (status) {
-    case 'present':
-      return 'Presente';
-    case 'absent':
-      return 'Ausente';
-    case 'late':
-      return 'Retrasado';
-  }
-};
+function lsGet<T>(key: string, def: T): T {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch { return def; }
+}
 
-export default function AttendanceScreen({ user }: AttendanceScreenProps) {
-  const [filterCourse, setFilterCourse] = useState<string>('all');
+function lsSet(key: string, val: any) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.error('Error guardando:', e); }
+}
 
-  const filteredAttendance = filterCourse === 'all' 
-    ? attendanceData 
-    : attendanceData.filter(a => a.course === filterCourse);
+// Configuración de cursos
+const CURSOS = ['Comunicación', 'Matemática', 'Ciencia y Tecnología', 'Historia', 'Inglés', 'Educación Física', 'Arte', 'Tutoría'];
 
-  const stats = {
-    total: attendanceData.length,
-    present: attendanceData.filter(a => a.status === 'present').length,
-    absent: attendanceData.filter(a => a.status === 'absent').length,
-    late: attendanceData.filter(a => a.status === 'late').length,
+export default function AttendanceScreen() {
+  const [seccion, setSeccion] = useState<'asistencia' | 'refuerzo'>('asistencia');
+  const [alumnos, setAlumnos] = useState<Alumno[]>([]);
+  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [registrosAsistencia, setRegistrosAsistencia] = useState<RegistroAsistencia[]>([]);
+  const [registrosRefuerzo, setRegistrosRefuerzo] = useState<RegistroRefuerzo[]>([]);
+
+  // Filtros
+  const [filtroGrado, setFiltroGrado] = useState('');
+  const [filtroSeccion, setFiltroSeccion] = useState('');
+  const [filtroBimestre, setFiltroBimestre] = useState('1');
+  const [filtroCurso, setFiltroCurso] = useState('');
+
+  const [guardado, setGuardado] = useState(false);
+
+  useEffect(() => {
+    const lista = lsGet<Alumno[]>(LS_ALUMNOS, []);
+    setAlumnos(lista);
+    if (lista.length > 0) {
+      setFiltroGrado(lista[0].grado);
+    }
+  }, []);
+
+  useEffect(() => {
+    const asistencia = lsGet<RegistroAsistencia[]>(LS_ASISTENCIA_REGISTRO, []);
+    const refuerzo = lsGet<RegistroRefuerzo[]>(LS_REFUERZO_REGISTRO, []);
+    const bim = parseInt(filtroBimestre);
+    setRegistrosAsistencia(asistencia.filter(r => r.fecha === fecha && r.bimestre === bim));
+    setRegistrosRefuerzo(refuerzo.filter(r => r.fecha === fecha && r.bimestre === bim));
+  }, [fecha, filtroBimestre]);
+
+  const mostrarGuardado = () => {
+    setGuardado(true);
+    setTimeout(() => setGuardado(false), 2500);
   };
 
-  const attendanceRate = ((stats.present / stats.total) * 100).toFixed(1);
+  const grados = [...new Set(alumnos.map(a => a.grado))].sort();
+  const secciones = filtroGrado ? [...new Set(alumnos.filter(a => a.grado === filtroGrado).map(a => a.seccion))].sort() : [];
 
-  const courses = [...new Set(attendanceData.map(a => a.course))];
+  const alumnosFiltrados = alumnos.filter(a =>
+    (!filtroGrado || a.grado === filtroGrado) &&
+    (!filtroSeccion || a.seccion === filtroSeccion)
+  );
+
+  const marcarAsistencia = (alumnoId: string, estado: EstadoAsistencia) => {
+    const todos = lsGet<RegistroAsistencia[]>(LS_ASISTENCIA_REGISTRO, []);
+    const idx = todos.findIndex(r => r.alumnoId === alumnoId && r.fecha === fecha && r.bimestre === parseInt(filtroBimestre));
+    if (idx >= 0) {
+      todos[idx].estado = estado;
+    } else {
+      todos.push({
+        alumnoId,
+        fecha,
+        estado,
+        bimestre: parseInt(filtroBimestre),
+        horaRegistro: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+      });
+    }
+    lsSet(LS_ASISTENCIA_REGISTRO, todos);
+    const bim = parseInt(filtroBimestre);
+    setRegistrosAsistencia(todos.filter(r => r.fecha === fecha && r.bimestre === bim));
+    mostrarGuardado();
+  };
+
+  const eliminarAsistencia = (alumnoId: string) => {
+    const todos = lsGet<RegistroAsistencia[]>(LS_ASISTENCIA_REGISTRO, []);
+    const filtrados = todos.filter(r => !(r.alumnoId === alumnoId && r.fecha === fecha && r.bimestre === parseInt(filtroBimestre)));
+    lsSet(LS_ASISTENCIA_REGISTRO, filtrados);
+    const bim = parseInt(filtroBimestre);
+    setRegistrosAsistencia(filtrados.filter(r => r.fecha === fecha && r.bimestre === bim));
+    mostrarGuardado();
+  };
+
+  const toggleRefuerzo = (alumnoId: string) => {
+    const todos = lsGet<RegistroRefuerzo[]>(LS_REFUERZO_REGISTRO, []);
+    const idx = todos.findIndex(r => r.alumnoId === alumnoId && r.fecha === fecha && r.bimestre === parseInt(filtroBimestre));
+    if (idx >= 0) {
+      todos[idx].participa = !todos[idx].participa;
+    } else {
+      todos.push({
+        alumnoId,
+        fecha,
+        bimestre: parseInt(filtroBimestre),
+        participa: true
+      });
+    }
+    lsSet(LS_REFUERZO_REGISTRO, todos);
+    const bim = parseInt(filtroBimestre);
+    setRegistrosRefuerzo(todos.filter(r => r.fecha === fecha && r.bimestre === bim));
+    mostrarGuardado();
+  };
+
+  const getAsistencia = (alumnoId: string) => registrosAsistencia.find(r => r.alumnoId === alumnoId);
+  const getRefuerzo = (alumnoId: string) => registrosRefuerzo.find(r => r.alumnoId === alumnoId);
+
+  const estadoConfig = {
+    asistio: { label: 'Asistió', color: 'bg-emerald-600 hover:bg-emerald-700', textColor: 'text-emerald-100', icon: '✓' },
+    falto: { label: 'Faltó', color: 'bg-red-600 hover:bg-red-700', textColor: 'text-red-100', icon: '✗' },
+    retrasado: { label: 'Retrasado', color: 'bg-amber-600 hover:bg-amber-700', textColor: 'text-amber-100', icon: '⏰' },
+    justifico: { label: 'Justificó', color: 'bg-blue-600 hover:bg-blue-700', textColor: 'text-blue-100', icon: '📄' },
+    permiso: { label: 'Permiso', color: 'bg-violet-600 hover:bg-violet-700', textColor: 'text-violet-100', icon: '🔐' },
+  };
+
+  const statsAsistencia = {
+    asistio: registrosAsistencia.filter(r => r.estado === 'asistio').length,
+    falto: registrosAsistencia.filter(r => r.estado === 'falto').length,
+    retrasado: registrosAsistencia.filter(r => r.estado === 'retrasado').length,
+    justifico: registrosAsistencia.filter(r => r.estado === 'justifico').length,
+    permiso: registrosAsistencia.filter(r => r.estado === 'permiso').length,
+  };
+
+  const statsRefuerzo = {
+    participa: registrosRefuerzo.filter(r => r.participa).length,
+    noParticipa: registrosRefuerzo.filter(r => !r.participa).length,
+  };
+
+  const cursoLabel = filtroCurso || 'Todos los cursos';
 
   return (
-    <div className="min-h-screen p-6 space-y-8 pb-24">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-neon-lime/20 rounded-lg neon-border-lime">
-            <Calendar className="w-8 h-8 text-neon-lime" />
-          </div>
-          <div>
-            <h1 className="text-4xl font-bold tracking-tighter uppercase">
-              Mi <span className="text-neon-magenta neon-text-magenta">Asistencia</span>
-            </h1>
-            <p className="text-xs text-white/75 font-mono tracking-widest">CONTROL DE ASISTENCIA</p>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Porcentaje Asistencia', value: `${attendanceRate}%`, icon: TrendingUp, color: 'neon-lime' },
-          { label: 'Presente', value: stats.present, icon: CheckCircle, color: 'neon-lime' },
-          { label: 'Ausente', value: stats.absent, icon: XCircle, color: 'red-500' },
-          { label: 'Retrasado', value: stats.late, icon: Clock, color: 'yellow-500' },
-        ].map((kpi, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className={`glass-card p-4 neon-border-${kpi.color} hover:neon-border-magenta transition-all`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-white/85 text-xs uppercase">{kpi.label}</p>
-              <kpi.icon className={`w-5 h-5 text-${kpi.color}`} />
-            </div>
-            <p className={`text-2xl font-bold text-${kpi.color}`}>{kpi.value}</p>
-          </motion.div>
-        ))}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6">
+      <div className="fixed inset-0 -z-50">
+        <div className="absolute inset-0 bg-gradient-cyber opacity-60"></div>
       </div>
 
-      {/* Chart-like visualization */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="glass-card p-6 neon-border-cyan"
-      >
-        <h3 className="text-white font-bold uppercase tracking-wider mb-6 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-neon-cyan" />
-          Resumen de Asistencia
-        </h3>
-        <div className="space-y-4">
+      <div className="relative z-10 max-w-7xl mx-auto space-y-6">
+        <HeaderElegante icon={Clock} title="EDUGEST REGISTRO DE ASISTENCIA" subtitle="Control diario y registro de refuerzo" />
+
+        {/* Pestañas */}
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
           {[
-            { label: 'Presente', value: stats.present, max: stats.total, color: 'from-neon-lime to-neon-cyan' },
-            { label: 'Retrasado', value: stats.late, max: stats.total, color: 'from-yellow-500 to-orange-500' },
-            { label: 'Ausente', value: stats.absent, max: stats.total, color: 'from-red-500 to-pink-500' },
-          ].map((item) => (
-            <div key={item.label}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-white text-sm uppercase tracking-wider font-semibold">{item.label}</p>
-                <span className="text-neon-cyan text-sm font-bold">{item.value}/{item.max}</span>
-              </div>
-              <div className="h-3 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className={`h-full bg-gradient-to-r ${item.color} transition-all duration-500`}
-                  style={{ width: `${(item.value / item.max) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* Filter and Records */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="glass-card p-6 neon-border-magenta"
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-white font-bold uppercase tracking-wider flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-neon-magenta" />
-            Historial de Asistencia
-          </h3>
-        </div>
-
-        {/* Filter */}
-        <div className="mb-6">
-          <p className="text-white/85 text-sm uppercase tracking-wider mb-3">Filtrar por Curso</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilterCourse('all')}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm uppercase tracking-wider transition-all ${
-                filterCourse === 'all'
-                  ? 'bg-neon-cyan text-black'
-                  : 'bg-white/10 border border-white/20 text-white hover:bg-white/20'
+            { id: 'asistencia', label: '📋 Registro de Asistencia' },
+            { id: 'refuerzo', label: '🎯 Registro de Refuerzo' }
+          ].map(tab => (
+            <motion.button
+              key={tab.id}
+              onClick={() => setSeccion(tab.id as any)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 ${
+                seccion === tab.id
+                  ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/50'
+                  : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
               }`}
             >
-              Todos
-            </button>
-            {courses.map((course) => (
-              <button
-                key={course}
-                onClick={() => setFilterCourse(course)}
-                className={`px-4 py-2 rounded-lg font-semibold text-sm uppercase tracking-wider transition-all ${
-                  filterCourse === course
-                    ? 'bg-neon-magenta text-black'
-                    : 'bg-white/10 border border-white/20 text-white hover:bg-white/20'
-                }`}
+              {tab.label}
+            </motion.button>
+          ))}
+        </motion.div>
+
+        {/* FILTROS PRINCIPALES */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm space-y-4">
+          {/* Fila 1: Grado, Sección, Bimestre */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Grado</label>
+              <select
+                value={filtroGrado}
+                onChange={(e) => {
+                  setFiltroGrado(e.target.value);
+                  setFiltroSeccion('');
+                }}
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-cyan-500 focus:ring-cyan-500/20 text-sm"
               >
-                {course}
-              </button>
-            ))}
-          </div>
-        </div>
+                <option value="">Seleccionar grado</option>
+                {grados.map(g => <option key={g} value={g}>{g}°</option>)}
+              </select>
+            </div>
 
-        {/* Records Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-white/10">
-              <tr className="text-white/85 text-xs uppercase">
-                <th className="text-left py-3 px-4">Fecha</th>
-                <th className="text-left py-3 px-4">Curso</th>
-                <th className="text-left py-3 px-4">Instructor</th>
-                <th className="text-left py-3 px-4">Estado</th>
-                <th className="text-left py-3 px-4">Hora</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAttendance.map((record, i) => (
-                <motion.tr
-                  key={record.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                >
-                  <td className="py-3 px-4 text-white font-medium">{record.date}</td>
-                  <td className="py-3 px-4 text-white/90">{record.course}</td>
-                  <td className="py-3 px-4 text-white/90">{record.instructor}</td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(record.status)}
-                      <span className={`px-3 py-1 rounded-full border text-xs font-medium ${getStatusColor(record.status)}`}>
-                        {getStatusLabel(record.status)}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-white/90">{record.time}</td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            <div>
+              <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Sección</label>
+              <select
+                value={filtroSeccion}
+                onChange={(e) => setFiltroSeccion(e.target.value)}
+                disabled={!filtroGrado}
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-cyan-500 focus:ring-cyan-500/20 text-sm disabled:opacity-50"
+              >
+                <option value="">Todas las secciones</option>
+                {secciones.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
 
-        {filteredAttendance.length === 0 && (
-          <div className="text-center py-8 text-white/75">
-            <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-            <p>No hay registros de asistencia</p>
+            <div>
+              <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Bimestre</label>
+              <select
+                value={filtroBimestre}
+                onChange={(e) => setFiltroBimestre(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-cyan-500 focus:ring-cyan-500/20 text-sm"
+              >
+                <option value="1">I Bimestre</option>
+                <option value="2">II Bimestre</option>
+                <option value="3">III Bimestre</option>
+                <option value="4">IV Bimestre</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Fecha</label>
+              <input
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-cyan-500 focus:ring-cyan-500/20 text-sm"
+              />
+            </div>
           </div>
-        )}
-      </motion.div>
+
+          {/* Fila 2: Curso y Guardado */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-3">
+              <label className="text-xs uppercase font-semibold text-slate-400 mb-2 block">Curso</label>
+              <select
+                value={filtroCurso}
+                onChange={(e) => setFiltroCurso(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:border-cyan-500 focus:ring-cyan-500/20 text-sm"
+              >
+                <option value="">Todos los cursos</option>
+                {CURSOS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            {guardado && (
+              <div className="flex items-center justify-center bg-emerald-900/30 border border-emerald-600 rounded-lg col-span-1">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-emerald-100 font-semibold text-sm">
+                  ✓ Guardado
+                </motion.div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Info Sesión */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-wrap items-center justify-between gap-4 px-6 py-3 bg-slate-800/40 border border-slate-700 rounded-lg">
+          <div className="text-sm text-slate-300">
+            <span className="font-semibold text-cyan-400">{filtroGrado || '—'}°</span>
+            {filtroSeccion && <span className="ml-2">Sección <span className="font-semibold text-cyan-400">{filtroSeccion}</span></span>}
+          </div>
+          <div className="text-sm text-slate-300">
+            Bimestre <span className="font-semibold text-cyan-400">{filtroBimestre}</span> •
+            Curso <span className="font-semibold text-cyan-400">{cursoLabel}</span>
+          </div>
+          <div className="text-sm text-slate-400">
+            📅 {new Date(fecha).toLocaleDateString('es-PE')}
+          </div>
+        </motion.div>
+
+        {/* SECCIÓN ASISTENCIA */}
+        <AnimatePresence mode="wait">
+          {seccion === 'asistencia' && (
+            <motion.div key="asistencia" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+              {/* Estadísticas */}
+              <motion.div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {Object.entries(estadoConfig).map(([key, config]: any) => (
+                  <motion.div
+                    key={key}
+                    whileHover={{ scale: 1.05 }}
+                    className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 text-center backdrop-blur-sm"
+                  >
+                    <p className="text-2xl font-bold">{statsAsistencia[key as keyof typeof statsAsistencia]}</p>
+                    <p className="text-xs text-slate-400 mt-1">{config.label}</p>
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {/* Lista de Alumnos */}
+              <motion.div className="bg-slate-800/50 border border-slate-700 rounded-lg backdrop-blur-sm overflow-hidden">
+                <div className="max-h-[65vh] overflow-y-auto">
+                  <AnimatePresence>
+                    {alumnosFiltrados.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">
+                        Selecciona grado y sección para ver alumnos
+                      </div>
+                    ) : (
+                      alumnosFiltrados.map((alumno, idx) => {
+                        const asistencia = getAsistencia(alumno.id);
+                        return (
+                          <motion.div
+                            key={alumno.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ delay: idx * 0.02 }}
+                            className="border-b border-slate-700 last:border-0 p-4 hover:bg-slate-700/30 transition-colors"
+                          >
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-white truncate">{alumno.apellidos_nombres}</p>
+                                <p className="text-xs text-slate-400">{alumno.grado}° - Sección {alumno.seccion}</p>
+                              </div>
+
+                              {asistencia ? (
+                                <motion.div className="flex items-center gap-2" initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
+                                  <div className={`px-3 py-1 rounded-lg text-xs font-semibold ${estadoConfig[asistencia.estado].color} ${estadoConfig[asistencia.estado].textColor}`}>
+                                    {estadoConfig[asistencia.estado].label}
+                                  </div>
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => eliminarAsistencia(alumno.id)}
+                                    className="px-3 py-1 rounded-lg bg-red-900/30 text-red-300 hover:bg-red-900/50 text-xs font-semibold"
+                                  >
+                                    Limpiar
+                                  </motion.button>
+                                </motion.div>
+                              ) : (
+                                <div className="flex gap-1 flex-wrap justify-end">
+                                  {Object.entries(estadoConfig).map(([key, config]: any) => (
+                                    <motion.button
+                                      key={key}
+                                      whileHover={{ scale: 1.1 }}
+                                      whileTap={{ scale: 0.95 }}
+                                      onClick={() => marcarAsistencia(alumno.id, key)}
+                                      title={config.label}
+                                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${config.color} ${config.textColor}`}
+                                    >
+                                      {config.icon}
+                                    </motion.button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* SECCIÓN REFUERZO */}
+        <AnimatePresence mode="wait">
+          {seccion === 'refuerzo' && (
+            <motion.div key="refuerzo" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+              {/* Estadísticas Refuerzo */}
+              <motion.div className="grid grid-cols-2 gap-3">
+                <motion.div whileHover={{ scale: 1.05 }} className="bg-emerald-900/30 border border-emerald-600 rounded-lg p-4 text-center backdrop-blur-sm">
+                  <p className="text-2xl font-bold text-emerald-100">{statsRefuerzo.participa}</p>
+                  <p className="text-xs text-emerald-300 mt-1">Participan</p>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.05 }} className="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center backdrop-blur-sm">
+                  <p className="text-2xl font-bold text-slate-200">{statsRefuerzo.noParticipa}</p>
+                  <p className="text-xs text-slate-400 mt-1">No Participan</p>
+                </motion.div>
+              </motion.div>
+
+              {/* Lista Refuerzo */}
+              <motion.div className="bg-slate-800/50 border border-slate-700 rounded-lg backdrop-blur-sm overflow-hidden">
+                <div className="max-h-[65vh] overflow-y-auto">
+                  <AnimatePresence>
+                    {alumnosFiltrados.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">
+                        Selecciona grado y sección para ver alumnos
+                      </div>
+                    ) : (
+                      alumnosFiltrados.map((alumno, idx) => {
+                        const refuerzo = getRefuerzo(alumno.id);
+                        const participa = refuerzo?.participa ?? false;
+                        return (
+                          <motion.div
+                            key={alumno.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ delay: idx * 0.02 }}
+                            className={`border-b border-slate-700 last:border-0 p-4 transition-all ${participa ? 'bg-slate-700/20' : 'opacity-60 bg-slate-800/30'}`}
+                          >
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className={`font-semibold truncate ${participa ? 'text-white' : 'text-slate-400'}`}>
+                                  {alumno.apellidos_nombres}
+                                </p>
+                                <p className="text-xs text-slate-400">{alumno.grado}° - Sección {alumno.seccion}</p>
+                              </div>
+
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => toggleRefuerzo(alumno.id)}
+                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                                  participa
+                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                }`}
+                              >
+                                {participa ? (
+                                  <span className="flex items-center gap-2">
+                                    <Eye className="w-4 h-4" /> Participa
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-2">
+                                    <EyeOff className="w-4 h-4" /> No Participa
+                                  </span>
+                                )}
+                              </motion.button>
+                            </div>
+                          </motion.div>
+                        );
+                      })
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

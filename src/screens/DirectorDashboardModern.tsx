@@ -1,9 +1,10 @@
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { Users, TrendingUp, AlertCircle, BarChart3, Clock, CheckCircle, XCircle, PieChart, BookOpen, GraduationCap } from 'lucide-react';
+import { Users, TrendingUp, AlertCircle, BarChart3, Clock, CheckCircle, XCircle, PieChart, BookOpen, GraduationCap, Award } from 'lucide-react';
 import FuturisticCard from '../components/FuturisticCard';
 import HologramText from '../components/HologramText';
 import DataGrid from '../components/DataGrid';
+import HeaderElegante from '../components/HeaderElegante';
 import { LineChart, Line, BarChart, Bar, PieChart as Rechartspie, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface User {
@@ -21,7 +22,7 @@ interface DirectorDashboardModernProps {
 const LS_ALUMNOS = 'ie_alumnos';
 const LS_DOCENTES = 'ie_docentes';
 const LS_CALIFICATIVOS = 'ie_calificativos_v2';
-const LS_ASISTENCIA = 'ie_asistencia';
+const LS_ASISTENCIA_REGISTRO = 'ie_asistencia_registro_v2';
 
 function lsGet<T>(key: string, def: T): T {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch { return def; }
@@ -42,14 +43,14 @@ export default function DirectorDashboardModern({ user }: DirectorDashboardModer
       const alumnos = lsGet<any[]>(LS_ALUMNOS, []);
       const docentes = lsGet<any[]>(LS_DOCENTES, []);
       const calificaciones = lsGet<any[]>(LS_CALIFICATIVOS, []);
-      const asistencia = lsGet<any[]>(LS_ASISTENCIA, []);
+      const asistenciaRegistro = lsGet<any[]>(LS_ASISTENCIA_REGISTRO, []);
 
       const uniqueGrados = [...new Set(alumnos.map(a => a.grado).filter(Boolean))];
       const uniqueSecciones = [...new Set(alumnos.map(a => a.seccion).filter(Boolean))];
 
       const fechaHoy = new Date().toISOString().split('T')[0];
-      const asistenciaHoy = asistencia.filter(a => a.fecha === fechaHoy);
-      const presentes = asistenciaHoy.filter(a => a.estado === 'presente').length;
+      const asistenciaHoy = asistenciaRegistro.filter(a => a.fecha === fechaHoy);
+      const presentes = asistenciaHoy.filter(a => a.estado === 'asistio').length;
       const asistenciaPct = asistenciaHoy.length > 0 ? Math.round((presentes / asistenciaHoy.length) * 100) : 0;
 
       setStats({
@@ -93,16 +94,11 @@ export default function DirectorDashboardModern({ user }: DirectorDashboardModer
 
       <div className="relative z-10 max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-3"
-        >
-          <h1 className="text-5xl font-black tracking-tighter">
-            Panel <HologramText>Director</HologramText>
-          </h1>
-          <p className="text-white/85 font-mono tracking-widest text-sm">GESTIÓN INSTITUCIONAL Y DESEMPEÑO</p>
-        </motion.div>
+        <HeaderElegante
+          icon={Award}
+          title="EDUGEST PANEL DIRECTOR"
+          subtitle="Gestión institucional y desempeño académico"
+        />
 
         {/* KPI Stats */}
         <motion.div
@@ -119,9 +115,9 @@ export default function DirectorDashboardModern({ user }: DirectorDashboardModer
               transition={{ delay: 0.1 + i * 0.1 }}
             >
               <FuturisticCard variant={stat.color as any} glow hover>
-                <div className="p-4 space-y-3">
-                  <p className="text-white/85 text-xs uppercase">{stat.label}</p>
-                  <p className="text-3xl font-bold text-white">{stat.value}</p>
+                <div className="p-5 space-y-3">
+                  <p className="text-slate-200 text-xs uppercase font-semibold tracking-wider">{stat.label}</p>
+                  <p className="text-4xl font-black text-white">{stat.value}</p>
                 </div>
               </FuturisticCard>
             </motion.div>
@@ -193,33 +189,33 @@ export default function DirectorDashboardModern({ user }: DirectorDashboardModer
           <FuturisticCard variant="lime" glow hover>
             <div className="p-6 space-y-3">
               <div className="flex items-center gap-2">
-                <CheckCircle className="w-6 h-6 text-neon-lime animate-pulse-glow" />
-                <p className="font-bold text-white text-sm uppercase">Instituciones Sanas</p>
+                <CheckCircle className="w-6 h-6 text-lime-400" />
+                <p className="font-bold text-white text-sm uppercase tracking-wider">Instituciones Sanas</p>
               </div>
-              <p className="text-3xl font-bold text-white">94%</p>
-              <p className="text-xs text-white/85">Cumplimiento de estándares</p>
+              <p className="text-4xl font-black text-lime-300">94%</p>
+              <p className="text-xs text-slate-300">Cumplimiento de estándares</p>
             </div>
           </FuturisticCard>
 
           <FuturisticCard variant="blue" glow hover>
             <div className="p-6 space-y-3">
               <div className="flex items-center gap-2">
-                <AlertCircle className="w-6 h-6 text-neon-blue animate-pulse-glow" />
-                <p className="font-bold text-white text-sm uppercase">Alertas Pendientes</p>
+                <AlertCircle className="w-6 h-6 text-blue-400" />
+                <p className="font-bold text-white text-sm uppercase tracking-wider">Alertas Pendientes</p>
               </div>
-              <p className="text-3xl font-bold text-white">3</p>
-              <p className="text-xs text-white/85">Requieren atención</p>
+              <p className="text-4xl font-black text-blue-300">3</p>
+              <p className="text-xs text-slate-300">Requieren atención</p>
             </div>
           </FuturisticCard>
 
           <FuturisticCard variant="cyan" glow hover>
             <div className="p-6 space-y-3">
               <div className="flex items-center gap-2">
-                <Clock className="w-6 h-6 text-neon-cyan animate-pulse-glow" />
-                <p className="font-bold text-white text-sm uppercase">Actualizado</p>
+                <Clock className="w-6 h-6 text-cyan-400" />
+                <p className="font-bold text-white text-sm uppercase tracking-wider">Actualizado</p>
               </div>
-              <p className="text-3xl font-bold text-neon-cyan">Ahora</p>
-              <p className="text-xs text-white/85">Sincronización en tiempo real</p>
+              <p className="text-4xl font-black text-cyan-300">Ahora</p>
+              <p className="text-xs text-slate-300">Sincronización en tiempo real</p>
             </div>
           </FuturisticCard>
         </motion.div>

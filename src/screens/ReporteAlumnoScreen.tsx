@@ -9,8 +9,9 @@ import {
   User, Search, FileText, BookOpen, CheckSquare, Shield,
   TrendingUp, Award, Clock, Calendar, Phone, MapPin,
   ChevronLeft, Download, XCircle, CheckCircle, AlertTriangle,
-  BarChart3, Star, Users
+  BarChart3, Star, Users, ClipboardList
 } from 'lucide-react';
+import HeaderElegante from '../components/HeaderElegante';
 
 interface ReporteAlumnoProps {
   user: { id: string; name: string; email: string; role: string; schoolId: string };
@@ -314,23 +315,18 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
     : '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-6 space-y-5">
+    <div className="min-h-screen bg-dark-bg text-white overflow-hidden p-6">
+      {/* Fondo animado */}
+      <div className="fixed inset-0 -z-50">
+        <div className="absolute inset-0 bg-gradient-cyber opacity-60"></div>
+      </div>
 
-      {/* ── HEADER ── */}
-      <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3">
-        <div className="p-2 bg-purple-500/20 rounded-xl border border-purple-500/30">
-          <FileText className="w-7 h-7 text-purple-400" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-white">
-            Informe <span className="text-purple-400">Alumno</span>
-          </h1>
-          <p className="text-xs text-purple-400/60 font-mono tracking-widest uppercase">
-            Dashboard académico integrado
-          </p>
-        </div>
-      </motion.div>
+      <div className="relative z-10 max-w-7xl mx-auto space-y-8">
+        <HeaderElegante
+          icon={ClipboardList}
+          title="EDUGEST REPORTE ALUMNO"
+          subtitle="Dashboard académico integrado"
+        />
 
       {/* ── SELECTOR DE ALUMNO ── */}
       {!alumnoSelec && (
@@ -864,6 +860,7 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
 
         </motion.div>
       )}
+      </div>
     </div>
   );
 }

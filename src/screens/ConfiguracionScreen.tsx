@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle, Wifi, WifiOff, Database, Key, Server } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle, Wifi, WifiOff, Database, Key, Server, Settings } from 'lucide-react';
+import HeaderElegante from '../components/HeaderElegante';
 import { getStorageStats, isSyncedToCloud, syncAllToTurso } from '../services/dataService';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -1076,42 +1078,68 @@ export default function ConfiguracionScreen() {
   const [tab, setTab] = useState<'anios'|'bimestres'|'instrumentos'|'unidades'|'competencias'|'cursos'|'asignaciones'|'api'>('bimestres');
 
   const tabs = [
-    { id: 'anios',         label: '🗓️ Años' },
-    { id: 'bimestres',    label: '📅 Bimestres' },
-    { id: 'instrumentos', label: '📋 Instrumentos' },
-    { id: 'unidades',     label: '📚 Unidades' },
-    { id: 'competencias', label: '🎯 Competencias' },
-    { id: 'cursos',       label: '📖 Cursos' },
-    { id: 'asignaciones', label: '🏫 Asignaciones' },
-    { id: 'api',          label: '🌐 API & Cuentas' },
+    { id: 'anios',         label: '🗓️ Años', icon: '📆' },
+    { id: 'bimestres',    label: '📅 Bimestres', icon: '📅' },
+    { id: 'instrumentos', label: '📋 Instrumentos', icon: '📋' },
+    { id: 'unidades',     label: '📚 Unidades', icon: '📚' },
+    { id: 'competencias', label: '🎯 Competencias', icon: '🎯' },
+    { id: 'cursos',       label: '📖 Cursos', icon: '📖' },
+    { id: 'asignaciones', label: '🏫 Asignaciones', icon: '🏫' },
+    { id: 'api',          label: '🌐 API & Cuentas', icon: '🌐' },
   ] as const;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-indigo-500/20">
-        <div className="max-w-4xl mx-auto px-6 py-5">
-          <h1 className="text-3xl font-black text-white">⚙️ Configuración Académica</h1>
-          <p className="text-indigo-400/70 text-sm mt-0.5">Bimestres, instrumentos, unidades, años, competencias, cursos, asignaciones y estado del sistema</p>
-        </div>
-        <div className="max-w-4xl mx-auto px-6 flex gap-1 overflow-x-auto pb-px">
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all ${tab === t.id ? 'border-indigo-400 text-indigo-300' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 overflow-hidden">
+      {/* Fondo animado */}
+      <div className="fixed inset-0 -z-50">
+        <div className="absolute inset-0 bg-gradient-cyber opacity-60"></div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        {tab === 'anios'         && <AniosSection />}
-        {tab === 'bimestres'    && <BimestresSection />}
-        {tab === 'instrumentos' && <InstrumentosSection />}
-        {tab === 'unidades'     && <UnidadesSection />}
-        {tab === 'competencias' && <CompetenciasSection />}
-        {tab === 'cursos'       && <CursosSection />}
-        {tab === 'asignaciones' && <AsignacionesSection />}
-        {tab === 'api'          && <ApiStatusSection />}
+      <div className="relative z-10 max-w-full">
+        <HeaderElegante
+          icon={Settings}
+          title="EDUGEST CONFIGURACIÓN"
+          subtitle="Configuración académica del sistema"
+        />
+
+        {/* Selector visual de secciones en grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
+          {tabs.map((t, i) => (
+            <motion.button
+              key={t.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              onClick={() => setTab(t.id)}
+              className={`relative p-4 rounded-xl transition-all border-2 ${
+                tab === t.id
+                  ? 'bg-gradient-to-br from-cyan-500/30 to-blue-500/30 border-cyan-400 shadow-lg shadow-cyan-500/20'
+                  : 'bg-slate-800/50 border-slate-700 hover:border-cyan-400/50 hover:bg-slate-800/80'
+              }`}
+            >
+              <div className="text-2xl mb-1">{t.icon}</div>
+              <div className="text-xs font-bold text-white text-center line-clamp-2">{t.label.split(' ').slice(1).join(' ')}</div>
+              {tab === t.id && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute inset-0 rounded-xl bg-cyan-400/10"
+                  transition={{ type: 'spring', duration: 0.3 }}
+                />
+              )}
+            </motion.button>
+          ))}
+        </div>
+
+        <div className="space-y-6">
+          {tab === 'anios'         && <AniosSection />}
+          {tab === 'bimestres'    && <BimestresSection />}
+          {tab === 'instrumentos' && <InstrumentosSection />}
+          {tab === 'unidades'     && <UnidadesSection />}
+          {tab === 'competencias' && <CompetenciasSection />}
+          {tab === 'cursos'       && <CursosSection />}
+          {tab === 'asignaciones' && <AsignacionesSection />}
+          {tab === 'api'          && <ApiStatusSection />}
+        </div>
       </div>
     </div>
   );

@@ -100,10 +100,10 @@ function promedioCompetencia(alumnoId: string, compId: string, columnas: Columna
 
 // ── Colores escala ────────────────────────────────────────────────────────────
 const CAL_BG: Record<string, string> = {
-  C:  'bg-red-500/25 text-red-300 border-red-500/50',
-  B:  'bg-yellow-500/25 text-yellow-200 border-yellow-500/50',
-  A:  'bg-green-500/25 text-green-300 border-green-500/50',
-  AD: 'bg-blue-500/25 text-blue-300 border-blue-400/60',
+  C:  'bg-red-900 text-red-100 border-red-600',
+  B:  'bg-amber-800 text-amber-100 border-amber-600',
+  A:  'bg-emerald-900 text-emerald-100 border-emerald-600',
+  AD: 'bg-violet-900 text-violet-100 border-violet-600',
 };
 const CAL_LABEL: Record<string, string> = {
   C: 'En Inicio', B: 'En Proceso', A: 'Logro Esperado', AD: 'Logro Destacado',
@@ -133,16 +133,16 @@ function PopupExamen({ alumno, columna, calActual, onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-slate-800 border border-amber-500/30 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-amber-600/50 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
         {/* Header con datos del alumno SIEMPRE visibles */}
-        <div className="px-6 py-4 border-b border-slate-700 flex-shrink-0 bg-slate-700/40 rounded-t-2xl">
+        <div className="px-6 py-4 border-b border-slate-700 flex-shrink-0 bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-2xl">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-white font-black text-base">{nomAlumno}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
+              <p className="text-slate-300 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="px-2 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 rounded-lg text-xs font-bold">📝 {columna.nombre}</span>
+                <span className="px-3 py-1.5 bg-amber-800 border border-amber-600 text-amber-100 rounded-lg text-xs font-bold">📝 {columna.nombre}</span>
                 <span className="text-xs text-slate-500">{columna.totalItems} preguntas</span>
                 <span className="text-xs text-slate-500">Escala: 100%=A · 99–55%=B · ≤54%=C</span>
               </div>
@@ -270,14 +270,14 @@ function PopupNotaNumerica({ alumno, columna, calActual, onGuardar, onCerrar }: 
   
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-slate-800 border border-green-500/30 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-slate-700 bg-slate-700/40 rounded-t-2xl">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-emerald-600/50 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-2xl">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-white font-black text-base">{nomAlumno}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
+              <p className="text-slate-300 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="px-2 py-1 bg-green-500/20 border border-green-500/40 text-green-300 rounded-lg text-xs font-bold">🔢 {columna.nombre}</span>
+                <span className="px-3 py-1.5 bg-emerald-800 border border-emerald-600 text-emerald-100 rounded-lg text-xs font-bold">🔢 {columna.nombre}</span>
                 <span className="text-xs text-slate-500">Nota Numérica (0-20)</span>
               </div>
             </div>
@@ -286,18 +286,18 @@ function PopupNotaNumerica({ alumno, columna, calActual, onGuardar, onCerrar }: 
         </div>
         
         <div className="px-6 py-8 flex flex-col items-center">
-          <label className="block text-xs text-slate-400 mb-3 font-medium uppercase tracking-wide">Ingrese la nota (0-20)</label>
-          <input 
-            type="number" 
-            min={0} 
-            max={20} 
-            value={nota} 
+          <label className="block text-xs text-slate-300 mb-4 font-semibold uppercase tracking-widest">Ingrese la nota (0-20)</label>
+          <input
+            type="number"
+            min={0}
+            max={20}
+            value={nota}
             onChange={e => setNota(Math.max(0, Math.min(20, Number(e.target.value))))}
-            className="w-32 text-center text-4xl font-black bg-slate-700 border-2 border-slate-500 rounded-xl py-4 text-white focus:outline-none focus:border-green-500"
+            className="w-32 text-center text-4xl font-black bg-slate-800 border-2 border-emerald-600 rounded-xl py-4 text-white focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30"
           />
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-2 mt-6 flex-wrap justify-center">
             {[0,5,10,11,12,13,14,15,16,17,18,19,20].map(n => (
-              <button key={n} onClick={() => setNota(n)} className={`w-10 h-10 rounded-lg font-bold text-sm ${nota === n ? 'bg-green-500 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{n}</button>
+              <button key={n} onClick={() => setNota(n)} className={`w-10 h-10 rounded-lg font-bold text-sm transition-all ${nota === n ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/50' : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'}`}>{n}</button>
             ))}
           </div>
         </div>
@@ -385,15 +385,15 @@ function PopupInstrumento({ alumno, columna, calActual, onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-slate-800 border border-cyan-500/30 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-cyan-600/50 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 
-        <div className="px-6 py-4 border-b border-slate-700 bg-slate-700/40 rounded-t-2xl sticky top-0 z-10">
+        <div className="px-6 py-4 border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-2xl sticky top-0 z-10">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-white font-black text-base">{nomAlumno}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
+              <p className="text-slate-300 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="px-2 py-1 bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 rounded-lg text-xs font-bold">{cfg.icono} {columna.nombre}</span>
+                <span className="px-3 py-1.5 bg-cyan-800 border border-cyan-600 text-cyan-100 rounded-lg text-xs font-bold">{cfg.icono} {columna.nombre}</span>
                 <span className="text-xs text-slate-500">{cfg.label} · {items.length} indicadores</span>
                 <button onClick={() => setMostrarTabla(!mostrarTabla)} className="text-xs text-cyan-400 underline">
                   {mostrarTabla ? 'Ocultar' : 'Mostrar'} tabla
