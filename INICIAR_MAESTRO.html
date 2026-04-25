@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>⚡ Inicializar Maestro</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .box {
+    background: #fff;
+    border-radius: 15px;
+    padding: 50px;
+    max-width: 600px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    color: #333;
+  }
+  h1 {
+    font-size: 28px;
+    margin-bottom: 30px;
+    color: #667eea;
+    text-align: center;
+  }
+  .status {
+    font-size: 16px;
+    margin: 30px 0;
+    min-height: 60px;
+    padding: 20px;
+    background: #f0f4ff;
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+  }
+  .loader {
+    border: 4px solid #ddd;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .done {
+    color: #22c55e;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+  }
+  .error {
+    color: #ef4444;
+    font-size: 16px;
+    text-align: center;
+  }
+  button {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 15px 40px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 20px;
+    width: 100%;
+    transition: all 0.3s;
+    font-family: 'Courier New', monospace;
+  }
+  button:hover {
+    background: #764ba2;
+    transform: translateY(-2px);
+  }
+  button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .info {
+    background: #f3f4f6;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 20px 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #555;
+  }
+</style>
+</head>
+<body>
+
+<div class="box">
+  <h1>🏫 Inicializar Maestro</h1>
+
+  <div class="info">
+    <strong>¿Qué hace?</strong><br>
+    Crea calificativos vacíos para que puedas ver tus alumnos, grados y secciones.
+  </div>
+
+  <div class="status" id="status">
+    Listo para inicializar
+  </div>
+
+  <div id="loader"></div>
+
+  <button id="btnIniciar" onclick="inicializarMaestro()">
+    🚀 Inicializar
+  </button>
+
+  <button id="btnIr" onclick="irAlSistema()" style="display:none; background: #22c55e;">
+    ✅ Ir a Calificativos
+  </button>
+</div>
+
+<script>
+  async function inicializarMaestro() {
+    const status = document.getElementById('status');
+    const loader = document.getElementById('loader');
+    const btnIniciar = document.getElementById('btnIniciar');
+    const btnIr = document.getElementById('btnIr');
+
+    btnIniciar.disabled = true;
+    loader.innerHTML = '<div class="loader"></div>';
+    status.textContent = '⚙️ Leyendo configuración...';
+
+    try {
+      // 1. Leer docenteId desde localStorage
+      const docenteId = localStorage.getItem('docenteId');
+      if (!docenteId) {
+        throw new Error('No se encontró docenteId. ¿Ya iniciaste sesión?');
+      }
+      console.log(`DocenteId: ${docenteId}`);
+
+      // 2. Leer asignaciones del maestro
+      status.textContent = '📚 Leyendo asignaciones...';
+      const asignaciones = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
+      const misAsignaciones = asignaciones.filter((a) => a.docenteId === docenteId);
+
+      if (misAsignaciones.length === 0) {
+        throw new Error(`No hay asignaciones para ${docenteId}. Contacta al admin.`);
+      }
+
+      console.log(`Asignaciones: ${misAsignaciones.length}`);
+      const grados = [...new Set(misAsignaciones.flatMap(a => a.grados))];
+      const secciones = [...new Set(misAsignaciones.flatMap(a => a.secciones))];
+      console.log(`Grados: ${grados.join(', ')}, Secciones: ${secciones.join(', ')}`);
+
+      // 3. Leer alumnos
+      status.textContent = '👥 Leyendo alumnos...';
+      const alumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+
+      // Filtrar alumnos por grados y secciones del maestro
+      const misAlumnos = alumnos.filter(a =>
+        grados.includes(a.grado) && secciones.includes(a.seccion)
+      );
+
+      if (misAlumnos.length === 0) {
+        throw new Error('No hay alumnos en tus grados/secciones.');
+      }
+
+      console.log(`Alumnos: ${misAlumnos.length}`);
+
+      // 4. Crear calificativos vacíos (estructura simple)
+      status.textContent = '💾 Creando calificativos vacíos...';
+
+      const existentes = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
+      let creados = 0;
+
+      // Para cada alumno, crear un calificativo "placeholder"
+      // Así CalificativosScreen verá que hay datos y mostrará la tabla
+      misAlumnos.forEach(alumno => {
+        // Buscar si ya existe algún calificativo para este alumno
+        const yaExiste = existentes.some(c => c.alumnoId === alumno.id);
+
+        if (!yaExiste) {
+          // Crear un calificativo vacío (placeholder)
+          existentes.push({
+            alumnoId: alumno.id,
+            columnaId: 'placeholder-init', // ID dummy
+            marcados: [],
+            claves: [],
+            notaNumerica: null,
+            calificativo: null, // Sin calificativo aún
+            esAD: false,
+            fecha: new Date().toISOString().split('T')[0],
+          });
+          creados++;
+        }
+      });
+
+      // 5. Guardar
+      localStorage.setItem('ie_calificativos_v2', JSON.stringify(existentes));
+
+      loader.innerHTML = '';
+      status.innerHTML = `
+        <div class="done">
+          ✅ ¡INICIALIZACIÓN COMPLETADA!<br><br>
+          👥 ${misAlumnos.length} alumnos<br>
+          📍 Grados: ${grados.join(', ')}<br>
+          📋 Secciones: ${secciones.join(', ')}<br>
+          ➕ ${creados} placeholders creados
+        </div>
+      `;
+
+      btnIniciar.style.display = 'none';
+      btnIr.style.display = 'block';
+
+    } catch (error) {
+      loader.innerHTML = '';
+      status.innerHTML = `
+        <div class="error">
+          ❌ ERROR<br><br>
+          ${error.message}<br><br>
+          <small>Verifica:<br>
+          1. ¿Ya iniciaste sesión?<br>
+          2. ¿Tienes asignaciones configuradas?<br>
+          3. ¿Hay alumnos en esos grados/secciones?
+        </small>
+        </div>
+      `;
+      btnIniciar.disabled = false;
+      btnIniciar.textContent = '🔄 INTENTAR DE NUEVO';
+    }
+  }
+
+  function irAlSistema() {
+    // Redirigir a CalificativosScreen
+    window.location.href = window.location.pathname + '#/calificativos';
+  }
+</script>
+
+</body>
+</html>

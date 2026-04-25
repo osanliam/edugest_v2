@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { loadSystemData } from './services/dataService';
+import { setToken } from './utils/apiClient';
 import LoginScreen from './screens/LoginScreen';
 import AdminPanelScreen from './screens/AdminPanelScreen';
 import AdminPanelScreenModern from './screens/AdminPanelScreenModern';
@@ -53,6 +54,7 @@ interface User {
   email: string;
   role: UserRole;
   schoolId: string;
+  docenteId?: string;
 }
 
 type ScreenType = 'login' | 'panel-admin' | 'inicio' | 'inicio-modern' | 'aula-virtual' | 'mensajes' | 'informes' |
@@ -69,17 +71,20 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    // Cargar datos del sistema al iniciar (sin esperar a Turso)
-    const storedUser = localStorage.getItem('user');
+    // Restaurar sesión desde sessionStorage (no localStorage)
+    const storedUser = sessionStorage.getItem('user');
+    const storedToken = sessionStorage.getItem('auth_token');
     const storedDarkMode = localStorage.getItem('darkMode');
 
-    if (storedUser) {
+    if (storedUser && storedToken) {
       try {
         const userData = JSON.parse(storedUser);
+        setToken(storedToken);
         setUser(userData);
         setCurrentScreen('inicio');
       } catch (e) {
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('auth_token');
       }
     }
 
@@ -88,9 +93,6 @@ export default function App() {
     }
 
     setIsLoading(false);
-
-    // Sincronizar con Turso en background (no bloquea UI)
-    loadSystemData();
   }, []);
 
   useEffect(() => {
@@ -106,13 +108,14 @@ export default function App() {
   const handleLogin = (userData: User) => {
     setUser(userData);
     setCurrentScreen('inicio');
-    localStorage.setItem('user', JSON.stringify(userData));
+    sessionStorage.setItem('user', JSON.stringify(userData));
   };
 
   const handleLogout = () => {
     setUser(null);
     setCurrentScreen('login');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('auth_token');
   };
 
   const canAccessScreen = (screen: ScreenType): boolean => {
@@ -137,7 +140,8 @@ export default function App() {
       ],
       teacher: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
-        'calificativos', 'horario', 'asistencia', 'normas-convivencia', 'grupos'
+        'calificativos', 'horario', 'asistencia', 'normas-convivencia', 'grupos',
+        'estudiantes', 'gestion-alumnos'
       ],
       student: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
@@ -192,7 +196,7 @@ export default function App() {
           {currentScreen === 'calificaciones'      && <CalificativosScreen user={user} />}
           {currentScreen === 'gestionar-usuarios'  && <AdminUsersScreen user={user} />}
           {currentScreen === 'gestion-docentes'    && <DocentesScreen />}
-          {currentScreen === 'gestion-alumnos'     && <AlumnosScreen />}
+          {currentScreen === 'gestion-alumnos'     && <AlumnosScreen user={user} />}
           {currentScreen === 'calificativos'       && <CalificativosScreen user={user} />}
           {currentScreen === 'configuracion'       && <ConfiguracionScreen />}
           {currentScreen === 'horario'             && <ScheduleScreenModern_v2 user={user} />}

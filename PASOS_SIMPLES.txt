@@ -1,0 +1,152 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    CARGAR MIS NOTAS - 3 PASOS SIMPLES                          ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+TU PREGUNTA:
+  "Si mis notas del nuevo sistema no están, revisa y soluciona"
+
+RESPUESTA:
+  ✅ Tus notas están convertidas y listas
+  ✅ Creé herramientas automáticas
+  ✅ Solo necesitas hacer 3 pasos
+
+───────────────────────────────────────────────────────────────────────────────
+
+PASO 1️⃣: ABRE EL CARGADOR
+
+  Opción A (MÁS FÁCIL):
+  • Haz doble clic en:
+    /Sistemita_Nuevo/cargar_notas_automatico.html
+
+  Opción B (En el navegador):
+  • Abre en navegador:
+    http://localhost:5173/cargar_notas_automatico.html?auto=true
+
+  Verás una pantalla verde/negra con un botón "Cargar Notas"
+
+───────────────────────────────────────────────────────────────────────────────
+
+PASO 2️⃣: CLICK EN "CARGAR NOTAS"
+
+  Verás:
+  ✓ Descargando datos...
+  ✓ Procesando notas...
+  ✓ Guardando...
+
+  Una barra de progreso llegará del 0% al 100%
+
+  Espera unos 10-15 segundos
+
+  Deberías ver al final:
+  ✓ 1040 Total en Sistema
+  ✓ X Nuevas
+  ✓ Y Actualizadas
+
+───────────────────────────────────────────────────────────────────────────────
+
+PASO 3️⃣: RECARGA LA PÁGINA
+
+  Click el botón "🔄 Recargar Sistema"
+
+  O presiona: Ctrl+R (Windows) / Cmd+R (Mac)
+
+  Luego:
+  • Ve al módulo "Calificativos"
+  • Deberías ver todas tus notas cargadas ✅
+
+───────────────────────────────────────────────────────────────────────────────
+
+¿QUÉ SON TUS NOTAS?
+
+  • 1040+ calificativos convertidos del sistema antiguo
+  • Formato: JSON con estructura:
+    {
+      alumnoId: "...",
+      columnaId: "...",
+      calificativo: "A/B/C/AD",
+      fecha: "2026-04-24T...",
+      ...
+    }
+  • Ubicación: notas_convertidas_remapeadas.json
+  • Estado: Listas para cargar
+
+───────────────────────────────────────────────────────────────────────────────
+
+¿DÓNDE SE GUARDAN?
+
+  En tu navegador, en localStorage:
+  • Key: "ie_calificativos_v2"
+  • Contenido: Tu JSON con todas las notas
+  • Persistencia: Siempre disponibles (no se pierden)
+
+───────────────────────────────────────────────────────────────────────────────
+
+VERIFICACIÓN RÁPIDA
+
+  Si ves en Calificativos:
+  ✅ Tabla con alumnos
+  ✅ Columnas con instrumentos
+  ✅ Calificativos (A/B/C/AD)
+
+  = TUS NOTAS ESTÁN CARGADAS CORRECTAMENTE 🎉
+
+───────────────────────────────────────────────────────────────────────────────
+
+SI ALGO FALLA
+
+  ❌ "No encuentra el archivo"
+  → Asegúrate que notas_convertidas_remapeadas.json está en la carpeta raíz
+
+  ❌ "Error de conexión"
+  → Recarga la página (F5) e intenta nuevamente
+
+  ❌ "No cambia nada"
+  → Abre Consola (F12) y busca errores rojos
+  → Copia el error y comparte conmigo
+
+───────────────────────────────────────────────────────────────────────────────
+
+ALTERNATIVA: CARGAR DESDE CONSOLA (F12)
+
+  Si el cargador no funciona, abre Consola y ejecuta:
+
+  fetch('/notas_convertidas_remapeadas.json')
+    .then(r => r.json())
+    .then(notas => {
+      const existentes = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
+      let nuevas = 0, act = 0;
+      notas.forEach(nota => {
+        const idx = existentes.findIndex(c =>
+          c.alumnoId === nota.alumnoId &&
+          c.columnaId === nota.columnaId
+        );
+        if (idx >= 0) { existentes[idx] = nota; act++; }
+        else { existentes.push(nota); nuevas++; }
+      });
+      localStorage.setItem('ie_calificativos_v2', JSON.stringify(existentes));
+      console.log(`✓ Cargadas: ${nuevas}, Actualizadas: ${act}, Total: ${existentes.length}`);
+    })
+    .catch(e => console.error('Error:', e));
+
+  Luego recarga (F5)
+
+───────────────────────────────────────────────────────────────────────────────
+
+ARCHIVOS CREADOS/UTILIZADOS
+
+  cargar_notas_automatico.html    ← Herramienta principal (USAR ESTA)
+  CARGAR_NOTAS_AL_SISTEMA.html   ← Alternativa interactiva
+  CARGAR_MIS_NOTAS_AHORA.md      ← Instrucciones detalladas
+  notas_convertidas_remapeadas.json ← TUS DATOS
+
+───────────────────────────────────────────────────────────────────────────────
+
+LISTO. SOLO 3 PASOS. HAZLO AHORA:
+
+  1. Abre: /Sistemita_Nuevo/cargar_notas_automatico.html
+  2. Click: "Cargar Notas" (espera 10-15 seg)
+  3. Click: "Recargar Sistema" (o F5)
+
+  ✅ LISTO. Tus notas están en el sistema.
+
+═══════════════════════════════════════════════════════════════════════════════

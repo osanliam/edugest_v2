@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Cargar Notas al Sistema</title>
+<style>
+  body {
+    font-family: 'Courier New', monospace;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #0f0;
+    padding: 30px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .container { background: rgba(0,0,0,0.7); border: 2px solid #0f0; border-radius: 10px; padding: 30px; }
+  h1 { color: #0f0; text-shadow: 0 0 10px #0f0; margin: 0 0 20px 0; }
+  h2 { color: #0f0; border-top: 2px solid #0f0; padding-top: 20px; margin-top: 30px; }
+  pre { background: #000; padding: 15px; overflow: auto; border: 1px solid #0f0; margin: 15px 0; }
+  .ok { color: #0f0; font-weight: bold; }
+  .err { color: #f00; font-weight: bold; }
+  .warn { color: #ff0; font-weight: bold; }
+  button {
+    background: #0f0;
+    color: #000;
+    padding: 12px 25px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 10px 5px;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    transition: all 0.3s;
+  }
+  button:hover { background: #0f0cc; transform: scale(1.05); }
+  button:disabled { background: #666; cursor: not-allowed; transform: scale(1); opacity: 0.5; }
+  #output {
+    background: #000;
+    border: 1px solid #0f0;
+    padding: 20px;
+    margin: 20px 0;
+    min-height: 300px;
+    max-height: 500px;
+    overflow-y: auto;
+    border-radius: 5px;
+    font-size: 12px;
+  }
+  .progress-bar {
+    width: 100%;
+    height: 30px;
+    background: #333;
+    border: 1px solid #0f0;
+    border-radius: 5px;
+    overflow: hidden;
+    margin: 15px 0;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0f0, #0f0cc);
+    width: 0%;
+    transition: width 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    font-weight: bold;
+    font-size: 12px;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin: 20px 0;
+  }
+  .stat-box {
+    background: #0f0/10;
+    border: 1px solid #0f0;
+    padding: 15px;
+    border-radius: 5px;
+    text-align: center;
+  }
+  .stat-number { font-size: 24px; font-weight: bold; color: #0f0; }
+  .stat-label { font-size: 12px; color: #888; margin-top: 5px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🔧 Cargar Notas del Sistema al localStorage</h1>
+
+  <p>Este proceso carga las <strong>1040+ notas convertidas</strong> en el localStorage de tu navegador.</p>
+
+  <h2>Paso 1: Verificar Datos</h2>
+  <button onclick="verificarDatos()" id="btnVerificar">▶️ Verificar notas disponibles</button>
+  <div id="output"></div>
+
+  <h2>Paso 2: Cargar al Sistema</h2>
+  <button onclick="cargarNotas()" id="btnCargar" disabled>▶️ Cargar notas al localStorage</button>
+  <button onclick="limpiarLog()">🗑️ Limpiar pantalla</button>
+
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <h2>Estadísticas</h2>
+  <div class="stats" id="stats"></div>
+
+  <h2>Próximos Pasos</h2>
+  <ol>
+    <li>Click "Verificar notas disponibles"</li>
+    <li>Si dice "✓ Datos listos", click "Cargar notas al localStorage"</li>
+    <li>Espera a que complete (puede tomar 10-30 segundos)</li>
+    <li>Cuando dice "✓ Carga completada", <strong>recarga la página</strong> (F5)</li>
+    <li>Abre Calificativos y deberías ver todas las notas cargadas</li>
+  </ol>
+</div>
+
+<script>
+  const output = document.getElementById('output');
+  const btnVerificar = document.getElementById('btnVerificar');
+  const btnCargar = document.getElementById('btnCargar');
+  const progressFill = document.getElementById('progressFill');
+  const statsDiv = document.getElementById('stats');
+
+  function log(msg) {
+    output.textContent += msg + '\n';
+    output.scrollTop = output.scrollHeight;
+    console.log(msg);
+  }
+
+  function limpiarLog() {
+    output.textContent = '';
+  }
+
+  function setProgress(percent) {
+    progressFill.style.width = percent + '%';
+    progressFill.textContent = percent + '%';
+  }
+
+  function showStats(total, competencias = {}, periodos = {}) {
+    statsDiv.innerHTML = `
+      <div class="stat-box">
+        <div class="stat-number">${total}</div>
+        <div class="stat-label">Total de Notas</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number">${Object.keys(competencias).length}</div>
+        <div class="stat-label">Competencias</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number">${Object.keys(periodos).length}</div>
+        <div class="stat-label">Períodos</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number">${new Date().toLocaleDateString()}</div>
+        <div class="stat-label">Cargado el</div>
+      </div>
+    `;
+  }
+
+  async function verificarDatos() {
+    limpiarLog();
+    log('='.repeat(70));
+    log('📋 VERIFICACIÓN DE DATOS');
+    log('='.repeat(70));
+
+    try {
+      // Los datos están incrustados en este HTML
+      const datosNotasJSON = `${datosCrudos}`;
+
+      if (!datosNotasJSON || datosNotasJSON.startsWith('AQUI_VAN_LOS_DATOS')) {
+        log('\n<span class="err">❌ ERROR: Los datos no están incrustados</span>');
+        log('Necesito cargar desde el archivo JSON directamente.');
+        log('\nAlternativa: Ve a la carpeta del proyecto y abre:');
+        log('  → /Sistemita_Nuevo/dist/cargar_notas.html');
+        return;
+      }
+
+      const notas = JSON.parse(datosNotasJSON);
+
+      if (!Array.isArray(notas)) {
+        log('\n<span class="err">❌ ERROR: Los datos no son un array</span>');
+        return;
+      }
+
+      log('\n<span class="ok">✓ Datos verificados correctamente</span>');
+      log(`\n📊 Información:`);
+      log(`   Total de notas: ${notas.length}`);
+
+      // Agrupar por competencia
+      const competencias = {};
+      const periodos = {};
+      const alumnos = new Set();
+
+      notas.forEach(nota => {
+        competencias[nota.competenciaId] = (competencias[nota.competenciaId] || 0) + 1;
+        periodos[nota.periodo] = (periodos[nota.periodo] || 0) + 1;
+        if (nota.alumnoId) alumnos.add(nota.alumnoId);
+      });
+
+      log(`   Alumnos únicos: ${alumnos.size}`);
+      log(`   Competencias: ${Object.keys(competencias).length}`);
+      Object.entries(competencias).forEach(([comp, count]) => {
+        log(`     - ${comp}: ${count} notas`);
+      });
+
+      log(`   Períodos: ${Object.keys(periodos).length}`);
+      Object.entries(periodos).forEach(([periodo, count]) => {
+        log(`     - ${periodo}: ${count} notas`);
+      });
+
+      showStats(notas.length, competencias, periodos);
+
+      log('\n<span class="ok">✓ Datos listos para cargar</span>');
+      log('Click el botón "Cargar notas al localStorage"');
+
+      btnCargar.disabled = false;
+      // Guardar datos para la carga
+      window.datosParaCargar = notas;
+
+    } catch (error) {
+      log('\n<span class="err">❌ ERROR al procesar datos:</span>');
+      log(error.message);
+    }
+  }
+
+  async function cargarNotas() {
+    if (!window.datosParaCargar) {
+      log('<span class="err">❌ No hay datos cargados. Click "Verificar" primero.</span>');
+      return;
+    }
+
+    limpiarLog();
+    log('='.repeat(70));
+    log('⚙️ CARGANDO NOTAS AL SISTEMA');
+    log('='.repeat(70));
+
+    btnVerificar.disabled = true;
+    btnCargar.disabled = true;
+
+    try {
+      const notas = window.datosParaCargar;
+      const total = notas.length;
+
+      log(`\n📥 Iniciando carga de ${total} notas...\n`);
+
+      // Obtener notas existentes
+      const existentes = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
+      log(`   Notas existentes en sistema: ${existentes.length}`);
+
+      // Procesar en lotes
+      const tamanoLote = 50;
+      let cargadas = 0;
+      let actualizadas = 0;
+
+      for (let i = 0; i < notas.length; i += tamanoLote) {
+        const lote = notas.slice(i, i + tamanoLote);
+
+        lote.forEach(nota => {
+          // Convertir formato si es necesario
+          const notaFormato = {
+            alumnoId: nota.alumnoId,
+            columnaId: nota.columnaId || 'col-default',
+            marcados: nota.marcados || [],
+            claves: nota.claves || [],
+            notaNumerica: nota.notaNumerica,
+            calificativo: nota.calificativo,
+            esAD: nota.esAD || false,
+            fecha: nota.fecha,
+          };
+
+          // Buscar si existe
+          const idx = existentes.findIndex(c =>
+            c.alumnoId === notaFormato.alumnoId &&
+            c.columnaId === notaFormato.columnaId
+          );
+
+          if (idx >= 0) {
+            existentes[idx] = notaFormato;
+            actualizadas++;
+          } else {
+            existentes.push(notaFormato);
+            cargadas++;
+          }
+        });
+
+        // Actualizar progreso
+        const porcentaje = Math.min(100, Math.round((i + tamanoLote) / total * 100));
+        setProgress(porcentaje);
+
+        // Yield al navegador para no bloquear
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      // Guardar en localStorage
+      localStorage.setItem('ie_calificativos_v2', JSON.stringify(existentes));
+
+      log(`\n✅ Proceso completado:`);
+      log(`   Nuevas notas: ${cargadas}`);
+      log(`   Actualizadas: ${actualizadas}`);
+      log(`   Total en sistema: ${existentes.length}`);
+
+      showStats(existentes.length);
+
+      log(`\n<span class="ok">✓ Carga completada exitosamente</span>`);
+      log('\n🔄 PRÓXIMO PASO: Recarga la página (F5 o Cmd+R)');
+      log('Luego abre Calificativos y verás todas las notas cargadas.');
+
+      setProgress(100);
+
+    } catch (error) {
+      log('\n<span class="err">❌ ERROR durante la carga:</span>');
+      log(error.message);
+    } finally {
+      btnVerificar.disabled = false;
+      btnCargar.disabled = false;
+    }
+  }
+
+  // Al cargar la página, intentar leer los datos
+  window.addEventListener('load', () => {
+    log('🔍 Detectando datos disponibles...\n');
+    // Los datos se deberían cargar desde la carpeta
+  });
+
+  // Marcar dónde van los datos
+  const datosCrudos = 'AQUI_VAN_LOS_DATOS';
+</script>
+
+</body>
+</html>

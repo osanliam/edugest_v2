@@ -58,7 +58,7 @@ export default async function handler(req, res) {
         return res.status(201).json({
           message: 'Usuario creado',
           id,
-          usuario: { id, nombre, email, rol },
+          usuario: { id, nombre, email, rol, docenteId: docenteId || null },
         });
       } catch (error) {
         if (error.message?.includes('UNIQUE')) {

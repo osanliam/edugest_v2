@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>⚡ Cargar Notas AHORA</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: linear-gradient(135deg, #0f0, #0a0);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .box {
+    background: #000;
+    border: 3px solid #0f0;
+    border-radius: 10px;
+    padding: 50px;
+    max-width: 500px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+    color: #0f0;
+  }
+  h1 {
+    font-size: 32px;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px #0f0;
+  }
+  .status {
+    font-size: 18px;
+    margin: 30px 0;
+    min-height: 60px;
+  }
+  .loader {
+    border: 4px solid #333;
+    border-top: 4px solid #0f0;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .done {
+    color: #0f0;
+    font-size: 20px;
+    font-weight: bold;
+  }
+  .progress {
+    width: 100%;
+    height: 20px;
+    background: #333;
+    border: 1px solid #0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 20px 0;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #0f0, #0f0cc);
+    width: 0%;
+    transition: width 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #000;
+    font-weight: bold;
+  }
+  button {
+    background: #0f0;
+    color: #000;
+    border: none;
+    padding: 15px 40px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.3s;
+    font-family: 'Courier New', monospace;
+  }
+  button:hover { background: #0f0cc; transform: scale(1.05); }
+  button:disabled { background: #666; cursor: not-allowed; }
+  .error { color: #f00; }
+</style>
+</head>
+<body>
+
+<div class="box">
+  <h1>📥 Cargar Notas</h1>
+
+  <div class="status" id="status">
+    ¿Cuáles notas cargar?
+  </div>
+
+  <button id="btnMías" onclick="cargarNotas('mías')" style="background: #0f0; margin: 10px;">
+    📝 MIS NOTAS ORIGINALES
+  </button>
+
+  <button id="btnTodas" onclick="cargarNotas('todas')" style="background: #0fa; margin: 10px;">
+    📚 TODAS LAS 1040 NOTAS
+  </button>
+
+  <div class="progress" id="progressContainer" style="display:none">
+    <div class="progress-bar" id="progressBar">0%</div>
+  </div>
+
+  <div id="loader"></div>
+
+  <button id="btnIr" onclick="irAlSistema()" style="display:none; background: #0fa;">➡️ IR AL SISTEMA</button>
+</div>
+
+<script>
+  async function cargarNotas(tipo) {
+    const status = document.getElementById('status');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const btnMías = document.getElementById('btnMías');
+    const btnTodas = document.getElementById('btnTodas');
+    const loader = document.getElementById('loader');
+    const btnIr = document.getElementById('btnIr');
+
+    btnMías.disabled = true;
+    btnTodas.disabled = true;
+    loader.innerHTML = '<div class="loader"></div>';
+    progressContainer.style.display = 'block';
+
+    try {
+      status.textContent = tipo === 'mías' ? '📝 Cargando TUS notas...' : '📚 Cargando TODAS las notas...';
+      progressBar.style.width = '10%';
+      progressBar.textContent = '10%';
+
+      // Cargar JSON
+      const response = await fetch('/notas_convertidas_remapeadas.json');
+      if (!response.ok) throw new Error('No se encontró el archivo de notas');
+
+      status.textContent = '⚙️ Procesando...';
+      progressBar.style.width = '30%';
+      progressBar.textContent = '30%';
+
+      const notasRaw = await response.json();
+      console.log(`Notas totales: ${notasRaw.length}`);
+
+      // Filtrar solo las primeras notas del backup original si seleccionó "mías"
+      let notasAcargar = notasRaw;
+      if (tipo === 'mías') {
+        // Las primeras ~747 notas son del backup original (solo C1)
+        notasAcargar = notasRaw.slice(0, 747);
+        status.textContent = `📝 Seleccionadas ${notasAcargar.length} notas originales...`;
+      }
+
+      // Convertir formato
+      const notas = notasAcargar.map(nota => ({
+        alumnoId: nota.alumnoId,
+        columnaId: nota.columnaId || `col-${nota.instrumento}`,
+        marcados: nota.marcados || [],
+        claves: nota.claves || [],
+        notaNumerica: nota.notaNumerica,
+        calificativo: nota.calificativo || 'C',
+        esAD: nota.esAD || false,
+        fecha: nota.fecha || new Date().toISOString().split('T')[0],
+      }));
+
+      progressBar.style.width = '60%';
+      progressBar.textContent = '60%';
+
+      // Obtener existentes
+      const existentes = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
+      let nuevas = 0, actualizadas = 0;
+
+      status.textContent = '💾 Guardando...';
+
+      // Merge
+      notas.forEach((nota, idx) => {
+        const findIdx = existentes.findIndex(c =>
+          c.alumnoId === nota.alumnoId &&
+          c.columnaId === nota.columnaId
+        );
+
+        if (findIdx >= 0) {
+          existentes[findIdx] = nota;
+          actualizadas++;
+        } else {
+          existentes.push(nota);
+          nuevas++;
+        }
+
+        // Progreso
+        const pct = 60 + Math.min(35, Math.round((idx / notas.length) * 35));
+        progressBar.style.width = pct + '%';
+        progressBar.textContent = pct + '%';
+      });
+
+      // Guardar
+      localStorage.setItem('ie_calificativos_v2', JSON.stringify(existentes));
+
+      progressBar.style.width = '100%';
+      progressBar.textContent = '100%';
+
+      loader.innerHTML = '';
+      status.innerHTML = `
+        <div class="done">
+          ✅ ¡CARGA COMPLETADA!<br><br>
+          ➕ ${nuevas} nuevas<br>
+          🔄 ${actualizadas} actualizadas<br>
+          📊 Total: ${existentes.length} notas
+        </div>
+      `;
+
+      btnMías.style.display = 'none';
+      btnTodas.style.display = 'none';
+      btnIr.style.display = 'block';
+
+    } catch (error) {
+      loader.innerHTML = '';
+      progressContainer.style.display = 'none';
+      status.innerHTML = `
+        <div class="error">
+          ❌ ERROR<br><br>
+          ${error.message}<br><br>
+          <small>Intenta:<br>1. Recarga la página<br>2. Abre DevTools (F12)<br>3. Ve a Console<br>4. Copia el error
+        </div>
+      `;
+      btnMías.disabled = false;
+      btnTodas.disabled = false;
+    }
+  }
+
+  function irAlSistema() {
+    // Redirigir al módulo de calificativos
+    window.location.href = window.location.pathname + '#/calificativos';
+  }
+
+  // Auto-cargar si está en parámetro
+  window.addEventListener('load', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('auto') === '1') {
+      setTimeout(() => {
+        document.getElementById('btnCargar').click();
+      }, 500);
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search } from 'lucide-react';
-import { syncToTurso } from '../services/dataService';
+import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search, RefreshCw } from 'lucide-react';
+import { cargarTodo, guardarCalificativos, guardarColumnas, getAsignaciones } from '../utils/apiClient';
 
 // ── Competencias ──────────────────────────────────────────────────────────────
 const COMPETENCIAS = [
@@ -75,15 +75,7 @@ interface Calificativo {
   fecha: string;
 }
 
-// ── localStorage ──────────────────────────────────────────────────────────────
-const LS_ALUMNOS  = 'ie_alumnos';
-const LS_COLUMNAS = 'cal_columnas';
-const LS_CALS     = 'ie_calificativos_v2';
-
-function lsGet(key: string, def: any = []) {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch { return def; }
-}
-function lsSet(key: string, val: any) { localStorage.setItem(key, JSON.stringify(val)); }
+// ── Sin localStorage — todo va directo a Turso ────────────────────────────────
 
 // ── Promedio por competencia ──────────────────────────────────────────────────
 const CAL_VALOR: Record<string, number> = { C: 1, B: 2, A: 3, AD: 4 };
@@ -653,8 +645,8 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // Modal NUEVA / EDITAR columna
 // ─────────────────────────────────────────────────────────────────────────────
-function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail }: {
-  columnaEditar?: Columna; onGuardar: (c: Columna) => void; onCerrar: () => void; userEmail?: string;
+function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres: bimestresProps }: {
+  columnaEditar?: Columna; onGuardar: (c: Columna) => void; onCerrar: () => void; userEmail?: string; bimestres?: any[];
 }) {
   const [nombre,    setNombre]    = useState(columnaEditar?.nombre ?? '');
   const [tipo,      setTipo]      = useState<TipoInstrumento>(columnaEditar?.tipo ?? 'lista-cotejo');
@@ -674,7 +666,7 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail }: {
     if (tipo === 'registro-anecdotico') return 'Positivo,Negativo';
     return 'Siempre,Casi siempre,A veces,Rara vez,Nunca';
   });
-  const unidades = lsGet<any[]>('cfg_unidades', []);
+  const unidades = bimestresProps || [];
 
   const ajustarTotal = (n: number) => {
     setTotal(n);
@@ -873,36 +865,66 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const [modalColumna,  setModalColumna]  = useState<{ columna?: Columna } | null>(null);
   const [showGestion,   setShowGestion]   = useState(false);
   const [compExpand,    setCompExpand]    = useState<Record<string, boolean>>({ comp1: true, comp2: true, comp3: true });
+  const [syncing,       setSyncing]       = useState(false);
+  const [syncMsg,       setSyncMsg]       = useState<{tipo:'ok'|'err';texto:string}|null>(null);
+  const [asignacionDocente, setAsignacionDocente] = useState<{grados:string[]; secciones:string[]} | null>(null);
+
+  const cargar = async () => {
+    setSyncing(true);
+    try {
+      const todo = await cargarTodo();
+      setAlumnos(todo.alumnos || []);
+      setColumnas(todo.columnas || []);
+      setCalificativos((todo.calificaciones || []).map((c: any) => ({
+        alumnoId: c.alumnoId || c.alumno_id,
+        columnaId: c.columnaId || c.columna_id,
+        marcados: typeof c.marcados === 'string' ? JSON.parse(c.marcados || '[]') : (c.marcados || []),
+        claves: typeof c.claves === 'string' ? JSON.parse(c.claves || '[]') : (c.claves || []),
+        notaNumerica: c.notaNumerica ?? c.nota_numerica,
+        calificativo: c.calificativo,
+        esAD: c.esAD || c.es_ad || false,
+        fecha: c.fecha,
+      })));
+      setBimestres((todo.unidades || []).filter((u: any) => u.activa !== false));
+    } catch (err: any) {
+      setSyncMsg({ tipo: 'err', texto: `❌ Error al cargar: ${err.message}` });
+      setTimeout(() => setSyncMsg(null), 4000);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Cargar asignación del docente desde Turso
+  const cargarAsignacion = async () => {
+    if (!user?.role || user.role !== 'teacher') return;
+    try {
+      const asigs = await getAsignaciones();
+      const docenteId = (user as any).docenteId;
+      if (!docenteId) return;
+      const mias = asigs.filter((a: any) => a.docenteId === docenteId);
+      if (mias.length === 0) return;
+      const grados   = [...new Set(mias.flatMap((a: any) => a.grados))] as string[];
+      const secciones = [...new Set(mias.flatMap((a: any) => a.secciones))] as string[];
+      setAsignacionDocente({ grados, secciones });
+    } catch (_) {}
+  };
 
   useEffect(() => {
-    setAlumnos(lsGet(LS_ALUMNOS));
-    setColumnas(lsGet(LS_COLUMNAS));
-    setCalificativos(lsGet(LS_CALS));
-    setBimestres(lsGet('cfg_unidades', []).filter((u: any) => u.activa !== false));
+    cargar();
+    cargarAsignacion();
   }, []);
 
-  const recargar = () => setCalificativos(lsGet(LS_CALS));
+  // ── Funciones de sincronización manual (recarga desde Turso) ─────────────────
+  const handleRecargar = async () => {
+    setSyncMsg(null);
+    await cargar();
+    await cargarAsignacion();
+    setSyncMsg({ tipo: 'ok', texto: '✅ Datos recargados desde el servidor' });
+    setTimeout(() => setSyncMsg(null), 3000);
+  };
 
   // ── Filtro por asignación del docente ────────────────────────────────────
-  // Si es teacher, buscar su asignación en cfg_asignaciones usando docenteId
-  // El docenteId lo buscamos por email del usuario logueado en ie_docentes
   const esDocente = user?.role === 'teacher';
-  const asignacionDocente = React.useMemo(() => {
-    if (!esDocente || !user?.email) return null;
-    const docentes: any[] = lsGet('ie_docentes', []);
-    const usuarios: any[] = lsGet('sistema_usuarios', []);
-    // Buscar el usuario por email para obtener docenteId
-    const usrObj = usuarios.find((u: any) => u.email === user.email);
-    const docenteId = usrObj?.docenteId || docentes.find((d: any) => d.email === user.email)?.id;
-    if (!docenteId) return null;
-    const asignaciones: any[] = lsGet('cfg_asignaciones', []);
-    // Puede haber múltiples asignaciones para el mismo docente — unir grados y secciones
-    const mias = asignaciones.filter((a: any) => a.docenteId === docenteId);
-    if (mias.length === 0) return null;
-    const grados   = [...new Set(mias.flatMap((a: any) => a.grados))] as string[];
-    const secciones = [...new Set(mias.flatMap((a: any) => a.secciones))] as string[];
-    return { grados, secciones };
-  }, [esDocente, user?.email]);
 
   // Base de alumnos: si docente, solo los de sus grados+secciones
   const alumnosBase = React.useMemo(() => {
@@ -933,36 +955,47 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const getCal = (alumnoId: string, columnaId: string) =>
     calificativos.find(c => c.alumnoId === alumnoId && c.columnaId === columnaId);
 
-  const handleGuardarCal = (cal: Calificativo) => {
-    const todos = lsGet(LS_CALS) as Calificativo[];
+  const handleGuardarCal = async (cal: Calificativo) => {
+    const todos = [...calificativos];
     const idx = todos.findIndex(c => c.alumnoId === cal.alumnoId && c.columnaId === cal.columnaId);
     if (idx >= 0) todos[idx] = cal; else todos.push(cal);
-    lsSet(LS_CALS, todos);
-    syncToTurso('calificativos', todos);
-    recargar();
+    setCalificativos(todos);
     setPopup(null);
+    try {
+      await guardarCalificativos(todos);
+    } catch (err: any) {
+      setSyncMsg({ tipo: 'err', texto: `❌ Error al guardar: ${err.message}` });
+      setTimeout(() => setSyncMsg(null), 4000);
+    }
   };
 
-  const handleGuardarColumna = (col: Columna) => {
-    const todas = lsGet(LS_COLUMNAS) as Columna[];
+  const handleGuardarColumna = async (col: Columna) => {
+    const todas = [...columnas];
     const idx = todas.findIndex(c => c.id === col.id);
     if (idx >= 0) todas[idx] = col; else todas.push(col);
-    lsSet(LS_COLUMNAS, todas);
-    syncToTurso('columnas', todas);
     setColumnas(todas);
     setModalColumna(null);
+    try {
+      await guardarColumnas(todas);
+    } catch (err: any) {
+      setSyncMsg({ tipo: 'err', texto: `❌ Error al guardar columna: ${err.message}` });
+      setTimeout(() => setSyncMsg(null), 4000);
+    }
   };
 
-  const eliminarColumna = (id: string) => {
+  const eliminarColumna = async (id: string) => {
     if (!confirm('¿Eliminar esta columna y todos sus calificativos?')) return;
     const todas = columnas.filter(c => c.id !== id);
-    lsSet(LS_COLUMNAS, todas);
-    syncToTurso('columnas', todas);
+    const cals  = calificativos.filter(c => c.columnaId !== id);
     setColumnas(todas);
-    const cals = calificativos.filter(c => c.columnaId !== id);
-    lsSet(LS_CALS, cals);
-    syncToTurso('calificativos', cals);
     setCalificativos(cals);
+    try {
+      await guardarColumnas(todas);
+      await guardarCalificativos(cals);
+    } catch (err: any) {
+      setSyncMsg({ tipo: 'err', texto: `❌ Error al eliminar: ${err.message}` });
+      setTimeout(() => setSyncMsg(null), 4000);
+    }
   };
 
   const nombre = (a: Alumno) => a.apellidos_nombres || a.nombre || '—';
@@ -992,7 +1025,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
               : <PopupInstrumento alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
       )}
       {modalColumna !== null && (
-        <ModalColumna columnaEditar={modalColumna.columna} onGuardar={handleGuardarColumna} onCerrar={() => setModalColumna(null)} userEmail={user?.email} />
+        <ModalColumna columnaEditar={modalColumna.columna} onGuardar={handleGuardarColumna} onCerrar={() => setModalColumna(null)} userEmail={user?.email} bimestres={bimestres} />
       )}
 
       {/* Header */}
@@ -1016,8 +1049,20 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
               className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg text-xs font-bold hover:opacity-90">
               <Plus size={13}/> Nueva columna
             </button>
+            <button onClick={handleRecargar} disabled={syncing}
+              className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg text-xs font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+              <RefreshCw size={13} className={syncing ? 'animate-spin' : ''}/> {syncing ? 'Cargando...' : 'Recargar'}
+            </button>
           </div>
         </div>
+
+        {/* Mensaje de sincronización */}
+        {syncMsg && (
+          <div className={`px-4 py-2 mx-4 rounded-lg ${syncMsg.tipo === 'ok' ? 'bg-green-500/20 border border-green-500/40' : 'bg-red-500/20 border border-red-500/40'}`}>
+            <p className={syncMsg.tipo === 'ok' ? 'text-green-300 text-xs font-bold' : 'text-red-300 text-xs font-bold'}>{syncMsg.texto}</p>
+          </div>
+        )}
+
         {columnas.length > 0 && !filtroUnidad && (
           <div className="px-4 py-2 bg-amber-500/20 border border-amber-500/40 mx-4 rounded-lg">
             <p className="text-amber-300 text-xs font-bold">⚠️ Selecciona una unidad para ver sus columnas independientes</p>
@@ -1125,18 +1170,20 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
           <div className="text-center py-20 text-slate-500">
             {alumnos.length === 0 ? 'No hay alumnos registrados. Ve al módulo Alumnos para agregarlos.' : 'Sin alumnos con ese filtro.'}
           </div>
-        ) : columnas.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-slate-400 text-lg font-bold mb-2">Sin columnas configuradas</p>
-            <p className="text-slate-500 text-sm mb-5">Agrega columnas de examen, lista de cotejo, ficha de observación o rúbrica</p>
-            <button onClick={() => setModalColumna({})}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl hover:opacity-90">
-              <Plus size={16}/> Nueva columna
-            </button>
-          </div>
         ) : (
+          <>
+            {columnas.length === 0 && (
+              <div className="px-4 py-3 mx-4 mt-4 bg-amber-500/20 border border-amber-500/40 rounded-lg text-center">
+                <p className="text-amber-300 text-sm font-bold mb-2">⚠️ Sin columnas configuradas</p>
+                <p className="text-amber-300 text-xs mb-3">Agrega columnas de examen, lista de cotejo, ficha de observación o rúbrica</p>
+                <button onClick={() => setModalColumna({})}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl hover:opacity-90 text-sm">
+                  <Plus size={16}/> Nueva columna
+                </button>
+              </div>
+            )}
 
-          /* ── TABLA PRINCIPAL ── */
+          {/* ── TABLA PRINCIPAL ── */}
           <div className="overflow-x-auto rounded-xl border border-slate-700/60">
             <table className="text-xs border-collapse" style={{ minWidth: '100%' }}>
               <thead>
@@ -1351,6 +1398,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
               </tfoot>
             </table>
           </div>
+            </>
         )}
       </div>
     </div>

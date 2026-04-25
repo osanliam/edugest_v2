@@ -2,47 +2,11 @@ import { useState } from 'react';
 import { motion } from "motion/react";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
 import { User as UserType } from '../types';
-import { mockLogin } from '../utils/mockAuth';
+import { login as apiLogin, setToken } from '../utils/apiClient';
 
-// En producción (Vercel) usa la API real; en local usa mock
+// Siempre usa la API real — directo a Turso
 async function loginRequest(email: string, password: string) {
-  // Primero verificar en localStorage (usuarios registrados)
-  try {
-    const storedUsers = localStorage.getItem('sistema_usuarios');
-    if (storedUsers) {
-      const users = JSON.parse(storedUsers);
-      const foundUser = users.find((u: any) => u.email === email && u.contraseña === password);
-      if (foundUser) {
-        return {
-          token: 'local-token-' + foundUser.id,
-          user: {
-            id: foundUser.id,
-            name: foundUser.nombre,
-            email: foundUser.email,
-            role: foundUser.rol,
-            school_id: '1'
-          }
-        };
-      }
-    }
-  } catch (e) {
-    console.error('Error checking localStorage users:', e);
-  }
-
-  if (import.meta.env.PROD) {
-    const res = await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Credenciales inválidas');
-    }
-    return res.json();
-  }
-  // Desarrollo local → mock
-  return mockLogin(email, password);
+  return apiLogin(email, password);
 }
 
 // Sin cuentas demo — todos usan sus credenciales reales registradas en el sistema
@@ -65,19 +29,21 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
     try {
       const data = await loginRequest(usuario, password);
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // El token ya se guarda en sessionStorage dentro de apiClient.login()
+      // Solo guardamos el user en sessionStorage para restaurar sesión al recargar
+      sessionStorage.setItem('user', JSON.stringify(data.user));
 
       const user: UserType = {
         id: data.user.id,
         name: data.user.name,
         email: data.user.email,
         role: data.user.role as any,
-        schoolId: data.user.school_id,
+        schoolId: data.user.school_id || '1',
+        docenteId: data.user.docenteId,
       };
       onLogin(user);
-    } catch (err) {
-      setError('Usuario o contraseña incorrectos');
+    } catch (err: any) {
+      setError(err.message || 'Usuario o contraseña incorrectos');
     } finally {
       setIsLoading(false);
     }
@@ -101,9 +67,14 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         {/* Login Card */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-red-600 to-red-700 dark:from-red-700 dark:to-red-800 px-8 py-8 text-center">
-            <h1 className="text-4xl font-bold text-white mb-2">🏫 EduGest</h1>
-            <p className="text-red-100">IE Manuel Fidencio Hidalgo Flores</p>
+          <div className="bg-gradient-to-r from-red-600 to-red-700 dark:from-red-700 dark:to-red-800 px-8 py-8">
+            <div className="flex items-center justify-center gap-4 mb-3">
+              <img src="/logo.png" alt="Logo" className="h-16 w-auto" />
+              <div>
+                <h1 className="text-4xl font-bold text-white leading-tight">EduGest</h1>
+              </div>
+            </div>
+            <p className="text-red-100 text-center">IE Manuel Fidencio Hidalgo Flores</p>
           </div>
 
           {/* Form */}
@@ -186,7 +157,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
         {/* Footer */}
         <p className="text-center mt-6 text-sm text-slate-600 dark:text-slate-400">
-          © 2024 EduGest - Sistema Integral de Educación
+          © 2026 EduGest - Sistema Integral de Educación
         </p>
       </motion.div>
     </div>

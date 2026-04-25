@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Test & Fix Adriana</title>
+<style>
+  body { font-family: monospace; background: #1a1a1a; color: #0f0; padding: 20px; }
+  pre { background: #000; padding: 15px; overflow: auto; border: 1px solid #0f0; margin: 10px 0; }
+  .ok { color: #0f0; font-weight: bold; }
+  .err { color: #f00; font-weight: bold; }
+  .warn { color: #ff0; font-weight: bold; }
+  button { background: #0f0; color: #000; padding: 10px 20px; font-weight: bold; cursor: pointer; margin: 10px 5px; border: none; border-radius: 5px; }
+  button:hover { background: #0f0cc; }
+  h2 { border-top: 2px solid #0f0; padding-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>🔧 Test & Fix: Adriana no ve alumnos</h1>
+
+<button onclick="testAdriana()">1️⃣ TEST: Verificar datos</button>
+<button onclick="fixAdriana()">2️⃣ FIX: Crear/actualizar asignación</button>
+<button onclick="clearOutput()">❌ Limpiar</button>
+
+<pre id="output"></pre>
+
+<script>
+  const output = document.getElementById('output');
+
+  function log(msg) {
+    output.textContent += msg + '\n';
+    console.log(msg);
+  }
+
+  function clearOutput() {
+    output.textContent = '';
+  }
+
+  function testAdriana() {
+    clearOutput();
+    log('='.repeat(60));
+    log('📋 TEST: Verificando datos de Adriana');
+    log('='.repeat(60) + '\n');
+
+    // Datos
+    const usuarios = JSON.parse(localStorage.getItem('sistema_usuarios') || '[]');
+    const docentes = JSON.parse(localStorage.getItem('ie_docentes') || '[]');
+    const asignaciones = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
+    const alumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+
+    // Buscar Adriana
+    const email = 'adriana97818@manuelfidencio.edu.pe';
+    const usuario = usuarios.find(u => u.email === email);
+    const docente = docentes.find(d => d.email === email);
+
+    log(`\n📌 USUARIO:`);
+    if (usuario) {
+      log(`  <span class="ok">✓ Encontrado</span>`);
+      log(`  Email: ${usuario.email}`);
+      log(`  DocenteId: ${usuario.docenteId || '(no definido)'}`);
+      log(`  Role: ${usuario.rol}`);
+    } else {
+      log(`  <span class="err">✗ NO ENCONTRADO</span>`);
+      return;
+    }
+
+    log(`\n📌 DOCENTE:`);
+    if (docente) {
+      log(`  <span class="ok">✓ Encontrado</span>`);
+      log(`  Email: ${docente.email}`);
+      log(`  Id: ${docente.id}`);
+      log(`  Nombre: ${docente.nombre || docente.apellidos_nombres}`);
+    } else {
+      log(`  <span class="warn">⚠ No encontrado en ie_docentes (no crítico)</span>`);
+    }
+
+    // DocenteId
+    const docenteId = usuario?.docenteId || docente?.id;
+    log(`\n🔑 DOCENTE ID USADO: "${docenteId}"`);
+
+    if (!docenteId) {
+      log(`  <span class="err">✗ PROBLEMA: No hay docenteId</span>`);
+      log(`  Solución: Editar usuario y agregar docenteId`);
+      return;
+    }
+
+    // Asignaciones
+    log(`\n📍 ASIGNACIONES:`);
+    const mias = asignaciones.filter(a => a.docenteId === docenteId);
+
+    if (mias.length === 0) {
+      log(`  <span class="err">✗ SIN ASIGNACIÓN</span>`);
+      log(`  Total asignaciones en sistema: ${asignaciones.length}`);
+      if (asignaciones.length > 0) {
+        log(`  DocenteIds existentes: ${[...new Set(asignaciones.map(a => a.docenteId))].join(', ')}`);
+      }
+      log(`\n  Solución: Ve a Configuración → Asignaciones y crea una nueva`);
+      log(`  - Docente: Adriana`);
+      log(`  - Grado: 5°`);
+      log(`  - Secciones: A, B (o las que correspondan)`);
+      return;
+    }
+
+    log(`  <span class="ok">✓ ${mias.length} asignación(es) encontrada(s)</span>`);
+    mias.forEach((a, i) => {
+      log(`\n  Asignación ${i+1}:`);
+      log(`    Grados: ${JSON.stringify(a.grados)}`);
+      log(`    Secciones: ${JSON.stringify(a.secciones)}`);
+    });
+
+    // Extraer grados y secciones
+    const gradosAsignados = [...new Set(mias.flatMap(a => a.grados))];
+    const seccionesAsignadas = [...new Set(mias.flatMap(a => a.secciones))];
+
+    log(`\n✅ Grados únicos: ${JSON.stringify(gradosAsignados)}`);
+    log(`✅ Secciones únicas: ${JSON.stringify(seccionesAsignadas)}`);
+
+    // Alumnos en el sistema
+    log(`\n📚 ALUMNOS EN EL SISTEMA:`);
+    log(`  Total: ${alumnos.length}`);
+
+    if (alumnos.length === 0) {
+      log(`  <span class="err">✗ No hay alumnos registrados</span>`);
+      return;
+    }
+
+    // Ver formato de grados en alumnos
+    const gradosEnAlumnos = [...new Set(alumnos.map(a => a.grado))].sort();
+    log(`  Grados encontrados: ${JSON.stringify(gradosEnAlumnos)}`);
+
+    // Filtrar alumnos
+    log(`\n🎯 FILTRADO:`);
+    const alumnosFiltrados = alumnos.filter(a =>
+      gradosAsignados.includes(a.grado) &&
+      seccionesAsignadas.includes(a.seccion)
+    );
+
+    if (alumnosFiltrados.length === 0) {
+      log(`  <span class="err">✗ 0 alumnos después del filtro</span>`);
+      log(`\n  Analizando por qué:`);
+
+      let gradoMatch = 0, seccionMatch = 0;
+      alumnos.forEach(a => {
+        const gm = gradosAsignados.includes(a.grado);
+        const sm = seccionesAsignadas.includes(a.seccion);
+        if (gm) gradoMatch++;
+        if (sm) seccionMatch++;
+      });
+
+      log(`\n  Alumnos con grado coincidente: ${gradoMatch}/${alumnos.length}`);
+      log(`  Alumnos con sección coincidente: ${seccionMatch}/${alumnos.length}`);
+
+      log(`\n  Primeros 5 alumnos del sistema:`);
+      alumnos.slice(0, 5).forEach((a, i) => {
+        const gm = gradosAsignados.includes(a.grado) ? '✓' : '✗';
+        const sm = seccionesAsignadas.includes(a.seccion) ? '✓' : '✗';
+        log(`    ${i+1}. ${(a.apellidos_nombres || a.nombre || 'N/A').substring(0, 30)} - Grado:"${a.grado}"[${gm}] Secc:"${a.seccion}"[${sm}]`);
+      });
+
+      // Posible solución
+      log(`\n  💡 Posibles soluciones:`);
+      log(`    1. Los alumnos pueden tener formato distinto (ej: "5" vs "5°")`);
+      log(`    2. Las asignaciones pueden estar para otro grado/sección`);
+      log(`    3. Normalizar grados a formato "5°" (ver botón FIX)`);
+
+    } else {
+      log(`  <span class="ok">✓ ${alumnosFiltrados.length} alumnos visibles</span>`);
+      log(`\n  Primeros 5:`);
+      alumnosFiltrados.slice(0, 5).forEach((a, i) => {
+        log(`    ${i+1}. ${a.apellidos_nombres || a.nombre || 'N/A'}`);
+      });
+    }
+
+    log(`\n${'='.repeat(60)}`);
+  }
+
+  function fixAdriana() {
+    clearOutput();
+    log('='.repeat(60));
+    log('⚙️ FIX: Aplicando soluciones');
+    log('='.repeat(60) + '\n');
+
+    const email = 'adriana97818@manuelfidencio.edu.pe';
+    const usuarios = JSON.parse(localStorage.getItem('sistema_usuarios') || '[]');
+    const alumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+    const asignaciones = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
+
+    // 1. Normalizar grados en alumnos
+    log('1️⃣ Normalizando formato de grados en alumnos...\n');
+    const gradoMap = {
+      '1': '1°', '2': '2°', '3': '3°', '4': '4°', '5': '5°',
+      'PRIMERO': '1°', 'SEGUNDO': '2°', 'TERCERO': '3°', 'CUARTO': '4°', 'QUINTO': '5°',
+    };
+
+    let changed = 0;
+    const alumnosFixed = alumnos.map(a => {
+      if (a.grado && a.grado !== gradoMap[a.grado] && gradoMap[a.grado]) {
+        changed++;
+        return { ...a, grado: gradoMap[a.grado] };
+      }
+      return a;
+    });
+
+    if (changed > 0) {
+      localStorage.setItem('ie_alumnos', JSON.stringify(alumnosFixed));
+      log(`  <span class="ok">✓ ${changed} alumnos normalizados</span>\n`);
+    } else {
+      log(`  ✓ Ya estaban en formato correcto\n`);
+    }
+
+    // 2. Verificar/crear asignación
+    log('2️⃣ Verificando asignación de Adriana...\n');
+    const usuario = usuarios.find(u => u.email === email);
+    if (!usuario) {
+      log(`  <span class="err">✗ Usuario no encontrado</span>`);
+      return;
+    }
+
+    const docenteId = usuario.docenteId;
+    if (!docenteId) {
+      log(`  <span class="warn">⚠ El usuario no tiene docenteId asignado</span>`);
+      log(`  Agregando automáticamente...\n`);
+      usuario.docenteId = 'adriana-' + Date.now();
+      localStorage.setItem('sistema_usuarios', JSON.stringify(usuarios));
+      log(`  <span class="ok">✓ DocenteId asignado: ${usuario.docenteId}</span>\n`);
+    }
+
+    const mias = asignaciones.filter(a => a.docenteId === docenteId);
+    if (mias.length === 0) {
+      log(`  <span class="warn">⚠ Sin asignación, creando automáticamente...</span>\n`);
+      const newAsig = {
+        id: 'asig-' + Date.now(),
+        docenteId: docenteId,
+        cursoId: 'comunicacion',
+        grados: ['5°'],
+        secciones: ['A', 'B', 'C']
+      };
+      asignaciones.push(newAsig);
+      localStorage.setItem('cfg_asignaciones', JSON.stringify(asignaciones));
+      log(`  <span class="ok">✓ Asignación creada:</span>`);
+      log(`    - Grados: ${JSON.stringify(newAsig.grados)}`);
+      log(`    - Secciones: ${JSON.stringify(newAsig.secciones)}`);
+    } else {
+      log(`  <span class="ok">✓ Asignación existe: ${mias[0].grados.join(', ')} - Secciones: ${mias[0].secciones.join(', ')}</span>\n`);
+    }
+
+    log(`\n${'='.repeat(60)}`);
+    log('<span class="ok">✓ FIX COMPLETADO - Recarga la página</span>');
+    log('='.repeat(60));
+  }
+</script>
+
+</body>
+</html>

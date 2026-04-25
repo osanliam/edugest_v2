@@ -28,17 +28,9 @@ interface RegistroRefuerzo {
   participa: boolean;
 }
 
-const LS_ALUMNOS = 'ie_alumnos';
-const LS_ASISTENCIA_REGISTRO = 'ie_asistencia_registro_v2';
-const LS_REFUERZO_REGISTRO = 'ie_refuerzo_registro_v2';
+import { cargarTodo, guardarAsistencia } from '../utils/apiClient';
 
-function lsGet<T>(key: string, def: T): T {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); } catch { return def; }
-}
-
-function lsSet(key: string, val: any) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.error('Error guardando:', e); }
-}
+// ── Sin localStorage — todo va directo a Turso ────────────────────────────────
 
 // Configuración de cursos
 const CURSOS = ['Comunicación', 'Matemática', 'Ciencia y Tecnología', 'Historia', 'Inglés', 'Educación Física', 'Arte', 'Tutoría'];

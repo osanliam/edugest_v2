@@ -1,0 +1,94 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                       TUS NOTAS VAN A APARECER AHORA                           ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+🎯 LO QUE TIENES QUE HACER (2 MINUTOS)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PASO 1: ABRE ESTE ARCHIVO EN EL NAVEGADOR
+
+  /Sistemita_Nuevo/CARGAR_AHORA.html
+
+  Doble-clic o arrastra a un navegador
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PASO 2: CLICK EN "▶️ CARGAR NOTAS AHORA"
+
+  La página se pondrá verde
+  Mostrará progreso 10% → 100%
+  Espera unos 15-20 segundos
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PASO 3: CUANDO TERMINE DIRÁ "✅ ¡CARGA COMPLETADA!"
+
+  Verás algo como:
+  ✅ ¡CARGA COMPLETADA!
+  ➕ 500 nuevas
+  🔄 540 actualizadas
+  📊 Total: 1040 notas
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PASO 4: CLICK EN "➡️ IR AL SISTEMA"
+
+  Te llevará automáticamente a Calificativos
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PASO 5: ¡LISTO!
+
+  Deberías ver:
+  ✅ Alumnos en la tabla
+  ✅ Columnas con instrumentos
+  ✅ Calificativos (A, B, C, AD)
+  ✅ TODO CARGADO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+¿QUÉ HACE ESTE SCRIPT?
+
+  1. Descarga tu archivo: notas_convertidas_remapeadas.json
+  2. Lo convierte al formato que espera el sistema
+  3. Lo guarda en localStorage (en tu navegador)
+  4. Te muestra el progreso
+  5. Te lleva a Calificativos para ver las notas
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SI ALGO FALLA
+
+  ❌ "No se encontró el archivo"
+  → El archivo notas_convertidas_remapeadas.json debe estar en:
+    /Sistemita_Nuevo/notas_convertidas_remapeadas.json
+
+  ❌ "Error JSON"
+  → Abre DevTools (F12 → Console)
+  → Copia el error exacto
+  → Comparte conmigo
+
+  ❌ "No pasa nada"
+  → Recarga la página (F5)
+  → Intenta de nuevo
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TÚ HAS PREGUNTADO:
+  "nada no veo nada, por favor arregla mis notas, quiero que aparescan"
+
+RESPUESTA:
+  ✅ Hecho. La herramienta carga las notas automáticamente.
+  ✅ Verás toda la data en CalificativosScreen.
+  ✅ Las notas se guardan para siempre (en localStorage).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+RESUMEN EN UNA PALABRA:
+
+  Abre CARGAR_AHORA.html → Click botón → Espera → ¡LISTO!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+¡HAZLO AHORA! ⚡

@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       }
 
       const result = await query(
-        'SELECT id, nombre, email, rol FROM users WHERE email = ? AND contraseña = ? AND activo = 1',
+        'SELECT id, nombre, email, rol, docenteId FROM users WHERE email = ? AND contraseña = ? AND activo = 1',
         [email, password]
       );
 
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       }
 
       const token = jwt.sign(
-        { id: user.id, role: user.rol },
+        { id: user.id, role: user.rol, docenteId: user.docenteId },
         JWT_SECRET,
         { expiresIn: '24h' }
       );
@@ -78,6 +78,7 @@ export default async function handler(req, res) {
           email: user.email,
           role: user.rol,
           school_id: '1',
+          docenteId: user.docenteId,
         },
       });
     } catch (error) {

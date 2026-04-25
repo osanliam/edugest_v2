@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Phone, Users } from 'lucide-react';
-import { guardarAlumnos } from '../services/dataService';
+import { getAlumnos, crearAlumno, editarAlumno, eliminarAlumno, getAsignaciones } from '../utils/apiClient';
 import HeaderElegante from '../components/HeaderElegante';
 
 interface Apoderado {
@@ -33,27 +33,7 @@ const GRADOS = ['1°', '2°', '3°', '4°', '5°'];
 const SECCIONES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 const SEXOS = ['Masculino', 'Femenino'];
 
-// ── localStorage directo (siempre, sin depender de backend) ──────────────────
-const LS_KEY = 'ie_alumnos';
-
-function lsCargar(): Alumno[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
-  } catch { return []; }
-}
-
-function lsGuardar(data: Alumno[]) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
-    guardarAlumnos(data); // Sincronizar con Turso si está en producción
-  } catch (e) {
-    console.error('Error guardando alumnos:', e);
-    throw new Error('No se pudo guardar. Verifica el espacio del navegador.');
-  }
-}
+// ── Sin localStorage — todo va directo a Turso vía API ───────────────────────
 
 function calcularEdad(fecha: string): number {
   if (!fecha) return 0;
@@ -100,7 +80,14 @@ const emptyForm = {
   madre: { ...emptyApod }, padre: { ...emptyApod },
 };
 
-export default function AlumnosScreen() {
+interface AlumnosScreenProps {
+  user?: { id: string; name: string; email: string; role: string; schoolId?: string };
+}
+
+export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
+  const esDocente = user?.role === 'teacher';
+  const [asignacionDocente, setAsignacionDocente] = useState<{ grados: string[]; secciones: string[] } | null>(null);
+
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
@@ -123,18 +110,19 @@ export default function AlumnosScreen() {
     setMsg({ tipo, texto }); setTimeout(() => setMsg(null), 3500);
   };
 
-  const cargar = () => {
+  const cargar = async () => {
     setCargando(true);
     try {
-      const lista = lsCargar();
+      // Cargar alumnos directo desde Turso
+      const lista = await getAlumnos();
       setAlumnos(lista.map((a: any) => ({
         ...a,
-        madre_nombres: a.madre_nombres || a.madre?.apellidos_nombres || '',
-        madre_dni:     a.madre_dni     || a.madre?.dni || '',
-        madre_celular: a.madre_celular || a.madre?.celular || '',
-        padre_nombres: a.padre_nombres || a.padre?.apellidos_nombres || '',
-        padre_dni:     a.padre_dni     || a.padre?.dni || '',
-        padre_celular: a.padre_celular || a.padre?.celular || '',
+        madre_nombres: a.madre_nombres || '',
+        madre_dni:     a.madre_dni     || '',
+        madre_celular: a.madre_celular || '',
+        padre_nombres: a.padre_nombres || '',
+        padre_dni:     a.padre_dni     || '',
+        padre_celular: a.padre_celular || '',
       })));
     } catch (e: any) {
       mostrar('err', 'Error al cargar alumnos: ' + e.message);
@@ -143,7 +131,31 @@ export default function AlumnosScreen() {
     }
   };
 
-  useEffect(() => { cargar(); }, []);
+  const cargarAsignacion = async () => {
+    if (!esDocente || !user?.email) return;
+    try {
+      const asignaciones = await getAsignaciones();
+      // Buscar por docenteId (viene del user) o por email en docentes
+      const docenteId = (user as any).docenteId;
+      const mias = docenteId
+        ? asignaciones.filter((a: any) => a.docenteId === docenteId)
+        : [];
+      if (mias.length > 0) {
+        const grados   = [...new Set(mias.flatMap((a: any) => a.grados || []))] as string[];
+        const secciones = [...new Set(mias.flatMap((a: any) => a.secciones || []))] as string[];
+        setAsignacionDocente({ grados, secciones });
+        if (grados.length > 0)   setFiltroGrado(grados[0]);
+        if (secciones.length > 0) setFiltroSeccion(secciones[0]);
+      }
+    } catch (e) {
+      console.error('Error cargando asignación:', e);
+    }
+  };
+
+  useEffect(() => {
+    cargar();
+    cargarAsignacion();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,18 +163,21 @@ export default function AlumnosScreen() {
       return mostrar('err', 'Completa los campos obligatorios');
     setGuardando(true);
     try {
-      const todos = lsCargar();
-      const payload = { ...form, edad: calcularEdad(form.fecha_nacimiento) };
+      const payload = {
+        apellidos_nombres: form.apellidos_nombres,
+        dni: form.dni,
+        fecha_nacimiento: form.fecha_nacimiento,
+        sexo: form.sexo,
+        grado: form.grado,
+        seccion: form.seccion,
+        madre: form.madre,
+        padre: form.padre,
+      };
       if (editando) {
-        const idx = todos.findIndex(a => a.id === editando.id);
-        if (idx >= 0) todos[idx] = { ...todos[idx], ...payload };
-        else todos.push({ ...payload, id: editando.id });
-        lsGuardar(todos);
+        await editarAlumno(editando.id, payload);
         mostrar('ok', 'Alumno actualizado');
       } else {
-        if (todos.some(a => a.dni === form.dni)) throw new Error('DNI ya registrado');
-        const nuevo = { ...payload, id: 'al-' + Date.now() };
-        lsGuardar([...todos, nuevo]);
+        await crearAlumno(payload);
         mostrar('ok', 'Alumno registrado');
       }
       setShowForm(false); setEditando(null); setForm(emptyForm);
@@ -171,12 +186,11 @@ export default function AlumnosScreen() {
     finally { setGuardando(false); }
   };
 
-  const handleEliminar = (id: string) => {
+  const handleEliminar = async (id: string) => {
     if (!confirm('¿Eliminar este alumno?')) return;
     setEliminando(id);
     try {
-      const todos = lsCargar();
-      lsGuardar(todos.filter(a => a.id !== id));
+      await eliminarAlumno(id);
       mostrar('ok', 'Alumno eliminado');
       cargar();
     } catch (e: any) { mostrar('err', e.message); }
@@ -279,22 +293,17 @@ export default function AlumnosScreen() {
     } catch { mostrar('err', 'Error leyendo el archivo Excel'); }
   };
 
-  const handleImportar = () => {
+  const handleImportar = async () => {
     setImportando(true);
     let ok = 0, err = 0;
-    try {
-      const todos = lsCargar();
-      for (const r of importRows) {
-        try {
-          if (todos.some((a: Alumno) => a.dni === r.dni)) { err++; continue; }
-          const nuevo = { ...r, id: 'al-' + Date.now() + '-' + ok, edad: calcularEdad(r.fecha_nacimiento) };
-          todos.push(nuevo);
-          ok++;
-        } catch { err++; }
-      }
-      lsGuardar(todos);
-    } catch (e: any) {
-      mostrar('err', 'Error al importar: ' + e.message);
+    const dniExistentes = new Set(alumnos.map(a => a.dni));
+    for (const r of importRows) {
+      try {
+        if (dniExistentes.has(r.dni)) { err++; continue; }
+        await crearAlumno(r);
+        dniExistentes.add(r.dni);
+        ok++;
+      } catch { err++; }
     }
     setImportResult({ ok, err });
     setImportando(false);
@@ -314,7 +323,15 @@ export default function AlumnosScreen() {
     XLSX.writeFile(wb, 'plantilla_alumnos.xlsx');
   };
 
-  const filtrados = alumnos.filter(a => {
+  // Si es docente, filtrar solo por sus grados y secciones asignadas
+  const alumnosBase = esDocente && asignacionDocente
+    ? alumnos.filter(a =>
+        asignacionDocente.grados.includes(a.grado) &&
+        asignacionDocente.secciones.includes(a.seccion)
+      )
+    : alumnos;
+
+  const filtrados = alumnosBase.filter(a => {
     const b = busqueda.toLowerCase();
     const matchB = a.apellidos_nombres.toLowerCase().includes(b) || a.dni.includes(b) ||
       (a.madre_nombres || '').toLowerCase().includes(b) || (a.padre_nombres || '').toLowerCase().includes(b);
@@ -333,8 +350,10 @@ export default function AlumnosScreen() {
       <div className="relative z-10 max-w-7xl mx-auto space-y-8">
         <HeaderElegante
           icon={Users}
-          title="EDUGEST ALUMNOS"
-          subtitle={`${alumnos.length} alumnos registrados`}
+          title={esDocente ? "MIS ALUMNOS" : "EDUGEST ALUMNOS"}
+          subtitle={esDocente && asignacionDocente
+            ? `${filtrados.length} alumnos · Grados: ${asignacionDocente.grados.join(', ')} · Secciones: ${asignacionDocente.secciones.join(', ')}`
+            : `${alumnos.length} alumnos registrados`}
         >
           <button onClick={cargar} className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors">
             <RefreshCw size={14} /> Actualizar
@@ -350,6 +369,11 @@ export default function AlumnosScreen() {
             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-lg text-sm hover:from-cyan-400 hover:to-blue-500 transition-all shadow-lg hover:shadow-cyan-500/40">
             <Plus size={16} /> Nuevo Alumno
           </button>
+          {esDocente && !asignacionDocente && (
+            <span className="text-amber-400 text-xs px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              ⚠️ Sin asignación — contacta al administrador
+            </span>
+          )}
         </HeaderElegante>
 
         <div className="space-y-5">

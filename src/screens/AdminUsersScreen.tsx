@@ -264,13 +264,34 @@ export default function AdminUsersScreen({ user }: { user?: any }) {
       // También intentar sync con API en prod
       if (import.meta.env.PROD && getToken()) {
         try {
-          const existenteApi = todos.find(u => u.docenteId === docenteSelec.id);
-          if (existenteApi) {
-            await fetch(`/api/users?id=${existenteApi.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-              body: JSON.stringify({ email: asignarForm.email, ...(asignarForm.contraseña ? { contraseña: asignarForm.contraseña } : {}) }),
-            });
+          const usuarioSync = todos.find(u => u.docenteId === docenteSelec.id);
+          if (usuarioSync) {
+            if (existente) {
+              // Actualizar usuario existente en la API (incluir docenteId)
+              const bodyPut: any = {
+                email: asignarForm.email,
+                docenteId: docenteSelec.id,
+              };
+              if (asignarForm.contraseña) bodyPut.contraseña = asignarForm.contraseña;
+              await fetch(`/api/users?id=${usuarioSync.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                body: JSON.stringify(bodyPut),
+              });
+            } else {
+              // Crear nuevo usuario en la API con docenteId
+              await fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                body: JSON.stringify({
+                  nombre: usuarioSync.nombre,
+                  email: asignarForm.email,
+                  contraseña: asignarForm.contraseña,
+                  rol: 'teacher',
+                  docenteId: docenteSelec.id,
+                }),
+              });
+            }
           }
         } catch { /* silencioso */ }
       }

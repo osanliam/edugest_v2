@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle, Wifi, WifiOff, Database, Key, Server, Settings } from 'lucide-react';
 import HeaderElegante from '../components/HeaderElegante';
-import { getStorageStats, isSyncedToCloud, syncAllToTurso } from '../services/dataService';
+import { getStorageStats, isSyncedToCloud, syncAllToTurso, syncToTurso } from '../services/dataService';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Bimestre {
@@ -633,7 +633,11 @@ function AsignacionesSection() {
   });
 
   const flash = (tipo:'ok'|'err', texto:string) => { setMsg({tipo,texto}); setTimeout(()=>setMsg(null),3500); };
-  const guardarLS = (data: Asignacion[]) => { lsSet(LS_ASIGNACIONES, data); setAsignaciones(data); };
+  const guardarLS = (data: Asignacion[]) => {
+    lsSet(LS_ASIGNACIONES, data);
+    setAsignaciones(data);
+    syncToTurso('asignaciones', data);
+  };
 
   const abrirNueva = () => {
     setEditAsig(null);

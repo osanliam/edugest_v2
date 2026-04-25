@@ -33,7 +33,8 @@ export function getStorageStats() {
   const keys = [
     'ie_alumnos', 'ie_docentes', 'sistema_usuarios', 'ie_calificativos_v2',
     'cal_columnas', 'cfg_bimestres', 'cfg_unidades', 'cfg_grados', 'cfg_secciones',
-    'cfg_instrumentos', 'cfg_asignaciones', 'ie_asistencia', 'cfg_normas_convivencia', 'ie_registros_normas'
+    'cfg_instrumentos', 'cfg_asignaciones', 'ie_asistencia', 'cfg_normas_convivencia',
+    'ie_registros_normas'
   ];
   
   let totalBytes = 0;
@@ -131,6 +132,15 @@ export function getRegistrosNormas() {
   try { return JSON.parse(localStorage.getItem('ie_registros_normas') || '[]'); } catch { return []; }
 }
 
+export function getAsignaciones() {
+  try { return JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]'); } catch { return []; }
+}
+
+export function guardarAsignaciones(asignaciones: any[]) {
+  localStorage.setItem('cfg_asignaciones', JSON.stringify(asignaciones));
+  syncToTurso('asignaciones', asignaciones);
+}
+
 export function getAsistencia() {
   try { return JSON.parse(localStorage.getItem('ie_asistencia') || '[]'); } catch { return []; }
 }
@@ -194,6 +204,7 @@ export async function syncAllToTurso(): Promise<{ ok: boolean; message: string; 
     { key: 'ie_calificativos_v2',    tipo: 'calificativos' },
     { key: 'ie_asistencia',          tipo: 'asistencia' },
     { key: 'ie_registros_normas',    tipo: 'registros_normas' },
+    { key: 'cfg_asignaciones',       tipo: 'asignaciones' },
   ];
 
   // En desarrollo no hay servidor — mostrar resumen local sin intentar fetch
@@ -347,6 +358,25 @@ export async function loadSystemData() {
       });
       localStorage.setItem('ie_registros_normas', JSON.stringify(fusionados));
     }
+
+    if (cloudData.asignaciones?.length > 0) {
+      // Las asignaciones vienen con grados/secciones/cursos como JSON strings desde Turso
+      const localAsig = getAsignaciones();
+      const fusionadas = [...localAsig];
+      cloudData.asignaciones.forEach((a: any) => {
+        // Parsear campos JSON si vienen como string
+        const parsed = {
+          ...a,
+          grados:   typeof a.grados   === 'string' ? JSON.parse(a.grados   || '[]') : (a.grados   || []),
+          secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
+          cursos:   typeof a.cursos   === 'string' ? JSON.parse(a.cursos   || '[]') : (a.cursos   || []),
+        };
+        const idx = fusionadas.findIndex(x => x.id === parsed.id);
+        if (idx >= 0) fusionadas[idx] = parsed; // actualizar si ya existe
+        else fusionadas.push(parsed);
+      });
+      localStorage.setItem('cfg_asignaciones', JSON.stringify(fusionadas));
+    }
   }
   
   // Sincronizar datos locales a la nube
@@ -369,6 +399,8 @@ export async function loadSystemData() {
   if (asistencia.length > 0) syncToTurso('asistencia', asistencia);
   const registrosNormas = getRegistrosNormas();
   if (registrosNormas.length > 0) syncToTurso('registros_normas', registrosNormas);
+  const asignaciones = getAsignaciones();
+  if (asignaciones.length > 0) syncToTurso('asignaciones', asignaciones);
 
   return {
     estudiantes: getEstudiantes(),

@@ -112,6 +112,14 @@ async function ensureTables(c) {
       observacion TEXT,
       registradoPor TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS asignaciones (
+      id TEXT PRIMARY KEY,
+      docenteId TEXT,
+      grados TEXT,
+      secciones TEXT,
+      cursos TEXT,
+      extra TEXT
+    )`,
   ];
 
   for (const sql of stmts) {
@@ -164,7 +172,7 @@ export default async function handler(req, res) {
   // ── GET all data ──────────────────────────────────────────────────────────
   if (req.method === 'GET') {
     try {
-      const [usuarios, docentes, alumnos, columnas, calificaciones, asistencia, unidades, normas, registrosNormas] =
+      const [usuarios, docentes, alumnos, columnas, calificaciones, asistencia, unidades, normas, registrosNormas, asignaciones] =
         await Promise.all([
           c.execute('SELECT * FROM users'),
           c.execute('SELECT * FROM docentes'),
@@ -175,6 +183,7 @@ export default async function handler(req, res) {
           c.execute('SELECT * FROM unidades'),
           c.execute('SELECT * FROM normas'),
           c.execute('SELECT * FROM registros_normas'),
+          c.execute('SELECT * FROM asignaciones'),
         ]);
 
       return res.json({
@@ -187,6 +196,7 @@ export default async function handler(req, res) {
         unidades: unidades.rows || [],
         normas: normas.rows || [],
         registros_normas: registrosNormas.rows || [],
+        asignaciones: asignaciones.rows || [],
       });
     } catch (e) {
       return res.status(500).json({ error: e.message });
@@ -322,6 +332,24 @@ export default async function handler(req, res) {
             [r.id, r.alumnoId, r.conductaId, r.ejeId, r.fecha, r.cumplimiento, r.puntos || 0, r.observacion || '', r.registradoPor || '']
           );
           e ? errores.push(`registro_norma ${r.id}: ${e}`) : ok++;
+        }
+      }
+
+      else if (tipo === 'asignaciones') {
+        for (const a of datos) {
+          const e = await safeExec(c,
+            `INSERT OR REPLACE INTO asignaciones (id, docenteId, grados, secciones, cursos, extra)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              a.id,
+              a.docenteId || '',
+              JSON.stringify(Array.isArray(a.grados) ? a.grados : []),
+              JSON.stringify(Array.isArray(a.secciones) ? a.secciones : []),
+              JSON.stringify(Array.isArray(a.cursos) ? a.cursos : []),
+              a.extra ? JSON.stringify(a.extra) : null,
+            ]
+          );
+          e ? errores.push(`asignacion ${a.id}: ${e}`) : ok++;
         }
       }
 
