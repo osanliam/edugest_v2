@@ -101,12 +101,33 @@ export async function eliminarUsuario(id: string) {
   return api(`/api/users?id=${id}`, { method: 'DELETE' });
 }
 
+// Helper: fetch con timeout
+async function fetchWithTimeout(url: string, opts: RequestInit = {}, timeout = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(url, { ...opts, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TODO EN UNO  →  /api/sync  (GET devuelve todo: alumnos, docentes, asignaciones,
 //                              columnas, calificativos, asistencia, unidades…)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function cargarTodo() {
-  return api('/api/sync') as Promise<{
+  const headers: Record<string, string> = {};
+  if (_token) headers['Authorization'] = `Bearer ${_token}`;
+  const res = await fetchWithTimeout(BASE + '/api/sync', { headers }, 30000);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Error ${res.status}`);
+  }
+  return res.json() as Promise<{
     alumnos: any[];
     docentes: any[];
     usuarios: any[];
