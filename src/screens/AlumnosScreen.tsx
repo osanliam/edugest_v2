@@ -113,17 +113,23 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   const cargar = async () => {
     setCargando(true);
     try {
-      // Cargar alumnos directo desde Turso
-      const lista = await getAlumnos();
-      setAlumnos(lista.map((a: any) => ({
-        ...a,
-        madre_nombres: a.madre_nombres || '',
-        madre_dni:     a.madre_dni     || '',
-        madre_celular: a.madre_celular || '',
-        padre_nombres: a.padre_nombres || '',
-        padre_dni:     a.padre_dni     || '',
-        padre_celular: a.padre_celular || '',
-      })));
+      // Cargar alumnos desde localStorage primero (más rápido y completo)
+      const localAlumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+      if (localAlumnos.length > 0) {
+        setAlumnos(localAlumnos);
+      } else {
+        // Fallback a Turso
+        const lista = await getAlumnos();
+        setAlumnos(lista.map((a: any) => ({
+          ...a,
+          madre_nombres: a.madre_nombres || '',
+          madre_dni:     a.madre_dni     || '',
+          madre_celular: a.madre_celular || '',
+          padre_nombres: a.padre_nombres || '',
+          padre_dni:     a.padre_dni     || '',
+          padre_celular: a.padre_celular || '',
+        })));
+      }
     } catch (e: any) {
       mostrar('err', 'Error al cargar alumnos: ' + e.message);
     } finally {
@@ -134,8 +140,10 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   const cargarAsignacion = async () => {
     if (!esDocente || !user?.email) return;
     try {
-      const asignaciones = await getAsignaciones();
-      // Buscar por docenteId (viene del user) o por email en docentes
+      // Cargar asignaciones desde localStorage primero
+      const localAsigs = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
+      const asignaciones = localAsigs.length > 0 ? localAsigs : await getAsignaciones();
+      
       const docenteId = (user as any).docenteId;
       const mias = docenteId
         ? asignaciones.filter((a: any) => a.docenteId === docenteId)

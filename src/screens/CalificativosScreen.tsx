@@ -872,20 +872,35 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const cargar = async () => {
     setSyncing(true);
     try {
-      const todo = await cargarTodo();
-      setAlumnos(todo.alumnos || []);
-      setColumnas(todo.columnas || []);
-      setCalificativos((todo.calificaciones || []).map((c: any) => ({
-        alumnoId: c.alumnoId || c.alumno_id,
-        columnaId: c.columnaId || c.columna_id,
-        marcados: typeof c.marcados === 'string' ? JSON.parse(c.marcados || '[]') : (c.marcados || []),
-        claves: typeof c.claves === 'string' ? JSON.parse(c.claves || '[]') : (c.claves || []),
-        notaNumerica: c.notaNumerica ?? c.nota_numerica,
-        calificativo: c.calificativo,
-        esAD: c.esAD || c.es_ad || false,
-        fecha: c.fecha,
-      })));
-      setBimestres((todo.unidades || []).filter((u: any) => u.activa !== false));
+      // Intentar cargar desde localStorage primero (datos locales son más rápidos y completos)
+      const localAlumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+      const localColumnas = JSON.parse(localStorage.getItem('cal_columnas') || '[]');
+      const localCalif = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
+      const localUnidades = JSON.parse(localStorage.getItem('cfg_unidades') || '[]');
+
+      if (localAlumnos.length > 0) {
+        // Usar datos locales (el admin tiene todo aquí)
+        setAlumnos(localAlumnos);
+        setColumnas(localColumnas);
+        setCalificativos(localCalif);
+        setBimestres((localUnidades || []).filter((u: any) => u.activa !== false));
+      } else {
+        // Fallback a Turso si no hay datos locales
+        const todo = await cargarTodo();
+        setAlumnos(todo.alumnos || []);
+        setColumnas(todo.columnas || []);
+        setCalificativos((todo.calificaciones || []).map((c: any) => ({
+          alumnoId: c.alumnoId || c.alumno_id,
+          columnaId: c.columnaId || c.columna_id,
+          marcados: typeof c.marcados === 'string' ? JSON.parse(c.marcados || '[]') : (c.marcados || []),
+          claves: typeof c.claves === 'string' ? JSON.parse(c.claves || '[]') : (c.claves || []),
+          notaNumerica: c.notaNumerica ?? c.nota_numerica,
+          calificativo: c.calificativo,
+          esAD: c.esAD || c.es_ad || false,
+          fecha: c.fecha,
+        })));
+        setBimestres((todo.unidades || []).filter((u: any) => u.activa !== false));
+      }
     } catch (err: any) {
       setSyncMsg({ tipo: 'err', texto: `❌ Error al cargar: ${err.message}` });
       setTimeout(() => setSyncMsg(null), 4000);
