@@ -37,6 +37,13 @@ async function ensureTables(c) {
       cargo TEXT,
       email TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS apoderados (
+      id TEXT PRIMARY KEY,
+      apellidos_nombres TEXT,
+      dni TEXT,
+      celular TEXT,
+      parentesco TEXT
+    )`,
     `CREATE TABLE IF NOT EXISTS alumnos (
       id TEXT PRIMARY KEY,
       apellidos_nombres TEXT,
@@ -52,7 +59,10 @@ async function ensureTables(c) {
       apelidosPadre TEXT,
       nombreMadre TEXT,
       email TEXT,
-      extra TEXT
+      extra TEXT,
+      madre_id TEXT,
+      padre_id TEXT,
+      user_id TEXT
     )`,
     `CREATE TABLE IF NOT EXISTS columnas (
       id TEXT PRIMARY KEY,
@@ -130,6 +140,9 @@ async function ensureTables(c) {
   const alterSafe = async (sql) => { try { await c.execute(sql); } catch (_) {} };
   await alterSafe(`ALTER TABLE alumnos ADD COLUMN nombre TEXT`);
   await alterSafe(`ALTER TABLE alumnos ADD COLUMN extra TEXT`);
+  await alterSafe(`ALTER TABLE alumnos ADD COLUMN madre_id TEXT`);
+  await alterSafe(`ALTER TABLE alumnos ADD COLUMN padre_id TEXT`);
+  await alterSafe(`ALTER TABLE alumnos ADD COLUMN user_id TEXT`);
   await alterSafe(`ALTER TABLE asistencia ADD COLUMN modo TEXT`);
   await alterSafe(`ALTER TABLE asistencia ADD COLUMN hora TEXT`);
   await alterSafe(`ALTER TABLE users ADD COLUMN docenteId TEXT`);
