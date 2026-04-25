@@ -113,29 +113,9 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   const cargar = async () => {
     setCargando(true);
     try {
-      // Cargar alumnos desde localStorage primero
+      // Usar SOLO localStorage — instantáneo
       const localAlumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
-      // También intentar cargar desde Turso
-      let tursoAlumnos: any[] = [];
-      try {
-        const lista = await getAlumnos();
-        tursoAlumnos = lista.map((a: any) => ({
-          ...a,
-          madre_nombres: a.madre_nombres || '',
-          madre_dni:     a.madre_dni     || '',
-          madre_celular: a.madre_celular || '',
-          padre_nombres: a.padre_nombres || '',
-          padre_dni:     a.padre_dni     || '',
-          padre_celular: a.padre_celular || '',
-        }));
-      } catch (e) {
-        console.warn('Turso alumnos no disponible');
-      }
-      // Merge: prioridad a localStorage
-      const alumnosMap = new Map();
-      tursoAlumnos.forEach((a: any) => alumnosMap.set(a.id, a));
-      localAlumnos.forEach((a: any) => alumnosMap.set(a.id, a));
-      setAlumnos(Array.from(alumnosMap.values()));
+      setAlumnos(localAlumnos);
     } catch (e: any) {
       mostrar('err', 'Error al cargar alumnos: ' + e.message);
     } finally {
@@ -146,9 +126,8 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   const cargarAsignacion = async () => {
     if (!esDocente || !user?.email) return;
     try {
-      // Cargar asignaciones desde localStorage primero
-      const localAsigs = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
-      const asignaciones = localAsigs.length > 0 ? localAsigs : await getAsignaciones();
+      // Usar SOLO localStorage
+      const asignaciones = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
       
       const docenteId = (user as any).docenteId;
       const mias = docenteId

@@ -872,66 +872,18 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const cargar = async () => {
     setSyncing(true);
     try {
-      // Cargar desde localStorage primero
+      // Usar SOLO localStorage — es instantáneo y tiene tus notas manuales
       const localAlumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
       const localColumnas = JSON.parse(localStorage.getItem('cal_columnas') || '[]');
       const localCalif = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
       const localUnidades = JSON.parse(localStorage.getItem('cfg_unidades') || '[]');
 
-      // Intentar cargar desde Turso también (merge con localStorage)
-      let tursoAlumnos: any[] = [];
-      let tursoColumnas: any[] = [];
-      let tursoCalif: any[] = [];
-      let tursoUnidades: any[] = [];
-      try {
-        const todo = await cargarTodo();
-        tursoAlumnos = todo.alumnos || [];
-        tursoColumnas = todo.columnas || [];
-        tursoCalif = (todo.calificaciones || []).map((c: any) => ({
-          alumnoId: c.alumnoId || c.alumno_id,
-          columnaId: c.columnaId || c.columna_id,
-          marcados: typeof c.marcados === 'string' ? JSON.parse(c.marcados || '[]') : (c.marcados || []),
-          claves: typeof c.claves === 'string' ? JSON.parse(c.claves || '[]') : (c.claves || []),
-          notaNumerica: c.notaNumerica ?? c.nota_numerica,
-          calificativo: c.calificativo,
-          esAD: c.esAD || c.es_ad || false,
-          fecha: c.fecha,
-        }));
-        tursoUnidades = todo.unidades || [];
-      } catch (e) {
-        console.warn('Turso no disponible, usando solo localStorage');
-      }
+      setAlumnos(localAlumnos);
+      setColumnas(localColumnas);
+      setCalificativos(localCalif);
+      setBimestres((localUnidades || []).filter((u: any) => u.activa !== false));
 
-      // Merge alumnos: prioridad a localStorage, complementar con Turso
-      const alumnosMap = new Map();
-      tursoAlumnos.forEach((a: any) => alumnosMap.set(a.id, a));
-      localAlumnos.forEach((a: any) => alumnosMap.set(a.id, a)); // localStorage sobrescribe
-      const mergedAlumnos = Array.from(alumnosMap.values());
-
-      // Merge columnas: prioridad a localStorage
-      const columnasMap = new Map();
-      tursoColumnas.forEach((c: any) => columnasMap.set(c.id, c));
-      localColumnas.forEach((c: any) => columnasMap.set(c.id, c));
-      const mergedColumnas = Array.from(columnasMap.values());
-
-      // Merge calificaciones: prioridad a localStorage (notas manuales son más recientes)
-      const califMap = new Map();
-      tursoCalif.forEach((c: any) => califMap.set(`${c.alumnoId}-${c.columnaId}`, c));
-      localCalif.forEach((c: any) => califMap.set(`${c.alumnoId}-${c.columnaId}`, c));
-      const mergedCalif = Array.from(califMap.values());
-
-      // Merge unidades
-      const unidadesMap = new Map();
-      tursoUnidades.forEach((u: any) => unidadesMap.set(u.id, u));
-      localUnidades.forEach((u: any) => unidadesMap.set(u.id, u));
-      const mergedUnidades = Array.from(unidadesMap.values()).filter((u: any) => u.activa !== false);
-
-      setAlumnos(mergedAlumnos);
-      setColumnas(mergedColumnas);
-      setCalificativos(mergedCalif);
-      setBimestres(mergedUnidades);
-
-      console.log(`✅ Merge: ${mergedAlumnos.length} alumnos, ${mergedColumnas.length} columnas, ${mergedCalif.length} calificaciones`);
+      console.log(`✅ Local: ${localAlumnos.length} alumnos, ${localColumnas.length} columnas, ${localCalif.length} calificaciones`);
     } catch (err: any) {
       setSyncMsg({ tipo: 'err', texto: `❌ Error al cargar: ${err.message}` });
       setTimeout(() => setSyncMsg(null), 4000);
