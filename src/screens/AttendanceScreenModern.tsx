@@ -9,6 +9,7 @@ import FuturisticCard from '../components/FuturisticCard';
 import HologramText from '../components/HologramText';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { syncToTurso, isSyncedToCloud } from '../services/dataService';
+import { getAlumnos } from '../utils/apiClient';
 
 interface User {
   id: string; name: string; email: string; role: string; schoolId: string;
@@ -84,15 +85,25 @@ export default function AttendanceScreenModern({ user }: AttendanceScreenModernP
 
   // Cargar datos
   useEffect(() => {
-    const stored = lsGet<Alumno[]>('ie_alumnos', []);
-    setAlumnos(stored);
-    setAsistencia(lsGet<RegistroAsistencia[]>(LS_ASISTENCIA, []));
-    setRefuerzoIds(lsGet<string[]>(LS_REFUERZO_LISTA, []));
-    // Auto-detectar primer grado disponible
-    if (stored.length > 0) {
-      const grados = [...new Set(stored.map(a => normGrado(a.grado)).filter(Boolean))].sort();
-      if (grados.length > 0 && !grados.includes(grado)) setGrado(grados[0]);
-    }
+    (async () => {
+      let stored: Alumno[] = [];
+      // 1) Intentar descargar desde Turso
+      try {
+        stored = await getAlumnos();
+        localStorage.setItem('ie_alumnos', JSON.stringify(stored));
+      } catch {
+        // 2) Fallback a localStorage
+        stored = lsGet<Alumno[]>('ie_alumnos', []);
+      }
+      setAlumnos(stored);
+      setAsistencia(lsGet<RegistroAsistencia[]>(LS_ASISTENCIA, []));
+      setRefuerzoIds(lsGet<string[]>(LS_REFUERZO_LISTA, []));
+      // Auto-detectar primer grado disponible
+      if (stored.length > 0) {
+        const grados = [...new Set(stored.map(a => normGrado(a.grado)).filter(Boolean))].sort();
+        if (grados.length > 0 && !grados.includes(grado)) setGrado(grados[0]);
+      }
+    })();
   }, []);
 
   // Alumnos del modo diario (grado + sección)

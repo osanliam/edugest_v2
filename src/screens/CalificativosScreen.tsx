@@ -872,7 +872,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const cargar = async () => {
     setSyncing(true);
     try {
-      // Usar SOLO localStorage — es instantáneo y tiene tus notas manuales
+      // 1) Base desde localStorage (notas manuales del docente nunca se pierden)
       const localAlumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
       const localColumnas = JSON.parse(localStorage.getItem('cal_columnas') || '[]');
       const localCalif = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
@@ -883,7 +883,24 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       setCalificativos(localCalif);
       setBimestres((localUnidades || []).filter((u: any) => u.activa !== false));
 
-      console.log(`✅ Local: ${localAlumnos.length} alumnos, ${localColumnas.length} columnas, ${localCalif.length} calificaciones`);
+      // 2) Descargar desde Turso en segundo plano y actualizar
+      try {
+        const todo = await cargarTodo();
+        if (todo.alumnos?.length > 0) {
+          setAlumnos(todo.alumnos);
+          localStorage.setItem('ie_alumnos', JSON.stringify(todo.alumnos));
+        }
+        if (todo.columnas?.length > 0) {
+          setColumnas(todo.columnas);
+          localStorage.setItem('cal_columnas', JSON.stringify(todo.columnas));
+        }
+        if (todo.unidades?.length > 0) {
+          setBimestres((todo.unidades || []).filter((u: any) => u.activa !== false));
+          localStorage.setItem('cfg_unidades', JSON.stringify(todo.unidades));
+        }
+      } catch {
+        // Si falla Turso, ya tenemos localStorage como fallback
+      }
     } catch (err: any) {
       setSyncMsg({ tipo: 'err', texto: `❌ Error al cargar: ${err.message}` });
       setTimeout(() => setSyncMsg(null), 4000);

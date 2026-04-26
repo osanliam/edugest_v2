@@ -113,9 +113,17 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   const cargar = async () => {
     setCargando(true);
     try {
-      // Usar SOLO localStorage — instantáneo
-      const localAlumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
-      setAlumnos(localAlumnos);
+      // 1) Intentar descargar desde Turso (servidor)
+      let lista: Alumno[] = [];
+      try {
+        lista = await getAlumnos();
+        // Guardar en localStorage para la próxima vez
+        localStorage.setItem('ie_alumnos', JSON.stringify(lista));
+      } catch {
+        // 2) Fallback a localStorage si el servidor falla
+        lista = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+      }
+      setAlumnos(lista);
     } catch (e: any) {
       mostrar('err', 'Error al cargar alumnos: ' + e.message);
     } finally {
