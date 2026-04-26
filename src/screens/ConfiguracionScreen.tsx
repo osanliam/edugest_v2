@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle, Wifi, WifiOff, Database, Key, Server, Settings } from 'lucide-react';
 import HeaderElegante from '../components/HeaderElegante';
 import { getStorageStats, isSyncedToCloud, syncAllToTurso, syncToTurso } from '../services/dataService';
+import { getAsignaciones as getAsignacionesTurso } from '../utils/apiClient';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Bimestre {
@@ -619,7 +620,22 @@ function AsignacionesSection() {
   const [cursos, setCursos]             = useState<Curso[]>([]);
 
   useEffect(() => {
-    setAsignaciones(lsGet(LS_ASIGNACIONES, []));
+    // Cargar asignaciones: intentar Turso primero, fallback a localStorage
+    (async () => {
+      let asigs: Asignacion[] = [];
+      const localAsigs = lsGet(LS_ASIGNACIONES, []);
+      try {
+        asigs = await getAsignacionesTurso();
+        // Si Turso está vacío pero localStorage tiene datos, subirlos a Turso
+        if (asigs.length === 0 && localAsigs.length > 0) {
+          syncToTurso('asignaciones', localAsigs);
+          asigs = localAsigs;
+        }
+      } catch {
+        asigs = localAsigs;
+      }
+      setAsignaciones(asigs);
+    })();
     setDocentes(lsGet(LS_DOCENTES_KEY, []));
     setCursos(lsGet(LS_CURSOS, []));
   }, []);

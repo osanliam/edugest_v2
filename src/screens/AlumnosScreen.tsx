@@ -126,9 +126,14 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   const cargarAsignacion = async () => {
     if (!esDocente || !user?.email) return;
     try {
-      // Usar SOLO localStorage
-      const asignaciones = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
-      
+      // Primero intentar desde Turso (servidor), fallback a localStorage
+      let asignaciones: any[] = [];
+      try {
+        asignaciones = await getAsignaciones();
+      } catch {
+        asignaciones = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
+      }
+
       const docenteId = (user as any).docenteId;
       const mias = docenteId
         ? asignaciones.filter((a: any) => a.docenteId === docenteId)
