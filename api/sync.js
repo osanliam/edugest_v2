@@ -249,7 +249,15 @@ export default async function handler(req, res) {
       if (tiposSolicitados.includes('docentes'))          data.docentes          = await ejecutar('SELECT * FROM docentes');
       if (tiposSolicitados.includes('alumnos'))           data.alumnos           = await ejecutar('SELECT * FROM alumnos');
       if (tiposSolicitados.includes('columnas'))          data.columnas          = await ejecutar('SELECT * FROM columnas');
-      if (tiposSolicitados.includes('calificaciones'))    data.calificaciones    = await ejecutar('SELECT * FROM calificaciones');
+      if (tiposSolicitados.includes('calificaciones')) {
+        const rawCal = await ejecutar('SELECT * FROM calificaciones');
+        data.calificaciones = rawCal.map(c => ({
+          ...c,
+          marcados: typeof c.marcados === 'string' ? JSON.parse(c.marcados || '[]') : (c.marcados || []),
+          claves:   typeof c.claves   === 'string' ? JSON.parse(c.claves   || '[]') : (c.claves   || []),
+          esAD: c.esAD === 1 || c.esAD === true,
+        }));
+      }
       if (tiposSolicitados.includes('asistencia'))        data.asistencia        = await ejecutar('SELECT * FROM asistencia');
       if (tiposSolicitados.includes('unidades'))          data.unidades          = await ejecutar('SELECT * FROM unidades');
       if (tiposSolicitados.includes('normas'))            data.normas            = await ejecutar('SELECT * FROM normas');
