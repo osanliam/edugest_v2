@@ -33,37 +33,59 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       // Solo guardamos el user en sessionStorage para restaurar sesión al recargar
       sessionStorage.setItem('user', JSON.stringify(data.user));
 
-      // Sincronización en segundo plano — NO bloquea el ingreso al sistema
-      // Se descarga por partes pequeñas para respetar el límite de 10s de Vercel
-      const syncEnSegundoPlano = async () => {
-        const partes = [
-          ['alumnos,asignaciones',    ['ie_alumnos','cfg_asignaciones']],
-          ['docentes,columnas',       ['ie_docentes','cal_columnas']],
-          ['unidades,normas',         ['cfg_unidades','cfg_normas_convivencia']],
-          ['calificaciones,asistencia',['ie_calificativos_v2','ie_asistencia']],
-        ] as const;
-        const claves: Record<string, string> = {
-          alumnos:        'ie_alumnos',
-          asignaciones:   'cfg_asignaciones',
-          docentes:       'ie_docentes',
-          columnas:       'cal_columnas',
-          unidades:       'cfg_unidades',
-          normas:         'cfg_normas_convivencia',
-          calificaciones: 'ie_calificativos_v2',
-          asistencia:     'ie_asistencia',
-        };
-        for (const [tipos] of partes) {
-          try {
-            const res = await cargarTodo(tipos as string);
-            for (const [tipo, datos] of Object.entries(res)) {
-              if (Array.isArray(datos) && datos.length > 0 && claves[tipo]) {
-                localStorage.setItem(claves[tipo], JSON.stringify(datos));
-              }
+      // Mapa de tipo → clave localStorage
+      const claves: Record<string, string> = {
+        alumnos:        'ie_alumnos',
+        asignaciones:   'cfg_asignaciones',
+        docentes:       'ie_docentes',
+        columnas:       'cal_columnas',
+        unidades:       'cfg_unidades',
+        normas:         'cfg_normas_convivencia',
+        calificaciones: 'ie_calificativos_v2',
+        asistencia:     'ie_asistencia',
+      };
+
+      const guardarRespuesta = (res: any) => {
+        for (const [tipo, datos] of Object.entries(res)) {
+          if (Array.isArray(datos) && datos.length > 0 && claves[tipo]) {
+            // Asignaciones: parsear grados/secciones/cursos si vienen como string
+            if (tipo === 'asignaciones') {
+              const parsed = (datos as any[]).map((a: any) => ({
+                ...a,
+                grados:    typeof a.grados    === 'string' ? JSON.parse(a.grados    || '[]') : (a.grados    || []),
+                secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
+                cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
+              }));
+              localStorage.setItem(claves[tipo], JSON.stringify(parsed));
+            } else {
+              localStorage.setItem(claves[tipo], JSON.stringify(datos));
             }
-          } catch { /* silencioso — cada parte es independiente */ }
+          }
         }
       };
-      syncEnSegundoPlano(); // sin await — no bloquea
+
+      // Cargar cada tipo por separado para evitar timeout (2894 alumnos es pesado)
+      // Asignaciones y unidades primero — son pequeñas y críticas para docentes
+      const tiposEsenciales = ['asignaciones', 'unidades', 'columnas', 'alumnos'];
+      const tiposSecundarios = ['docentes', 'normas', 'calificaciones', 'asistencia'];
+
+      // PASO 1: Esenciales uno a uno — esperamos antes de entrar
+      for (const tipo of tiposEsenciales) {
+        try {
+          const res = await cargarTodo(tipo);
+          guardarRespuesta(res);
+        } catch { /* si falla un tipo, continúa con el siguiente */ }
+      }
+
+      // PASO 2: Secundarios en segundo plano
+      (async () => {
+        for (const tipo of tiposSecundarios) {
+          try {
+            const res = await cargarTodo(tipo);
+            guardarRespuesta(res);
+          } catch { /* silencioso */ }
+        }
+      })();
 
       const user: UserType = {
         id: data.user.id,

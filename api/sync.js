@@ -195,11 +195,26 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── GET accion=borrar_cal → borra TODAS las calificaciones (sin descargar) ─
+  // ── GET accion=borrar_cal → borra TODAS las calificaciones ─────────────────
   if (req.method === 'GET' && req.query?.accion === 'borrar_cal') {
     try {
       const r = await c.execute('DELETE FROM calificaciones');
       return res.json({ ok: true, deleted: r.rowsAffected });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── GET accion=borrar_tabla&tabla=alumnos → borra tabla completa ──────────
+  if (req.method === 'GET' && req.query?.accion === 'borrar_tabla') {
+    const permitidas = ['alumnos', 'docentes', 'calificaciones', 'asistencia', 'columnas'];
+    const tabla = req.query?.tabla;
+    if (!permitidas.includes(tabla)) {
+      return res.status(400).json({ error: `Tabla no permitida: ${tabla}` });
+    }
+    try {
+      const r = await c.execute(`DELETE FROM ${tabla}`);
+      return res.json({ ok: true, tabla, deleted: r.rowsAffected });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

@@ -31,13 +31,28 @@ export default function DashboardScreen({ user }: DashboardScreenProps) {
 
   useEffect(() => {
     const loadData = () => {
-      const alumnos = lsGet<any[]>(LS_ALUMNOS, []);
-      const docentes = lsGet<any[]>(LS_DOCENTES, []);
+      const todosAlumnos  = lsGet<any[]>(LS_ALUMNOS, []);
+      const docentes      = lsGet<any[]>(LS_DOCENTES, []);
       const calificaciones = lsGet<any[]>(LS_CALIFICATIVOS, []);
-      const asistencia = lsGet<any[]>(LS_ASISTENCIA, []);
-      const columnas = lsGet<any[]>('cal_columnas', []);
+      const asistencia    = lsGet<any[]>(LS_ASISTENCIA, []);
 
-      const uniqueGrados = [...new Set(alumnos.map(a => a.grado).filter(Boolean))];
+      // Si es docente, filtrar solo sus alumnos según sus asignaciones
+      let alumnos = todosAlumnos;
+      if (user.role === 'teacher' && (user as any).docenteId) {
+        const asignaciones = lsGet<any[]>('cfg_asignaciones', []);
+        const mias = asignaciones.filter(a => a.docenteId === (user as any).docenteId);
+        if (mias.length > 0) {
+          const grados   = [...new Set(mias.flatMap(a => a.grados   || []))] as string[];
+          const secciones = [...new Set(mias.flatMap(a => a.secciones || []))] as string[];
+          alumnos = todosAlumnos.filter(a =>
+            grados.includes(a.grado) && secciones.includes(a.seccion)
+          );
+        } else {
+          alumnos = []; // docente sin asignación → no mostrar alumnos ajenos
+        }
+      }
+
+      const uniqueGrados   = [...new Set(alumnos.map(a => a.grado).filter(Boolean))];
       const uniqueSecciones = [...new Set(alumnos.map(a => a.seccion).filter(Boolean))];
 
       const fechaHoy = new Date().toISOString().split('T')[0];
@@ -57,7 +72,7 @@ export default function DashboardScreen({ user }: DashboardScreenProps) {
 
       setStats({
         estudiantes: alumnos.length,
-        docentes: docentes.length,
+        docentes: user.role === 'teacher' ? 1 : docentes.length,
         asistencia: asistenciaPct,
         promedio: parseFloat(promedio),
         calificaciones: calificaciones.length,
@@ -68,7 +83,7 @@ export default function DashboardScreen({ user }: DashboardScreenProps) {
     };
 
     loadData();
-  }, []);
+  }, [user]);
 
   const gradesData = [
     { period: 'C1', promedio: stats.promedio > 0 ? stats.promedio : 7.5 },

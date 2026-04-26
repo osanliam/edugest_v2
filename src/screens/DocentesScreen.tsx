@@ -235,9 +235,9 @@ export default function DocentesScreen() {
   };
 
   const filtrados = docentes.filter(d =>
-    d.apellidos_nombres.toLowerCase().includes(busqueda.toLowerCase()) ||
-    d.dni.includes(busqueda) ||
-    d.cargo?.toLowerCase().includes(busqueda.toLowerCase())
+    (d.apellidos_nombres || '').toLowerCase().includes(busqueda.toLowerCase()) ||
+    (d.dni || '').includes(busqueda) ||
+    (d.cargo || '').toLowerCase().includes(busqueda.toLowerCase())
   );
 
   return (

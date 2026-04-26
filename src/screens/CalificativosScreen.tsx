@@ -905,7 +905,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       setAlumnos(localAlumnos);
       setColumnas(localColumnas);
       setCalificativos(localCalif);
-      setBimestres((localUnidades || []).filter((u: any) => u.activa !== false));
+      setBimestres((localUnidades || []).filter((u: any) => u.activa !== false && u.activa !== 0));
       // Aplicar asignación inmediatamente desde localStorage
       if (localAsigs.length > 0) aplicarAsignacion(localAsigs);
 
