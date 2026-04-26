@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search, RefreshCw } from 'lucide-react';
+import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search, RefreshCw, Download } from 'lucide-react';
 import { cargarTodo, guardarCalificativos, guardarColumnas, getAsignaciones } from '../utils/apiClient';
 
 // ── Competencias ──────────────────────────────────────────────────────────────
@@ -961,6 +961,8 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     setPopup(null);
     // Guardar primero en localStorage (nunca se pierde)
     localStorage.setItem('ie_calificativos_v2', JSON.stringify(todos));
+    // Backup automático cada 5 notas guardadas
+    if (todos.length % 5 === 0) backupAutomatico();
     // Intentar sync con Turso en segundo plano
     try {
       await guardarCalificativos(todos);
@@ -982,6 +984,30 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       await guardarColumnas(todas);
     } catch (err: any) {
       console.warn('Sync Turso columnas falló:', err.message);
+    }
+  };
+
+  // ── Backup automático ─────────────────────────────────────────────────
+  const backupAutomatico = () => {
+    try {
+      const data = {
+        alumnos: JSON.parse(localStorage.getItem('ie_alumnos') || '[]'),
+        calificaciones: JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]'),
+        columnas: JSON.parse(localStorage.getItem('cal_columnas') || '[]'),
+        asignaciones: JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]'),
+        usuarios: JSON.parse(localStorage.getItem('sistema_usuarios') || '[]'),
+        docentes: JSON.parse(localStorage.getItem('ie_docentes') || '[]'),
+        unidades: JSON.parse(localStorage.getItem('cfg_unidades') || '[]'),
+        timestamp: new Date().toISOString(),
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `backup-edugest-auto-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      console.log('✅ Backup automático descargado');
+    } catch (e) {
+      console.error('❌ Error en backup automático:', e);
     }
   };
 
@@ -1057,6 +1083,10 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
             <button onClick={handleRecargar} disabled={syncing}
               className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg text-xs font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
               <RefreshCw size={13} className={syncing ? 'animate-spin' : ''}/> {syncing ? 'Cargando...' : 'Recargar'}
+            </button>
+            <button onClick={backupAutomatico}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">
+              <Download size={13}/> Backup
             </button>
           </div>
         </div>
