@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Phone, Users } from 'lucide-react';
-import { getAlumnos, crearAlumno, editarAlumno, eliminarAlumno, getAsignaciones } from '../utils/apiClient';
+import { getAlumnos, crearAlumno, editarAlumno, eliminarAlumno, getAsignaciones, cargarTodo } from '../utils/apiClient';
 import HeaderElegante from '../components/HeaderElegante';
 
 interface Apoderado {
@@ -155,6 +155,50 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
       }
     } catch (e) {
       console.error('Error cargando asignación:', e);
+    }
+  };
+
+  const sincronizarDesdeTurso = async () => {
+    setCargando(true);
+    try {
+      mostrar('ok', '📥 Descargando datos de la nube...');
+      const todo = await cargarTodo();
+      let guardados = 0;
+      if (todo.asignaciones?.length) {
+        localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
+        guardados++;
+      }
+      if (todo.alumnos?.length) {
+        localStorage.setItem('ie_alumnos', JSON.stringify(todo.alumnos));
+        guardados++;
+      }
+      if (todo.docentes?.length) {
+        localStorage.setItem('ie_docentes', JSON.stringify(todo.docentes));
+        guardados++;
+      }
+      if (todo.columnas?.length) {
+        localStorage.setItem('cal_columnas', JSON.stringify(todo.columnas));
+        guardados++;
+      }
+      if (todo.unidades?.length) {
+        localStorage.setItem('cfg_unidades', JSON.stringify(todo.unidades));
+        guardados++;
+      }
+      if (todo.normas?.length) {
+        localStorage.setItem('cfg_normas_convivencia', JSON.stringify(todo.normas));
+        guardados++;
+      }
+      if (todo.calificaciones?.length) {
+        localStorage.setItem('ie_calificativos_v2', JSON.stringify(todo.calificaciones));
+        guardados++;
+      }
+      mostrar('ok', `✅ ${guardados} tablas descargadas. Recargando...`);
+      cargar();
+      cargarAsignacion();
+    } catch (e: any) {
+      mostrar('err', '❌ Error descargando: ' + e.message);
+    } finally {
+      setCargando(false);
     }
   };
 
@@ -584,7 +628,16 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
             <p className="text-slate-400">Cargando alumnos...</p>
           </div>
         ) : filtrados.length === 0 ? (
-          <div className="text-center py-16 text-slate-500">No se encontraron alumnos</div>
+          <div className="text-center py-16 space-y-4">
+            <p className="text-slate-500">No se encontraron alumnos</p>
+            {esDocente && (
+              <button onClick={sincronizarDesdeTurso} disabled={cargando}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl text-sm hover:from-green-400 hover:to-emerald-500 transition-all shadow-lg hover:shadow-green-500/30 disabled:opacity-50">
+                {cargando ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+                {cargando ? 'Descargando...' : '📥 Cargar datos de la nube'}
+              </button>
+            )}
+          </div>
         ) : (
           <div className="space-y-2">
             {filtrados.map((a, i) => (

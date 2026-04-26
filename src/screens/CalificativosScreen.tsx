@@ -929,7 +929,51 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     cargarAsignacion();
   }, []);
 
-  // ── Funciones de sincronización manual (recarga desde Turso) ─────────────────
+  // ── Sincronización manual desde Turso ────────────────────────────────────
+  const sincronizarDesdeTurso = async () => {
+    setSyncing(true);
+    setSyncMsg({ tipo: 'ok', texto: '📥 Descargando datos de la nube...' });
+    try {
+      const todo = await cargarTodo();
+      let guardados = 0;
+      if (todo.asignaciones?.length) {
+        localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
+        guardados++;
+      }
+      if (todo.alumnos?.length) {
+        setAlumnos(todo.alumnos);
+        localStorage.setItem('ie_alumnos', JSON.stringify(todo.alumnos));
+        guardados++;
+      }
+      if (todo.docentes?.length) {
+        localStorage.setItem('ie_docentes', JSON.stringify(todo.docentes));
+        guardados++;
+      }
+      if (todo.columnas?.length) {
+        setColumnas(todo.columnas);
+        localStorage.setItem('cal_columnas', JSON.stringify(todo.columnas));
+        guardados++;
+      }
+      if (todo.unidades?.length) {
+        setBimestres((todo.unidades || []).filter((u: any) => u.activa !== false));
+        localStorage.setItem('cfg_unidades', JSON.stringify(todo.unidades));
+        guardados++;
+      }
+      if (todo.calificaciones?.length) {
+        setCalificativos(todo.calificaciones);
+        localStorage.setItem('ie_calificativos_v2', JSON.stringify(todo.calificaciones));
+        guardados++;
+      }
+      await cargarAsignacion();
+      setSyncMsg({ tipo: 'ok', texto: `✅ ${guardados} tablas descargadas de la nube` });
+    } catch (e: any) {
+      setSyncMsg({ tipo: 'err', texto: `❌ Error descargando: ${e.message}` });
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMsg(null), 4000);
+    }
+  };
+
   const handleRecargar = async () => {
     setSyncMsg(null);
     await cargar();
@@ -1219,8 +1263,17 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
 
         {/* Estados vacíos */}
         {alumnosFiltrados.length === 0 ? (
-          <div className="text-center py-20 text-slate-500">
-            {alumnos.length === 0 ? 'No hay alumnos registrados. Ve al módulo Alumnos para agregarlos.' : 'Sin alumnos con ese filtro.'}
+          <div className="text-center py-20 space-y-4">
+            <p className="text-slate-500">
+              {alumnos.length === 0 ? 'No hay alumnos registrados.' : 'Sin alumnos con ese filtro.'}
+            </p>
+            {esDocente && alumnos.length === 0 && (
+              <button onClick={sincronizarDesdeTurso} disabled={syncing}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl text-sm hover:from-green-400 hover:to-emerald-500 transition-all shadow-lg hover:shadow-green-500/30 disabled:opacity-50">
+                {syncing ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+                {syncing ? 'Descargando...' : '📥 Cargar datos de la nube'}
+              </button>
+            )}
           </div>
         ) : (
           <>
