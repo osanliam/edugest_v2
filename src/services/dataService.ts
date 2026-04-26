@@ -267,38 +267,15 @@ export async function loadSystemData() {
   
   if (cloudData) {
     // Fusionar datos de la nube con locales
+    // Turso es la fuente de verdad — reemplazar localStorage directamente sin fusionar
     if (cloudData.alumnos?.length > 0) {
-      const localAlum = getEstudiantes();
-      const cloudIds = new Set(cloudData.alumnos.map((a: any) => a.id));
-      const fusionados = [...localAlum];
-      cloudData.alumnos.forEach((a: any) => {
-        if (!fusionados.find(x => x.id === a.id)) {
-          fusionados.push(a);
-        }
-      });
-      localStorage.setItem('ie_alumnos', JSON.stringify(fusionados));
+      localStorage.setItem('ie_alumnos', JSON.stringify(cloudData.alumnos));
     }
-    
     if (cloudData.docentes?.length > 0) {
-      const localDoc = getMaestros();
-      const fusionados = [...localDoc];
-      cloudData.docentes.forEach((d: any) => {
-        if (!fusionados.find(x => x.id === d.id)) {
-          fusionados.push(d);
-        }
-      });
-      localStorage.setItem('ie_docentes', JSON.stringify(fusionados));
+      localStorage.setItem('ie_docentes', JSON.stringify(cloudData.docentes));
     }
-    
     if (cloudData.usuarios?.length > 0) {
-      const localUsr = getUsuarios();
-      const fusionados = [...localUsr];
-      cloudData.usuarios.forEach((u: any) => {
-        if (!fusionados.find(x => x.id === u.id)) {
-          fusionados.push(u);
-        }
-      });
-      localStorage.setItem('sistema_usuarios', JSON.stringify(fusionados));
+      localStorage.setItem('sistema_usuarios', JSON.stringify(cloudData.usuarios));
     }
     
     if (cloudData.columnas?.length > 0) {
@@ -367,27 +344,8 @@ export async function loadSystemData() {
   }
   
   // Sincronizar datos locales a la nube
-  const estudiantes = getEstudiantes();
-  const maestros = getMaestros();
-  const usuarios = getUsuarios();
-  const columnas = getColumnas();
-  const unidades = getUnidades();
-  const normas = getNormas();
-  const calificaciones = getCalificativos();
-  const asistencia = getAsistencia();
-  
-  if (estudiantes.length > 0) syncToTurso('alumnos', estudiantes);
-  if (maestros.length > 0) syncToTurso('docentes', maestros);
-  if (usuarios.length > 0) syncToTurso('usuarios', usuarios);
-  if (columnas.length > 0) syncToTurso('columnas', columnas);
-  if (unidades.length > 0) syncToTurso('unidades', unidades);
-  if (normas.length > 0) syncToTurso('normas', normas);
-  if (calificaciones.length > 0) syncToTurso('calificativos', calificaciones);
-  if (asistencia.length > 0) syncToTurso('asistencia', asistencia);
-  const registrosNormas = getRegistrosNormas();
-  if (registrosNormas.length > 0) syncToTurso('registros_normas', registrosNormas);
-  const asignaciones = getAsignaciones();
-  if (asignaciones.length > 0) syncToTurso('asignaciones', asignaciones);
+  // NO subir automáticamente a Turso — causa duplicados cada vez que alguien entra
+  // La subida se hace solo manualmente desde Configuración → Sincronizar
 
   return {
     estudiantes: getEstudiantes(),
