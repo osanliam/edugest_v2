@@ -713,15 +713,33 @@ function AsignacionesSection() {
     flash('ok', 'Archivo descargado. Envíalo por WhatsApp a cada docente.');
   };
 
+  const subirAsignacionesYAlumnos = async () => {
+    flash('ok', '📤 Subiendo asignaciones y alumnos...');
+    try {
+      const alumnos = lsGet('ie_alumnos', []);
+      const asigs = lsGet('cfg_asignaciones', []);
+      await syncToTurso('asignaciones', asigs);
+      await syncToTurso('alumnos', alumnos);
+      flash('ok', `✅ Subidos: ${asigs.length} asignaciones, ${alumnos.length} alumnos`);
+    } catch (e: any) {
+      flash('err', '❌ Error subiendo: ' + e.message);
+    }
+  };
+
   return (
     <div className={sectionCls}>
-      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-white font-bold text-lg flex items-center gap-2">🏫 Asignaciones Docente-Curso</h2>
         <div className="flex gap-2">
           {asignaciones.length > 0 && (
-            <button onClick={exportarParaDocentes} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-sm">
-              <Download size={15}/> Exportar para docentes
-            </button>
+            <>
+              <button onClick={subirAsignacionesYAlumnos} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold text-sm">
+                <RefreshCw size={15}/> Subir a la nube
+              </button>
+              <button onClick={exportarParaDocentes} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-sm">
+                <Download size={15}/> Exportar para docentes
+              </button>
+            </>
           )}
           <button onClick={abrirNueva} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm">
             <Plus size={15}/> Nueva asignación

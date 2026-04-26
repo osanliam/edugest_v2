@@ -235,7 +235,6 @@ export async function syncAllToTurso(): Promise<{ ok: boolean; message: string; 
 
   const syncedTypes: string[] = [];
   const failedTypes: string[] = [];
-  const allDetalles: string[] = [];
 
   for (const { key, tipo } of tipos) {
     try {
@@ -244,29 +243,11 @@ export async function syncAllToTurso(): Promise<{ ok: boolean; message: string; 
       const datos = JSON.parse(raw);
       if (!Array.isArray(datos) || datos.length === 0) continue;
 
-      const res = await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo, datos }),
-      });
-
-      const body = await res.json().catch(() => ({ success: false }));
-
-      if (res.ok && body.success) {
-        syncedTypes.push(`${tipo} (${body.ok ?? datos.length})`);
-      } else if (res.ok && body.ok > 0) {
-        // Parcialmente OK
-        syncedTypes.push(`${tipo} (${body.ok}/${datos.length})`);
-        if (body.detalles?.length) allDetalles.push(...body.detalles);
-      } else {
-        failedTypes.push(tipo);
-        const msg = body.error || body.detalles?.[0] || 'error desconocido';
-        allDetalles.push(`[${tipo}] ${msg}`);
-        console.error(`Sync error [${tipo}]:`, body);
-      }
+      // Usar syncToTurso que ya maneja chunks de 50
+      await syncToTurso(tipo, datos);
+      syncedTypes.push(`${tipo} (${datos.length})`);
     } catch (e: any) {
       failedTypes.push(tipo);
-      allDetalles.push(`[${tipo}] ${e.message}`);
       console.error(`Error syncing ${tipo}:`, e);
     }
   }
@@ -276,7 +257,7 @@ export async function syncAllToTurso(): Promise<{ ok: boolean; message: string; 
     ? `Sincronización completa: ${syncedTypes.length} colecciones subidas a Turso`
     : `Sync parcial: ${syncedTypes.length} OK — falló: ${failedTypes.join(', ')}`;
 
-  return { ok, message, syncedTypes: [...syncedTypes, ...allDetalles.map(d => `⚠ ${d}`)] };
+  return { ok, message, syncedTypes };
 }
 
 // ── Cargar datos del sistema ───────────────────────────────────────────────────
