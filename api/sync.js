@@ -239,7 +239,16 @@ export default async function handler(req, res) {
       if (tiposSolicitados.includes('unidades'))          data.unidades          = await ejecutar('SELECT * FROM unidades');
       if (tiposSolicitados.includes('normas'))            data.normas            = await ejecutar('SELECT * FROM normas');
       if (tiposSolicitados.includes('registros_normas'))  data.registros_normas  = await ejecutar('SELECT * FROM registros_normas');
-      if (tiposSolicitados.includes('asignaciones'))      data.asignaciones      = await ejecutar('SELECT * FROM asignaciones');
+      if (tiposSolicitados.includes('asignaciones')) {
+        const rawAsigs = await ejecutar('SELECT * FROM asignaciones');
+        // Parsear campos JSON que Turso devuelve como string
+        data.asignaciones = rawAsigs.map(a => ({
+          ...a,
+          grados:    typeof a.grados    === 'string' ? JSON.parse(a.grados    || '[]') : (a.grados    || []),
+          secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
+          cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
+        }));
+      }
 
       return res.json(data);
     } catch (e) {
