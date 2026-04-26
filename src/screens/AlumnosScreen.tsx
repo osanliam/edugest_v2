@@ -329,6 +329,35 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
     XLSX.writeFile(wb, 'plantilla_alumnos.xlsx');
   };
 
+  const importarAsignacionDocente = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(String(ev.target?.result || '{}'));
+        if (data.tipo !== 'asignacion_docente') {
+          mostrar('err', 'Archivo no válido. Usa el archivo generado desde Configuración > Asignaciones.');
+          return;
+        }
+        // Guardar asignaciones y alumnos en localStorage
+        if (Array.isArray(data.asignaciones)) {
+          localStorage.setItem('cfg_asignaciones', JSON.stringify(data.asignaciones));
+        }
+        if (Array.isArray(data.alumnos)) {
+          localStorage.setItem('ie_alumnos', JSON.stringify(data.alumnos));
+        }
+        mostrar('ok', '✅ Asignación cargada. Recargando...');
+        cargar();
+        cargarAsignacion();
+      } catch {
+        mostrar('err', 'Error leyendo el archivo JSON');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // Si es docente, filtrar solo por sus grados y secciones asignadas
   const alumnosBase = esDocente && asignacionDocente
     ? alumnos.filter(a =>

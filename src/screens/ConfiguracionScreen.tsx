@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle, Wifi, WifiOff, Database, Key, Server, Settings } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle, Wifi, WifiOff, Database, Key, Server, Settings, Download } from 'lucide-react';
 import HeaderElegante from '../components/HeaderElegante';
 import { getStorageStats, isSyncedToCloud, syncAllToTurso, syncToTurso } from '../services/dataService';
 import { getAsignaciones as getAsignacionesTurso } from '../utils/apiClient';
@@ -697,13 +697,36 @@ function AsignacionesSection() {
   };
   const nombreCurso = (id: string) => cursos.find(c=>c.id===id)?.nombre || 'Curso';
 
+  const exportarParaDocentes = () => {
+    const alumnos = lsGet('ie_alumnos', []);
+    const data = {
+      tipo: 'asignacion_docente',
+      fecha: new Date().toISOString(),
+      asignaciones,
+      alumnos,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `asignaciones_docentes_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    flash('ok', 'Archivo descargado. Envíalo por WhatsApp a cada docente.');
+  };
+
   return (
     <div className={sectionCls}>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-white font-bold text-lg flex items-center gap-2">🏫 Asignaciones Docente-Curso</h2>
-        <button onClick={abrirNueva} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm">
-          <Plus size={15}/> Nueva asignación
-        </button>
+        <div className="flex gap-2">
+          {asignaciones.length > 0 && (
+            <button onClick={exportarParaDocentes} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-sm">
+              <Download size={15}/> Exportar para docentes
+            </button>
+          )}
+          <button onClick={abrirNueva} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm">
+            <Plus size={15}/> Nueva asignación
+          </button>
+        </div>
       </div>
       {msg && <Msg tipo={msg.tipo} texto={msg.texto}/>}
 

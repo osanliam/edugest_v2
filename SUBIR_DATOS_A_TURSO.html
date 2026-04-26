@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SUBIR DATOS A TURSO — EduGest</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; margin: 0; padding: 20px; min-height: 100vh; }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { text-align: center; color: #38bdf8; margin-bottom: 10px; }
+  .subtitle { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 30px; }
+  .card { background: rgba(30,41,59,0.8); border: 1px solid rgba(56,189,248,0.2); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+  .card h2 { color: #7dd3fc; font-size: 18px; margin-top: 0; display: flex; align-items: center; gap: 8px; }
+  .stat { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(148,163,184,0.1); }
+  .stat:last-child { border-bottom: none; }
+  .stat-label { color: #94a3b8; font-size: 14px; }
+  .stat-value { color: #38bdf8; font-weight: bold; font-size: 16px; }
+  .stat-value.empty { color: #ef4444; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: 100%; }
+  .btn-primary { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(14,165,233,0.3); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
+  .progress-container { background: rgba(15,23,42,0.6); border-radius: 12px; padding: 20px; margin-top: 20px; }
+  .progress-bar-bg { background: rgba(148,163,184,0.2); border-radius: 8px; height: 20px; overflow: hidden; }
+  .progress-bar-fill { background: linear-gradient(90deg, #0ea5e9, #22c55e); height: 100%; border-radius: 8px; transition: width 0.3s; width: 0%; }
+  .log { background: rgba(15,23,42,0.6); border-radius: 8px; padding: 12px; margin-top: 12px; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; }
+  .log-entry { padding: 2px 0; }
+  .log-ok { color: #4ade80; }
+  .log-err { color: #f87171; }
+  .log-info { color: #38bdf8; }
+  .warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); border-radius: 12px; padding: 16px; color: #fcd34d; font-size: 14px; margin-bottom: 20px; }
+  .success-box { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 12px; padding: 16px; color: #86efac; font-size: 14px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>☁️ SUBIR DATOS A TURSO</h1>
+  <p class="subtitle">Sincroniza todo tu localStorage a la base de datos en la nube</p>
+
+  <div class="warning">
+    ⚠️ <strong>Importante:</strong> Abre esta página en el navegador donde tienes todos los datos (tu computadora de administrador). <br>
+    No cierres esta pestaña hasta que termine. El proceso puede tardar 2-3 minutos.
+  </div>
+
+  <div class="card">
+    <h2>📊 Datos detectados en tu navegador</h2>
+    <div id="stats"></div>
+  </div>
+
+  <button id="btnSubir" class="btn btn-primary" onclick="iniciarSubida()">
+    🚀 Iniciar Subida a Turso
+  </button>
+
+  <div id="progressSection" class="progress-container" style="display:none;">
+    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+      <span id="progressLabel">Preparando...</span>
+      <span id="progressPercent">0%</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div id="progressBar" class="progress-bar-fill"></div>
+    </div>
+    <div id="log" class="log"></div>
+  </div>
+
+  <div id="resultado" style="display:none;"></div>
+</div>
+
+<script>
+// ── Configuración ───────────────────────────────────────────────────────────
+const CHUNK_SIZE = 30; // registros por chunk (evita timeout de Vercel)
+const DELAY_MS = 800;  // ms entre chunks
+
+const COLECCIONES = [
+  { key: 'ie_alumnos',             tipo: 'alumnos',            nombre: 'Alumnos' },
+  { key: 'ie_docentes',            tipo: 'docentes',           nombre: 'Docentes' },
+  { key: 'sistema_usuarios',       tipo: 'usuarios',           nombre: 'Usuarios' },
+  { key: 'cal_columnas',           tipo: 'columnas',           nombre: 'Columnas (Instrumentos)' },
+  { key: 'cfg_unidades',           tipo: 'unidades',           nombre: 'Unidades/Bimestres' },
+  { key: 'cfg_normas_convivencia', tipo: 'normas',             nombre: 'Normas de Convivencia' },
+  { key: 'ie_calificativos_v2',    tipo: 'calificativos',      nombre: 'Calificaciones/Notas' },
+  { key: 'ie_asistencia',          tipo: 'asistencia',         nombre: 'Registros de Asistencia' },
+  { key: 'ie_registros_normas',    tipo: 'registros_normas',   nombre: 'Registros de Normas' },
+  { key: 'cfg_asignaciones',       tipo: 'asignaciones',       nombre: 'Asignaciones Docente-Curso' },
+];
+
+let datos = {};
+let totalRegistros = 0;
+let procesados = 0;
+
+// ── Leer localStorage ───────────────────────────────────────────────────────
+function cargarDatos() {
+  datos = {};
+  totalRegistros = 0;
+  const statsDiv = document.getElementById('stats');
+  statsDiv.innerHTML = '';
+
+  for (const col of COLECCIONES) {
+    let items = [];
+    try {
+      const raw = localStorage.getItem(col.key);
+      if (raw) items = JSON.parse(raw);
+    } catch { items = []; }
+    if (!Array.isArray(items)) items = [];
+    datos[col.tipo] = items;
+    totalRegistros += items.length;
+
+    const div = document.createElement('div');
+    div.className = 'stat';
+    div.innerHTML = `
+      <span class="stat-label">${col.nombre}</span>
+      <span class="stat-value ${items.length === 0 ? 'empty' : ''}">${items.length} registros</span>
+    `;
+    statsDiv.appendChild(div);
+  }
+
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'stat';
+  totalDiv.style.borderTop = '2px solid rgba(56,189,248,0.3)';
+  totalDiv.style.marginTop = '10px';
+  totalDiv.style.paddingTop = '15px';
+  totalDiv.innerHTML = `
+    <span class="stat-label" style="font-size:16px; color:#e2e8f0;">TOTAL</span>
+    <span class="stat-value" style="font-size:18px;">${totalRegistros} registros</span>
+  `;
+  statsDiv.appendChild(totalDiv);
+}
+
+function log(msg, tipo = 'info') {
+  const div = document.getElementById('log');
+  const entry = document.createElement('div');
+  entry.className = `log-entry log-${tipo}`;
+  entry.textContent = `[${new Date().toLocaleTimeString('es-PE')}] ${msg}`;
+  div.appendChild(entry);
+  div.scrollTop = div.scrollHeight;
+}
+
+function actualizarProgreso(actual, total, label) {
+  const pct = Math.round((actual / total) * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressPercent').textContent = pct + '%';
+  if (label) document.getElementById('progressLabel').textContent = label;
+}
+
+// ── Subir en chunks ─────────────────────────────────────────────────────────
+async function subirChunk(tipo, chunk, intento = 1) {
+  try {
+    const res = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo, datos: chunk })
+    });
+    const body = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      if (body.error?.includes('timeout') || body.error?.includes('deadline') || res.status === 504) {
+        if (intento <= 2) {
+          log(`⏳ ${tipo} chunk timeout, reintentando (${intento}/2)...`, 'info');
+          await new Promise(r => setTimeout(r, 2000));
+          return subirChunk(tipo, chunk, intento + 1);
+        }
+      }
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+
+    return body;
+  } catch (e) {
+    // Si el chunk es grande, intentar mitad
+    if (chunk.length > 5 && intento <= 2) {
+      const mitad = Math.ceil(chunk.length / 2);
+      log(`📦 ${tipo}: dividiendo chunk de ${chunk.length} en 2 partes...`, 'info');
+      const r1 = await subirChunk(tipo, chunk.slice(0, mitad), intento + 1);
+      const r2 = await subirChunk(tipo, chunk.slice(mitad), intento + 1);
+      return { ok: (r1.ok||0)+(r2.ok||0), success: r1.success && r2.success };
+    }
+    throw e;
+  }
+}
+
+async function iniciarSubida() {
+  const btn = document.getElementById('btnSubir');
+  btn.disabled = true;
+  btn.textContent = '⏳ Subiendo...';
+  document.getElementById('progressSection').style.display = 'block';
+  document.getElementById('resultado').style.display = 'none';
+  procesados = 0;
+
+  log('🚀 Iniciando subida a Turso...', 'info');
+  log(`📊 Total registros: ${totalRegistros}`, 'info');
+
+  let totalSubidos = 0;
+  let totalFallados = 0;
+
+  for (const col of COLECCIONES) {
+    const items = datos[col.tipo] || [];
+    if (items.length === 0) {
+      log(`⏭️ ${col.nombre}: vacío, saltando`, 'info');
+      continue;
+    }
+
+    log(`📤 Subiendo ${col.nombre} (${items.length} registros)...`, 'info');
+    const chunks = [];
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      chunks.push(items.slice(i, i + CHUNK_SIZE));
+    }
+
+    let subidosTipo = 0;
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      try {
+        const res = await subirChunk(col.tipo, chunk);
+        subidosTipo += res.ok || chunk.length;
+        totalSubidos += res.ok || chunk.length;
+        procesados += chunk.length;
+        actualizarProgreso(procesados, totalRegistros, `${col.nombre}... ${i+1}/${chunks.length} chunks`);
+        log(`✅ ${col.nombre} chunk ${i+1}/${chunks.length}: ${res.ok || chunk.length} OK`, 'ok');
+      } catch (e) {
+        log(`❌ ${col.nombre} chunk ${i+1}/${chunks.length}: ${e.message}`, 'err');
+        totalFallados += chunk.length;
+        procesados += chunk.length;
+        actualizarProgreso(procesados, totalRegistros, `Error en ${col.nombre}`);
+      }
+      await new Promise(r => setTimeout(r, DELAY_MS));
+    }
+    log(`🏁 ${col.nombre}: ${subidosTipo}/${items.length} subidos`, subidosTipo === items.length ? 'ok' : 'info');
+  }
+
+  // Verificar
+  log('🔍 Verificando datos en Turso...', 'info');
+  try {
+    const res = await fetch('/api/sync');
+    const data = await res.json();
+    const totalTurso = (data.alumnos?.length||0) + (data.docentes?.length||0) + (data.usuarios?.length||0) +
+                       (data.calificaciones?.length||0) + (data.asistencia?.length||0);
+    log(`☁️ Turso ahora tiene ~${totalTurso} registros visibles`, 'info');
+  } catch {
+    log('⚠️ No se pudo verificar Turso', 'err');
+  }
+
+  // Resultado
+  const resultado = document.getElementById('resultado');
+  resultado.style.display = 'block';
+  if (totalFallados === 0) {
+    resultado.innerHTML = `
+      <div class="success-box">
+        ✅ <strong>¡Sincronización completa!</strong><br>
+        Se subieron ${totalSubidos} registros a Turso.<br>
+        Ahora tus docentes podrán ver todo desde cualquier dispositivo.
+      </div>
+    `;
+  } else {
+    resultado.innerHTML = `
+      <div class="warning">
+        ⚠️ <strong>Sincronización parcial</strong><br>
+        Subidos: ${totalSubidos} | Fallados: ${totalFallados}<br>
+        Revisa los errores arriba. Puedes reintentar la subida.
+      </div>
+    `;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔄 Reintentar Subida';
+}
+
+// ── Inicio ──────────────────────────────────────────────────────────────────
+cargarDatos();
+</script>
+</body>
+</html>

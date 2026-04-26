@@ -69,15 +69,21 @@ export function getEnv() {
 
 export async function syncToTurso(tipo: string, datos: any[]) {
   if (!TURSO_ENABLED || !datos || datos.length === 0) return;
+  const CHUNK = 50;
   try {
-    const res = await fetchWithTimeout('/api/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo, datos })
-    }, 8000);
-    if (res.ok) {
-      console.log(`✅ Sincronizado: ${tipo} (${datos.length} registros)`);
+    for (let i = 0; i < datos.length; i += CHUNK) {
+      const chunk = datos.slice(i, i + CHUNK);
+      const res = await fetchWithTimeout('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo, datos: chunk })
+      }, 8000);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error(`Sync error [${tipo}] chunk ${i}-${i+chunk.length}:`, body.error || res.status);
+      }
     }
+    console.log(`✅ Sincronizado: ${tipo} (${datos.length} registros en ${Math.ceil(datos.length/CHUNK)} chunks)`);
   } catch (e) {
     console.error('Sync error:', e);
   }

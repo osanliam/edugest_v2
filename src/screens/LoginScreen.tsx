@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from "motion/react";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
 import { User as UserType } from '../types';
-import { login as apiLogin, setToken } from '../utils/apiClient';
+import { login as apiLogin, setToken, cargarTodo } from '../utils/apiClient';
 
 // Siempre usa la API real — directo a Turso
 async function loginRequest(email: string, password: string) {
@@ -32,6 +32,26 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       // El token ya se guarda en sessionStorage dentro de apiClient.login()
       // Solo guardamos el user en sessionStorage para restaurar sesión al recargar
       sessionStorage.setItem('user', JSON.stringify(data.user));
+
+      // Sincronización automática: descargar todo de Turso al login
+      try {
+        const todo = await cargarTodo();
+        if (todo.asignaciones?.length) localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
+        if (todo.alumnos?.length) localStorage.setItem('ie_alumnos', JSON.stringify(todo.alumnos));
+        if (todo.docentes?.length) localStorage.setItem('ie_docentes', JSON.stringify(todo.docentes));
+        if (todo.columnas?.length) localStorage.setItem('cal_columnas', JSON.stringify(todo.columnas));
+        if (todo.unidades?.length) localStorage.setItem('cfg_unidades', JSON.stringify(todo.unidades));
+        if (todo.normas?.length) localStorage.setItem('cfg_normas_convivencia', JSON.stringify(todo.normas));
+        if (todo.calificaciones?.length) localStorage.setItem('ie_calificativos_v2', JSON.stringify(todo.calificaciones));
+        if (todo.asistencia?.length) localStorage.setItem('ie_asistencia', JSON.stringify(todo.asistencia));
+        console.log('✅ Sync automático al login:', {
+          alumnos: todo.alumnos?.length || 0,
+          asignaciones: todo.asignaciones?.length || 0,
+          docentes: todo.docentes?.length || 0,
+        });
+      } catch (syncErr: any) {
+        console.warn('⚠️ Sync automático falló (seguimos con localStorage):', syncErr.message);
+      }
 
       const user: UserType = {
         id: data.user.id,
