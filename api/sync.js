@@ -1,4 +1,15 @@
 import { createClient } from '@libsql/client';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'sistemita-secreto-2026-muy-seguro';
+
+function parseJWT(req) {
+  try {
+    const auth = req.headers?.authorization || '';
+    if (!auth.startsWith('Bearer ')) return null;
+    return jwt.verify(auth.slice(7), JWT_SECRET);
+  } catch { return null; }
+}
 
 let client = null;
 let tablesReady = false;
@@ -130,6 +141,26 @@ async function ensureTables(c) {
       cursos TEXT,
       extra TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS historial_calificaciones (
+      id TEXT PRIMARY KEY,
+      calificacion_id TEXT NOT NULL,
+      docenteId TEXT,
+      alumnoId TEXT,
+      columnaId TEXT,
+      datos_anteriores TEXT,
+      datos_nuevos TEXT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS auditoria (
+      id TEXT PRIMARY KEY,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      usuario_id TEXT,
+      accion TEXT,
+      tabla TEXT,
+      registro_id TEXT,
+      cambios TEXT,
+      ip TEXT
+    )`,
   ];
 
   for (const sql of stmts) {
@@ -146,6 +177,17 @@ async function ensureTables(c) {
   await alterSafe(`ALTER TABLE asistencia ADD COLUMN modo TEXT`);
   await alterSafe(`ALTER TABLE asistencia ADD COLUMN hora TEXT`);
   await alterSafe(`ALTER TABLE users ADD COLUMN docenteId TEXT`);
+  await alterSafe(`ALTER TABLE calificaciones ADD COLUMN docenteId TEXT`);
+  await alterSafe(`ALTER TABLE calificaciones ADD COLUMN updated_at DATETIME`);
+
+  // Índices para acelerar las queries más frecuentes
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_cal_alumno    ON calificaciones(alumnoId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_cal_columna   ON calificaciones(columnaId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_cal_updated   ON calificaciones(updated_at)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_cal_compound  ON calificaciones(alumnoId, columnaId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_asig_docente  ON asignaciones(docenteId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_alumnos_grado ON alumnos(grado, seccion)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_users_email   ON users(email)`);
 
   tablesReady = true;
 }
@@ -172,6 +214,40 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Error inicializando tablas: ' + e.message });
   }
 
+  // ── GET accion=auditoria → logs de auditoría (solo admin/director) ──────
+  if (req.method === 'GET' && req.query?.accion === 'auditoria') {
+    const usuarioJWT = parseJWT(req);
+    const rolesPermitidos = ['admin', 'director', 'subdirector'];
+    if (!usuarioJWT || !rolesPermitidos.includes(usuarioJWT.role)) {
+      return res.status(403).json({ error: 'Sin permiso para ver auditoría' });
+    }
+    try {
+      const limite = parseInt(req.query?.limite || '100');
+      const r = await c.execute({
+        sql: 'SELECT * FROM auditoria ORDER BY timestamp DESC LIMIT ?',
+        args: [limite],
+      });
+      return res.json({ ok: true, registros: r.rows || [] });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── GET accion=historial&id=cal-xxx → versiones anteriores de un calificativo ──
+  if (req.method === 'GET' && req.query?.accion === 'historial') {
+    const calId = req.query?.id;
+    if (!calId) return res.status(400).json({ error: 'Falta id' });
+    try {
+      const r = await c.execute({
+        sql: 'SELECT * FROM historial_calificaciones WHERE calificacion_id = ? ORDER BY timestamp DESC LIMIT 20',
+        args: [calId],
+      });
+      return res.json({ ok: true, historial: r.rows || [] });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ── GET accion=contar  → solo devuelve COUNT de cada tabla (muy rápido) ──
   if (req.method === 'GET' && req.query?.accion === 'contar') {
     try {
@@ -190,6 +266,71 @@ export default async function handler(req, res) {
         conteos.cal_fecha_max = r.rows?.[0]?.max_fecha ?? '';
       } catch {}
       return res.json(conteos);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── GET accion=diagnostico → tamaño total + conteos de TODAS las tablas ──
+  if (req.method === 'GET' && req.query?.accion === 'diagnostico') {
+    try {
+      const tablas = [
+        'users','docentes','apoderados','alumnos','columnas',
+        'calificaciones','asistencia','unidades','normas',
+        'registros_normas','asignaciones','historial_calificaciones','auditoria'
+      ];
+      const conteos = {};
+      for (const t of tablas) {
+        try {
+          const r = await c.execute(`SELECT COUNT(*) as n FROM ${t}`);
+          conteos[t] = Number(r.rows?.[0]?.n ?? 0);
+        } catch { conteos[t] = 0; }
+      }
+      // Tamaño real de la BD
+      let dbSize = 0;
+      try {
+        const r = await c.execute('SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()');
+        dbSize = r.rows?.[0]?.size || 0;
+      } catch {}
+      return res.json({ ok: true, dbSize, dbSizeKB: Math.round(dbSize/1024*10)/10, conteos });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── GET accion=limpiar_historial&dias=30 → borra historial viejo ───────────
+  if (req.method === 'GET' && req.query?.accion === 'limpiar_historial') {
+    const dias = parseInt(req.query?.dias || '30');
+    try {
+      const r = await c.execute(
+        `DELETE FROM historial_calificaciones WHERE timestamp < datetime('now', '-${dias} days')`
+      );
+      return res.json({ ok: true, eliminados: r.rowsAffected, dias });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── GET accion=limpiar_auditoria&dias=30 → borra auditoría vieja ───────────
+  if (req.method === 'GET' && req.query?.accion === 'limpiar_auditoria') {
+    const dias = parseInt(req.query?.dias || '30');
+    try {
+      const r = await c.execute(
+        `DELETE FROM auditoria WHERE timestamp < datetime('now', '-${dias} days')`
+      );
+      return res.json({ ok: true, eliminados: r.rowsAffected, dias });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── GET accion=vacuum → recompacta la base de datos ────────────────────────
+  if (req.method === 'GET' && req.query?.accion === 'vacuum') {
+    try {
+      await c.execute('VACUUM');
+      const r = await c.execute('SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()');
+      const dbSize = r.rows?.[0]?.size || 0;
+      return res.json({ ok: true, mensaje: 'VACUUM completado', dbSize, dbSizeKB: Math.round(dbSize/1024*10)/10 });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
@@ -240,6 +381,9 @@ export default async function handler(req, res) {
         ? tiposParam.split(',').map(t => t.trim()).filter(Boolean)
         : ['usuarios','docentes','alumnos','columnas','calificaciones','asistencia','unidades','normas','registros_normas','asignaciones'];
 
+      // Incremental: solo cambios desde una fecha dada
+      const desde = req.query?.desde || null;
+
       const ejecutar = async (sql) => {
         try { return (await c.execute(sql)).rows || []; } catch { return []; }
       };
@@ -247,14 +391,51 @@ export default async function handler(req, res) {
       const data = {};
       if (tiposSolicitados.includes('usuarios'))          data.usuarios          = await ejecutar('SELECT * FROM users');
       if (tiposSolicitados.includes('docentes'))          data.docentes          = await ejecutar('SELECT * FROM docentes');
-      if (tiposSolicitados.includes('alumnos'))           data.alumnos           = await ejecutar('SELECT * FROM alumnos');
+      if (tiposSolicitados.includes('alumnos')) {
+        const gradoFiltro = req.query?.grado || null;
+        if (gradoFiltro) {
+          const grados = gradoFiltro.split(',').map(g => g.trim());
+          const placeholders = grados.map(() => '?').join(',');
+          try {
+            const r = await c.execute({ sql: `SELECT * FROM alumnos WHERE grado IN (${placeholders})`, args: grados });
+            data.alumnos = r.rows || [];
+          } catch { data.alumnos = []; }
+        } else {
+          data.alumnos = await ejecutar('SELECT * FROM alumnos');
+        }
+      }
       if (tiposSolicitados.includes('columnas'))          data.columnas          = await ejecutar('SELECT * FROM columnas');
       if (tiposSolicitados.includes('calificaciones')) {
-        const rawCal = await ejecutar('SELECT * FROM calificaciones');
+        const page  = parseInt(req.query?.page  || '0');
+        const limit = parseInt(req.query?.limit || '0'); // 0 = sin límite (retro-compat)
+
+        let calSql = 'SELECT * FROM calificaciones';
+        const calArgs = [];
+        if (desde) {
+          calSql += ' WHERE updated_at > ?';
+          calArgs.push(desde);
+        }
+        if (limit > 0) calSql += ` LIMIT ${limit} OFFSET ${page * limit}`;
+
+        // En la primera página también devolvemos el total para que el frontend calcule páginas
+        if (limit > 0 && page === 0) {
+          try {
+            const cntSql = desde
+              ? 'SELECT COUNT(*) as total FROM calificaciones WHERE updated_at > ?'
+              : 'SELECT COUNT(*) as total FROM calificaciones';
+            const cntRes = await c.execute(desde ? { sql: cntSql, args: [desde] } : cntSql);
+            data.calificaciones_total = Number(cntRes.rows?.[0]?.total ?? 0);
+          } catch { data.calificaciones_total = 0; }
+        }
+
+        const rawCal = calArgs.length
+          ? (await c.execute({ sql: calSql, args: calArgs })).rows || []
+          : await ejecutar(calSql);
+        const toArr = (v) => { try { const p = typeof v === 'string' ? JSON.parse(v || '[]') : v; return Array.isArray(p) ? p : []; } catch { return []; } };
         data.calificaciones = rawCal.map(c => ({
           ...c,
-          marcados: typeof c.marcados === 'string' ? JSON.parse(c.marcados || '[]') : (c.marcados || []),
-          claves:   typeof c.claves   === 'string' ? JSON.parse(c.claves   || '[]') : (c.claves   || []),
+          marcados: toArr(c.marcados),
+          claves:   toArr(c.claves),
           esAD: c.esAD === 1 || c.esAD === true,
         }));
       }
@@ -333,35 +514,20 @@ export default async function handler(req, res) {
       }
 
       else if (tipo === 'alumnos') {
-        for (const a of datos) {
-          // Guardar todos los campos extra como JSON para no perder nada
-          const camposConocidos = ['id','apellidos_nombres','nombre','dni','fecha_nacimiento','edad','sexo','grado','seccion','telefono','direccion','apelidosPadre','nombreMadre','email'];
-          const extra = {};
-          for (const k of Object.keys(a)) {
-            if (!camposConocidos.includes(k)) extra[k] = a[k];
-          }
-          const e = await safeExec(c,
-            `INSERT OR REPLACE INTO alumnos (id, apellidos_nombres, nombre, dni, fecha_nacimiento, edad, sexo, grado, seccion, telefono, direccion, apelidosPadre, nombreMadre, email, extra)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              a.id,
-              a.apellidos_nombres || '',
-              a.nombre || '',
-              a.dni || '',
-              a.fecha_nacimiento || a.fechaNac || '',
-              a.edad ? String(a.edad) : '',
-              a.sexo || '',
-              a.grado || '',
-              a.seccion || '',
-              a.telefono || '',
-              a.direccion || '',
-              a.apelidosPadre || '',
-              a.nombreMadre || '',
-              a.email || '',
-              Object.keys(extra).length > 0 ? JSON.stringify(extra) : null,
-            ]
-          );
-          e ? errores.push(`alumno ${a.id}: ${e}`) : ok++;
+        // Batch en lotes de 100 para evitar timeout
+        const LOTE = 100;
+        const camposConocidos = ['id','apellidos_nombres','nombre','dni','fecha_nacimiento','edad','sexo','grado','seccion','telefono','direccion','apelidosPadre','nombreMadre','email'];
+        for (let i = 0; i < datos.length; i += LOTE) {
+          const lote = datos.slice(i, i + LOTE);
+          const stmts = lote.map(a => {
+            const extra = {};
+            for (const k of Object.keys(a)) { if (!camposConocidos.includes(k)) extra[k] = a[k]; }
+            return {
+              sql: `INSERT OR REPLACE INTO alumnos (id, apellidos_nombres, nombre, dni, fecha_nacimiento, edad, sexo, grado, seccion, telefono, direccion, apelidosPadre, nombreMadre, email, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              args: [a.id, a.apellidos_nombres||'', a.nombre||'', a.dni||'', a.fecha_nacimiento||a.fechaNac||'', a.edad?String(a.edad):'', a.sexo||'', a.grado||'', a.seccion||'', a.telefono||'', a.direccion||'', a.apelidosPadre||'', a.nombreMadre||'', a.email||'', Object.keys(extra).length>0?JSON.stringify(extra):null]
+            };
+          });
+          try { await c.batch(stmts, 'write'); ok += lote.length; } catch(e) { errores.push(`lote ${i}: ${e.message}`); }
         }
       }
 
@@ -377,13 +543,73 @@ export default async function handler(req, res) {
       }
 
       else if (tipo === 'calificativos') {
+        const usuarioJWT = parseJWT(req);
+        const docenteId = usuarioJWT?.id || usuarioJWT?.docenteId || null;
+        const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+        const ahora = new Date().toISOString();
+
         for (const cal of datos) {
+          const id = cal.id || ('cal-' + cal.alumnoId + '-' + cal.columnaId);
+          let marcadosFinales = cal.marcados || [];
+          let accion = 'save';
+
+          // Leer registro existente para historial y merge
+          let datosAnteriores = null;
+          try {
+            const existente = await c.execute({
+              sql: 'SELECT id, docenteId, marcados, calificativo, esAD FROM calificaciones WHERE id = ?',
+              args: [id],
+            });
+            const reg = existente.rows[0];
+            if (reg) {
+              datosAnteriores = { marcados: reg.marcados, calificativo: reg.calificativo, esAD: reg.esAD, docenteId: reg.docenteId };
+              // Merge: si otro docente tiene el mismo registro, combinar marcados con OR
+              if (reg.docenteId && docenteId && reg.docenteId !== docenteId) {
+                accion = 'merge';
+                const prevMarcados = typeof reg.marcados === 'string' ? JSON.parse(reg.marcados || '[]') : (reg.marcados || []);
+                marcadosFinales = marcadosFinales.map((v, i) => v || (prevMarcados[i] || false));
+              }
+            }
+          } catch { /* continuar sin historial si falla */ }
+
+          // Guardar con docenteId y updated_at
           const e = await safeExec(c,
-            `INSERT OR REPLACE INTO calificaciones (id, alumnoId, columnaId, marcados, claves, notaNumerica, calificativo, esAD, fecha)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [cal.id || ('cal-' + cal.alumnoId + '-' + cal.columnaId), cal.alumnoId, cal.columnaId, JSON.stringify(cal.marcados || []), JSON.stringify(cal.claves || []), cal.notaNumerica || null, cal.calificativo || '', cal.esAD ? 1 : 0, cal.fecha || '']
+            `INSERT OR REPLACE INTO calificaciones
+               (id, alumnoId, columnaId, marcados, claves, notaNumerica, calificativo, esAD, fecha, docenteId, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, cal.alumnoId, cal.columnaId, JSON.stringify(marcadosFinales), JSON.stringify(cal.claves || []), cal.notaNumerica ?? null, cal.calificativo || '', cal.esAD ? 1 : 0, cal.fecha || ahora, docenteId, ahora]
           );
-          e ? errores.push(`calificativo ${cal.id}: ${e}`) : ok++;
+
+          if (e) {
+            errores.push(`calificativo ${id}: ${e}`);
+            continue;
+          }
+          ok++;
+
+          // Historial: guardar snapshot antes/después
+          await safeExec(c,
+            `INSERT INTO historial_calificaciones (id, calificacion_id, docenteId, alumnoId, columnaId, datos_anteriores, datos_nuevos, timestamp)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              'hist-' + id + '-' + Date.now(),
+              id, docenteId, cal.alumnoId, cal.columnaId,
+              datosAnteriores ? JSON.stringify(datosAnteriores) : null,
+              JSON.stringify({ marcados: marcadosFinales, calificativo: cal.calificativo, esAD: cal.esAD }),
+              ahora,
+            ]
+          );
+
+          // Auditoría: registrar quién guardó qué
+          await safeExec(c,
+            `INSERT INTO auditoria (id, timestamp, usuario_id, accion, tabla, registro_id, cambios, ip)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              'aud-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+              ahora, docenteId || 'anonymous', accion, 'calificaciones', id,
+              JSON.stringify({ alumnoId: cal.alumnoId, columnaId: cal.columnaId, calificativo: cal.calificativo }),
+              ip,
+            ]
+          );
         }
       }
 
@@ -399,14 +625,17 @@ export default async function handler(req, res) {
       }
 
       else if (tipo === 'unidades') {
+        // Full-replace: eliminar todas y re-insertar para que las bajas se propaguen
+        await c.execute('DELETE FROM unidades');
         for (const u of datos) {
           const e = await safeExec(c,
-            `INSERT OR REPLACE INTO unidades (id, numero, nombre, bimestreId, activa)
+            `INSERT INTO unidades (id, numero, nombre, bimestreId, activa)
              VALUES (?, ?, ?, ?, ?)`,
             [u.id, u.numero || 0, u.nombre || '', u.bimestreId || null, u.activa !== false ? 1 : 0]
           );
           e ? errores.push(`unidad ${u.id}: ${e}`) : ok++;
         }
+        if (datos.length === 0) ok = 0; // borrado exitoso aunque no haya inserts
       }
 
       else if (tipo === 'normas') {
@@ -432,9 +661,11 @@ export default async function handler(req, res) {
       }
 
       else if (tipo === 'asignaciones') {
+        // Full-replace: eliminar todas y re-insertar para que las bajas se propaguen
+        await c.execute('DELETE FROM asignaciones');
         for (const a of datos) {
           const e = await safeExec(c,
-            `INSERT OR REPLACE INTO asignaciones (id, docenteId, grados, secciones, cursos, extra)
+            `INSERT INTO asignaciones (id, docenteId, grados, secciones, cursos, extra)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [
               a.id,
@@ -447,6 +678,7 @@ export default async function handler(req, res) {
           );
           e ? errores.push(`asignacion ${a.id}: ${e}`) : ok++;
         }
+        if (datos.length === 0) ok = 0;
       }
 
       else {

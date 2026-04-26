@@ -305,6 +305,7 @@ function UnidadesSection() {
     if (idx >= 0) todos[idx] = form;
     else todos.push({ ...form, id: 'uni-' + Date.now(), activa: form.activa !== false });
     lsSet(LS.unidades, todos);
+    syncToTurso('unidades', todos);
     setLista(todos);
     setForm(null);
     setMsg({tipo:'ok',texto:'Unidad guardada'});
@@ -314,12 +315,14 @@ function UnidadesSection() {
   const toggleActiva = (u: Unidad) => {
     const todos = lista.map(x => x.id === u.id ? { ...x, activa: !x.activa } : x);
     lsSet(LS.unidades, todos);
+    syncToTurso('unidades', todos);
     setLista(todos);
   };
 
   const eliminar = (id: string) => {
     const todos = lista.filter(u => u.id !== id);
     lsSet(LS.unidades, todos);
+    syncToTurso('unidades', todos);
     setLista(todos);
   };
 
@@ -875,6 +878,10 @@ function ApiStatusSection() {
   const [lastCheck, setLastCheck] = useState<string>('');
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ ok: boolean; message: string; syncedTypes: string[] } | null>(null);
+  const [diag, setDiag] = useState<any | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanResult, setCleanResult] = useState<any | null>(null);
   const storage = getStorageStats();
   const cloud = isSyncedToCloud();
 
@@ -919,6 +926,52 @@ function ApiStatusSection() {
       setSyncResult({ ok: false, message: 'Error inesperado al sincronizar', syncedTypes: [] });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const diagnosticarTurso = async () => {
+    setDiagLoading(true);
+    setDiag(null);
+    try {
+      const res = await fetch('/api/sync?accion=diagnostico', { signal: AbortSignal.timeout(10000) });
+      const data = await res.json();
+      if (data.ok) setDiag(data);
+      else setDiag({ error: data.error || 'Error desconocido' });
+    } catch (e: any) {
+      setDiag({ error: e.message });
+    } finally {
+      setDiagLoading(false);
+    }
+  };
+
+  const limpiarTabla = async (accion: string, dias: number) => {
+    setCleaning(true);
+    setCleanResult(null);
+    try {
+      const res = await fetch(`/api/sync?accion=${accion}&dias=${dias}`, { signal: AbortSignal.timeout(10000) });
+      const data = await res.json();
+      setCleanResult(data);
+      diagnosticarTurso();
+    } catch (e: any) {
+      setCleanResult({ error: e.message });
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  const vacuumTurso = async () => {
+    setCleaning(true);
+    setCleanResult(null);
+    try {
+      const res = await fetch('/api/sync?accion=vacuum', { signal: AbortSignal.timeout(30000) });
+      const data = await res.json();
+      setCleanResult(data);
+      if (data.dbSizeKB) setDbSize(`${data.dbSizeKB} KB`);
+      diagnosticarTurso();
+    } catch (e: any) {
+      setCleanResult({ error: e.message });
+    } finally {
+      setCleaning(false);
     }
   };
 
@@ -1049,6 +1102,76 @@ function ApiStatusSection() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Diagnóstico y Limpieza Turso */}
+      <div className={sectionCls}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="text-white font-bold text-base flex items-center gap-2">
+              <AlertCircle size={18} className="text-amber-400" />
+              Diagnóstico y Limpieza de Turso
+            </h2>
+            <p className="text-slate-400 text-xs mt-1">
+              Revisa qué tablas ocupan espacio y limpia historial/auditoría antigua.
+            </p>
+          </div>
+          <button onClick={diagnosticarTurso} disabled={diagLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+            <RefreshCw size={13} className={diagLoading ? 'animate-spin' : ''} />
+            {diagLoading ? 'Analizando...' : '🔍 Diagnosticar'}
+          </button>
+        </div>
+
+        {diag && !diag.error && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-700/40 rounded-xl p-3 flex-1">
+                <p className="text-xs text-slate-400 uppercase">Tamaño total</p>
+                <p className="text-white font-bold text-lg">{diag.dbSizeKB} KB</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {Object.entries(diag.conteos as Record<string,number>).map(([tabla, count]) => (
+                <div key={tabla} className={`bg-slate-700/40 rounded-lg px-3 py-2 ${count > 500 ? 'border border-red-500/30' : count > 100 ? 'border border-yellow-500/30' : ''}`}>
+                  <p className="text-[10px] text-slate-400 uppercase truncate">{tabla.replace(/_/g,' ')}</p>
+                  <p className={`text-lg font-black ${count > 500 ? 'text-red-400' : count > 100 ? 'text-yellow-400' : 'text-cyan-400'}`}>{count}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button onClick={() => limpiarTabla('limpiar_historial', 7)} disabled={cleaning}
+                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+                🗑️ Borrar historial &gt; 7 días
+              </button>
+              <button onClick={() => limpiarTabla('limpiar_auditoria', 7)} disabled={cleaning}
+                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+                🗑️ Borrar auditoría &gt; 7 días
+              </button>
+              <button onClick={() => limpiarTabla('limpiar_historial', 30)} disabled={cleaning}
+                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+                🗑️ Borrar historial &gt; 30 días
+              </button>
+              <button onClick={() => limpiarTabla('limpiar_auditoria', 30)} disabled={cleaning}
+                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+                🗑️ Borrar auditoría &gt; 30 días
+              </button>
+              <button onClick={vacuumTurso} disabled={cleaning}
+                className="px-3 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+                💾 VACUUM (compactar)
+              </button>
+            </div>
+          </div>
+        )}
+
+        {cleanResult && (
+          <div className={`rounded-xl p-3 border text-xs ${cleanResult.ok ? 'bg-green-500/15 border-green-500/30 text-green-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
+            {cleanResult.ok
+              ? `✅ ${cleanResult.mensaje || 'Operación completada'}${cleanResult.eliminados !== undefined ? ` · ${cleanResult.eliminados} registros eliminados` : ''}${cleanResult.dbSizeKB !== undefined ? ` · Tamaño ahora: ${cleanResult.dbSizeKB} KB` : ''}`
+              : `❌ Error: ${cleanResult.error || 'Desconocido'}`}
+          </div>
+        )}
       </div>
 
       {/* Cuentas del sistema */}
