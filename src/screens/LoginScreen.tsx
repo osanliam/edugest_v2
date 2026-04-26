@@ -33,30 +33,37 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       // Solo guardamos el user en sessionStorage para restaurar sesión al recargar
       sessionStorage.setItem('user', JSON.stringify(data.user));
 
-      // Sincronización automática: descargar de Turso al login (por partes para evitar timeout)
-      try {
-        // Paso 1: lo esencial
-        const todo = await cargarTodo('alumnos,asignaciones,docentes,columnas,unidades,normas');
-        if (todo.asignaciones?.length) localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
-        if (todo.alumnos?.length) localStorage.setItem('ie_alumnos', JSON.stringify(todo.alumnos));
-        if (todo.docentes?.length) localStorage.setItem('ie_docentes', JSON.stringify(todo.docentes));
-        if (todo.columnas?.length) localStorage.setItem('cal_columnas', JSON.stringify(todo.columnas));
-        if (todo.unidades?.length) localStorage.setItem('cfg_unidades', JSON.stringify(todo.unidades));
-        if (todo.normas?.length) localStorage.setItem('cfg_normas_convivencia', JSON.stringify(todo.normas));
-        console.log('✅ Sync automático al login:', {
-          alumnos: todo.alumnos?.length || 0,
-          asignaciones: todo.asignaciones?.length || 0,
-          docentes: todo.docentes?.length || 0,
-        });
-        // Paso 2: calificaciones y asistencia en segundo plano
-        try {
-          const resto = await cargarTodo('calificaciones,asistencia');
-          if (resto.calificaciones?.length) localStorage.setItem('ie_calificativos_v2', JSON.stringify(resto.calificaciones));
-          if (resto.asistencia?.length) localStorage.setItem('ie_asistencia', JSON.stringify(resto.asistencia));
-        } catch { /* silencioso */ }
-      } catch (syncErr: any) {
-        console.warn('⚠️ Sync automático falló (seguimos con localStorage):', syncErr.message);
-      }
+      // Sincronización en segundo plano — NO bloquea el ingreso al sistema
+      // Se descarga por partes pequeñas para respetar el límite de 10s de Vercel
+      const syncEnSegundoPlano = async () => {
+        const partes = [
+          ['alumnos,asignaciones',    ['ie_alumnos','cfg_asignaciones']],
+          ['docentes,columnas',       ['ie_docentes','cal_columnas']],
+          ['unidades,normas',         ['cfg_unidades','cfg_normas_convivencia']],
+          ['calificaciones,asistencia',['ie_calificativos_v2','ie_asistencia']],
+        ] as const;
+        const claves: Record<string, string> = {
+          alumnos:        'ie_alumnos',
+          asignaciones:   'cfg_asignaciones',
+          docentes:       'ie_docentes',
+          columnas:       'cal_columnas',
+          unidades:       'cfg_unidades',
+          normas:         'cfg_normas_convivencia',
+          calificaciones: 'ie_calificativos_v2',
+          asistencia:     'ie_asistencia',
+        };
+        for (const [tipos] of partes) {
+          try {
+            const res = await cargarTodo(tipos as string);
+            for (const [tipo, datos] of Object.entries(res)) {
+              if (Array.isArray(datos) && datos.length > 0 && claves[tipo]) {
+                localStorage.setItem(claves[tipo], JSON.stringify(datos));
+              }
+            }
+          } catch { /* silencioso — cada parte es independiente */ }
+        }
+      };
+      syncEnSegundoPlano(); // sin await — no bloquea
 
       const user: UserType = {
         id: data.user.id,

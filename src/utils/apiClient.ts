@@ -123,7 +123,8 @@ export async function cargarTodo(tipos?: string) {
   const headers: Record<string, string> = {};
   if (_token) headers['Authorization'] = `Bearer ${_token}`;
   const url = BASE + '/api/sync' + (tipos ? `?tipos=${tipos}` : '');
-  const res = await fetchWithTimeout(url, { headers }, tipos ? 15000 : 30000);
+  // Vercel serverless tiene límite de 10s — usar 9s para dejar margen
+  const res = await fetchWithTimeout(url, { headers }, 9000);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Error ${res.status}`);

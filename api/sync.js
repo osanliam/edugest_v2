@@ -172,6 +172,39 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Error inicializando tablas: ' + e.message });
   }
 
+  // ── GET accion=contar  → solo devuelve COUNT de cada tabla (muy rápido) ──
+  if (req.method === 'GET' && req.query?.accion === 'contar') {
+    try {
+      const tablas = ['calificaciones','asistencia','alumnos','columnas','unidades','asignaciones','users','docentes'];
+      const conteos = {};
+      for (const t of tablas) {
+        try {
+          const r = await c.execute(`SELECT COUNT(*) as n FROM ${t}`);
+          conteos[t] = r.rows?.[0]?.n ?? 0;
+        } catch { conteos[t] = '?'; }
+      }
+      // También fechas min/max de calificaciones
+      try {
+        const r = await c.execute(`SELECT MIN(fecha) as min_fecha, MAX(fecha) as max_fecha FROM calificaciones`);
+        conteos.cal_fecha_min = r.rows?.[0]?.min_fecha ?? '';
+        conteos.cal_fecha_max = r.rows?.[0]?.max_fecha ?? '';
+      } catch {}
+      return res.json(conteos);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── GET accion=borrar_cal → borra TODAS las calificaciones (sin descargar) ─
+  if (req.method === 'GET' && req.query?.accion === 'borrar_cal') {
+    try {
+      const r = await c.execute('DELETE FROM calificaciones');
+      return res.json({ ok: true, deleted: r.rowsAffected });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ── GET size ──────────────────────────────────────────────────────────────
   if (req.method === 'GET' && req.query?.size === '1') {
     try {
@@ -209,6 +242,26 @@ export default async function handler(req, res) {
       if (tiposSolicitados.includes('asignaciones'))      data.asignaciones      = await ejecutar('SELECT * FROM asignaciones');
 
       return res.json(data);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── DELETE /api/sync?tipo=calificativos  → borra TODOS los registros de esa tabla
+  if (req.method === 'DELETE') {
+    const tipo = req.query?.tipo;
+    const tablaMap = {
+      calificativos: 'calificaciones',
+      asistencia:    'asistencia',
+      columnas:      'columnas',
+    };
+    const tabla = tablaMap[tipo];
+    if (!tabla) {
+      return res.status(400).json({ error: `Tipo no permitido para borrar: ${tipo}` });
+    }
+    try {
+      const result = await c.execute(`DELETE FROM ${tabla}`);
+      return res.json({ ok: true, deleted: result.rowsAffected, tabla });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

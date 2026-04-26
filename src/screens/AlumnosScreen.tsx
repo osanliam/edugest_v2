@@ -131,15 +131,33 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
     }
   };
 
+  const parsearAsignaciones = (asigs: any[]): any[] =>
+    asigs.map((a: any) => ({
+      ...a,
+      grados:    typeof a.grados    === 'string' ? JSON.parse(a.grados    || '[]') : (a.grados    || []),
+      secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
+      cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
+    }));
+
   const cargarAsignacion = async () => {
     if (!esDocente || !user?.email) return;
     try {
-      // Primero intentar desde Turso (servidor), fallback a localStorage
+      // 1) Intentar primero desde localStorage (rápido, sin red)
       let asignaciones: any[] = [];
-      try {
-        asignaciones = await getAsignaciones();
-      } catch {
-        asignaciones = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
+      const localAsigs = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
+      if (localAsigs.length > 0) {
+        asignaciones = parsearAsignaciones(localAsigs);
+      } else {
+        // 2) Solo si localStorage está vacío, consultar Turso (solo asignaciones)
+        try {
+          const todo = await cargarTodo('asignaciones');
+          asignaciones = parsearAsignaciones(todo.asignaciones || []);
+          if (asignaciones.length > 0) {
+            localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
+          }
+        } catch {
+          asignaciones = [];
+        }
       }
 
       const docenteId = (user as any).docenteId;

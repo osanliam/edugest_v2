@@ -869,23 +869,49 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const [syncMsg,       setSyncMsg]       = useState<{tipo:'ok'|'err';texto:string}|null>(null);
   const [asignacionDocente, setAsignacionDocente] = useState<{grados:string[]; secciones:string[]} | null>(null);
 
+  // Helper: parsear asignaciones (grados/secciones/cursos pueden venir como JSON string desde Turso)
+  const parsearAsignaciones = (asigs: any[]): any[] =>
+    asigs.map((a: any) => ({
+      ...a,
+      grados:    typeof a.grados    === 'string' ? JSON.parse(a.grados    || '[]') : (a.grados    || []),
+      secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
+      cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
+    }));
+
+  // Helper: aplicar asignaciones al estado del docente
+  const aplicarAsignacion = (asigs: any[]) => {
+    if (!user?.role || user.role !== 'teacher') return;
+    const docenteId = (user as any).docenteId;
+    if (!docenteId) return;
+    const mias = parsearAsignaciones(asigs).filter((a: any) => a.docenteId === docenteId);
+    if (mias.length === 0) return;
+    const grados   = [...new Set(mias.flatMap((a: any) => a.grados))] as string[];
+    const secciones = [...new Set(mias.flatMap((a: any) => a.secciones))] as string[];
+    if (grados.length > 0 || secciones.length > 0) {
+      setAsignacionDocente({ grados, secciones });
+    }
+  };
+
   const cargar = async () => {
     setSyncing(true);
     try {
-      // 1) Base desde localStorage (notas manuales del docente nunca se pierden)
-      const localAlumnos = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
-      const localColumnas = JSON.parse(localStorage.getItem('cal_columnas') || '[]');
-      const localCalif = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
-      const localUnidades = JSON.parse(localStorage.getItem('cfg_unidades') || '[]');
+      // 1) Base inmediata desde localStorage
+      const localAlumnos   = JSON.parse(localStorage.getItem('ie_alumnos')          || '[]');
+      const localColumnas  = JSON.parse(localStorage.getItem('cal_columnas')         || '[]');
+      const localCalif     = JSON.parse(localStorage.getItem('ie_calificativos_v2')  || '[]');
+      const localUnidades  = JSON.parse(localStorage.getItem('cfg_unidades')         || '[]');
+      const localAsigs     = JSON.parse(localStorage.getItem('cfg_asignaciones')     || '[]');
 
       setAlumnos(localAlumnos);
       setColumnas(localColumnas);
       setCalificativos(localCalif);
       setBimestres((localUnidades || []).filter((u: any) => u.activa !== false));
+      // Aplicar asignación inmediatamente desde localStorage
+      if (localAsigs.length > 0) aplicarAsignacion(localAsigs);
 
-      // 2) Descargar desde Turso en segundo plano y actualizar
+      // 2) Descargar desde Turso (solo tipos necesarios para evitar timeout)
       try {
-        const todo = await cargarTodo();
+        const todo = await cargarTodo('alumnos,columnas,unidades,asignaciones');
         if (todo.alumnos?.length > 0) {
           setAlumnos(todo.alumnos);
           localStorage.setItem('ie_alumnos', JSON.stringify(todo.alumnos));
@@ -898,6 +924,19 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
           setBimestres((todo.unidades || []).filter((u: any) => u.activa !== false));
           localStorage.setItem('cfg_unidades', JSON.stringify(todo.unidades));
         }
+        // Actualizar asignaciones desde Turso y reaplicar
+        if (todo.asignaciones?.length > 0) {
+          localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
+          aplicarAsignacion(todo.asignaciones);
+        }
+        // Calificaciones en segundo plano
+        try {
+          const resto = await cargarTodo('calificaciones');
+          if (resto.calificaciones?.length > 0) {
+            setCalificativos(resto.calificaciones);
+            localStorage.setItem('ie_calificativos_v2', JSON.stringify(resto.calificaciones));
+          }
+        } catch { /* silencioso */ }
       } catch {
         // Si falla Turso, ya tenemos localStorage como fallback
       }
@@ -909,24 +948,27 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     }
   };
 
-  // Cargar asignación del docente desde Turso
+  // cargarAsignacion: reutiliza localStorage (ya actualizado por cargar())
+  // Se mantiene para que sincronizarDesdeTurso() también pueda llamarla
   const cargarAsignacion = async () => {
     if (!user?.role || user.role !== 'teacher') return;
     try {
-      const asigs = await getAsignaciones();
-      const docenteId = (user as any).docenteId;
-      if (!docenteId) return;
-      const mias = asigs.filter((a: any) => a.docenteId === docenteId);
-      if (mias.length === 0) return;
-      const grados   = [...new Set(mias.flatMap((a: any) => a.grados))] as string[];
-      const secciones = [...new Set(mias.flatMap((a: any) => a.secciones))] as string[];
-      setAsignacionDocente({ grados, secciones });
+      const localAsigs = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
+      if (localAsigs.length > 0) {
+        aplicarAsignacion(localAsigs);
+        return;
+      }
+      // Si no hay en localStorage, consultar Turso directamente
+      const todo = await cargarTodo('asignaciones');
+      if (todo.asignaciones?.length > 0) {
+        localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
+        aplicarAsignacion(todo.asignaciones);
+      }
     } catch (_) {}
   };
 
   useEffect(() => {
     cargar();
-    cargarAsignacion();
   }, []);
 
   // ── Sincronización manual desde Turso ────────────────────────────────────
