@@ -68,13 +68,28 @@ export default function GradesScreenAPI() {
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              {Object.values(grade.competencies || {}).map((comp: any, i: number) => (
-                <div key={i} className="bg-slate-700/50 rounded p-3">
-                  <p className="text-xs font-semibold text-cyan-300 mb-1">{comp.nombre}</p>
-                  <p className="text-lg font-bold text-white">{comp.calificativo}</p>
-                  <p className="text-xs text-slate-400">{comp.porcentaje}%</p>
-                </div>
-              ))}
+              {Array.isArray(grade.competencies)
+                ? grade.competencies.map((comp: any, i: number) => (
+                    <div key={i} className="bg-slate-700/50 rounded p-3">
+                      <p className="text-xs font-semibold text-cyan-300 mb-1">{comp.nombre}</p>
+                      <p className="text-lg font-bold text-white">{comp.calificativo}</p>
+                      <p className="text-xs text-slate-400">{comp.porcentaje}%</p>
+                    </div>
+                  ))
+                : grade.competencies && typeof grade.competencies === 'object'
+                ? Object.values(grade.competencies).filter(comp => comp !== null && comp !== undefined).map((comp: any, i: number) => (
+                    <div key={i} className="bg-slate-700/50 rounded p-3">
+                      <p className="text-xs font-semibold text-cyan-300 mb-1">{(comp as any).nombre}</p>
+                      <p className="text-lg font-bold text-white">{(comp as any).calificativo}</p>
+                      <p className="text-xs text-slate-400">{(comp as any).porcentaje}%</p>
+                    </div>
+                  ))
+                : (
+                    <div className="col-span-3 bg-slate-700/30 rounded p-3 text-center text-slate-400">
+                      Sin competencias registradas
+                    </div>
+                  )
+              }
             </div>
           </div>
         ))

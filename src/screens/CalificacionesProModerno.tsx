@@ -38,7 +38,10 @@ export default function CalificacionesProModerno() {
   const cargarDatos = async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
       // Cargar estudiantes
       const resStudents = await fetch(`/api/users`, {
@@ -46,46 +49,67 @@ export default function CalificacionesProModerno() {
       });
       if (resStudents.ok) {
         const users = await resStudents.json();
-        const estudiantes = users.filter((u: any) => u.role === 'student');
-        setStudents(estudiantes);
+        if (Array.isArray(users)) {
+          const estudiantes = users.filter((u: any) => u && u.role === 'student');
+          setStudents(estudiantes);
+        }
       }
 
       // Cargar calificaciones
       const resGrades = await fetch(`/api/grades/all`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (resGrades.ok) {
         const data = await resGrades.json();
-        setGrades(data);
-        const uniquePeriods = [...new Set(data.map((g: Grade) => g.period))];
-        setPeriods(uniquePeriods as string[]);
+        if (Array.isArray(data)) {
+          // Validar cada elemento
+          const validGrades = data.filter(g => g && typeof g === 'object' && g.id);
+          setGrades(validGrades);
+          const uniquePeriods = [...new Set(validGrades.map((g: Grade) => g.period))].filter(p => p);
+          setPeriods(uniquePeriods as string[]);
+        } else {
+          console.warn('Datos de calificaciones no son un array:', data);
+          setGrades([]);
+        }
       }
     } catch (err) {
       console.error('Error cargando datos:', err);
+      setGrades([]);
+      setStudents([]);
     } finally {
       setLoading(false);
     }
   };
 
   const filtrarGrades = () => {
-    let filtered = grades;
+    try {
+      if (!Array.isArray(grades)) {
+        setFilteredGrades([]);
+        return;
+      }
 
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(g => {
-        const student = students.find(s => s.id === g.student_id);
-        return student?.name.toLowerCase().includes(searchLower) || 
-               student?.code.toLowerCase().includes(searchLower);
-      });
+      let filtered = grades.filter(g => g && typeof g === 'object');
+
+      if (search) {
+        const searchLower = search.toLowerCase();
+        filtered = filtered.filter(g => {
+          const student = students.find(s => s && s.id === g.student_id);
+          return (student?.name && student.name.toLowerCase().includes(searchLower)) ||
+                 (student?.code && student.code.toLowerCase().includes(searchLower));
+        });
+      }
+
+      if (selectedPeriod) {
+        filtered = filtered.filter(g => g.period === selectedPeriod);
+      }
+
+      const start = (page - 1) * pageSize;
+      setFilteredGrades(filtered.slice(start, start + pageSize));
+    } catch (error) {
+      console.error('Error filtrando grades:', error);
+      setFilteredGrades([]);
     }
-
-    if (selectedPeriod) {
-      filtered = filtered.filter(g => g.period === selectedPeriod);
-    }
-
-    const start = (page - 1) * pageSize;
-    setFilteredGrades(filtered.slice(start, start + pageSize));
   };
 
   const getNombreEstudiante = (studentId: string) => {
@@ -94,22 +118,36 @@ export default function CalificacionesProModerno() {
   };
 
   const exportCSV = () => {
-    const headers = ['Estudiante', 'Código', 'Período', 'Asignatura', 'Promedio'];
-    const rows = filteredGrades.map(g => [
-      getNombreEstudiante(g.student_id),
-      students.find(s => s.id === g.student_id)?.code || '',
-      g.period,
-      g.subject,
-      g.average
-    ]);
+    try {
+      if (!Array.isArray(filteredGrades) || filteredGrades.length === 0) {
+        alert('No hay datos para exportar');
+        return;
+      }
 
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'calificaciones.csv';
-    a.click();
+      const headers = ['Estudiante', 'Código', 'Período', 'Asignatura', 'Promedio'];
+      const rows = filteredGrades.map(g => {
+        if (!g || typeof g !== 'object') return headers; // Skip invalid entries
+        return [
+          getNombreEstudiante(g.student_id),
+          students.find(s => s && s.id === g.student_id)?.code || '',
+          g.period || '',
+          g.subject || '',
+          g.average || 0
+        ];
+      });
+
+      const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'calificaciones.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exportando CSV:', error);
+      alert('Error al exportar datos');
+    }
   };
 
   if (loading) {
