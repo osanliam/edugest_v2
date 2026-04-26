@@ -185,32 +185,30 @@ export default async function handler(req, res) {
   // ── GET all data ──────────────────────────────────────────────────────────
   if (req.method === 'GET') {
     try {
-      const [usuarios, docentes, alumnos, columnas, calificaciones, asistencia, unidades, normas, registrosNormas, asignaciones] =
-        await Promise.all([
-          c.execute('SELECT * FROM users'),
-          c.execute('SELECT * FROM docentes'),
-          c.execute('SELECT * FROM alumnos'),
-          c.execute('SELECT * FROM columnas'),
-          c.execute('SELECT * FROM calificaciones'),
-          c.execute('SELECT * FROM asistencia'),
-          c.execute('SELECT * FROM unidades'),
-          c.execute('SELECT * FROM normas'),
-          c.execute('SELECT * FROM registros_normas'),
-          c.execute('SELECT * FROM asignaciones'),
-        ]);
+      // Permitir filtrar por tipos para evitar timeout con grandes volúmenes
+      // Ej: /api/sync?tipos=alumnos,asignaciones,docentes
+      const tiposParam = req.query?.tipos || '';
+      const tiposSolicitados = tiposParam
+        ? tiposParam.split(',').map(t => t.trim()).filter(Boolean)
+        : ['usuarios','docentes','alumnos','columnas','calificaciones','asistencia','unidades','normas','registros_normas','asignaciones'];
 
-      return res.json({
-        usuarios: usuarios.rows || [],
-        docentes: docentes.rows || [],
-        alumnos: alumnos.rows || [],
-        columnas: columnas.rows || [],
-        calificaciones: calificaciones.rows || [],
-        asistencia: asistencia.rows || [],
-        unidades: unidades.rows || [],
-        normas: normas.rows || [],
-        registros_normas: registrosNormas.rows || [],
-        asignaciones: asignaciones.rows || [],
-      });
+      const ejecutar = async (sql) => {
+        try { return (await c.execute(sql)).rows || []; } catch { return []; }
+      };
+
+      const data = {};
+      if (tiposSolicitados.includes('usuarios'))          data.usuarios          = await ejecutar('SELECT * FROM users');
+      if (tiposSolicitados.includes('docentes'))          data.docentes          = await ejecutar('SELECT * FROM docentes');
+      if (tiposSolicitados.includes('alumnos'))           data.alumnos           = await ejecutar('SELECT * FROM alumnos');
+      if (tiposSolicitados.includes('columnas'))          data.columnas          = await ejecutar('SELECT * FROM columnas');
+      if (tiposSolicitados.includes('calificaciones'))    data.calificaciones    = await ejecutar('SELECT * FROM calificaciones');
+      if (tiposSolicitados.includes('asistencia'))        data.asistencia        = await ejecutar('SELECT * FROM asistencia');
+      if (tiposSolicitados.includes('unidades'))          data.unidades          = await ejecutar('SELECT * FROM unidades');
+      if (tiposSolicitados.includes('normas'))            data.normas            = await ejecutar('SELECT * FROM normas');
+      if (tiposSolicitados.includes('registros_normas'))  data.registros_normas  = await ejecutar('SELECT * FROM registros_normas');
+      if (tiposSolicitados.includes('asignaciones'))      data.asignaciones      = await ejecutar('SELECT * FROM asignaciones');
+
+      return res.json(data);
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

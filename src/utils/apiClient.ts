@@ -119,10 +119,11 @@ async function fetchWithTimeout(url: string, opts: RequestInit = {}, timeout = 5
 // TODO EN UNO  →  /api/sync  (GET devuelve todo: alumnos, docentes, asignaciones,
 //                              columnas, calificativos, asistencia, unidades…)
 // ─────────────────────────────────────────────────────────────────────────────
-export async function cargarTodo() {
+export async function cargarTodo(tipos?: string) {
   const headers: Record<string, string> = {};
   if (_token) headers['Authorization'] = `Bearer ${_token}`;
-  const res = await fetchWithTimeout(BASE + '/api/sync', { headers }, 30000);
+  const url = BASE + '/api/sync' + (tipos ? `?tipos=${tipos}` : '');
+  const res = await fetchWithTimeout(url, { headers }, tipos ? 15000 : 30000);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Error ${res.status}`);

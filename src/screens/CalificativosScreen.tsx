@@ -934,7 +934,8 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     setSyncing(true);
     setSyncMsg({ tipo: 'ok', texto: '📥 Descargando datos de la nube...' });
     try {
-      const todo = await cargarTodo();
+      // Paso 1: lo esencial (sin calificaciones ni asistencia que son muy grandes)
+      const todo = await cargarTodo('alumnos,asignaciones,docentes,columnas,unidades,normas');
       let guardados = 0;
       if (todo.asignaciones?.length) {
         localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
@@ -959,13 +960,19 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
         localStorage.setItem('cfg_unidades', JSON.stringify(todo.unidades));
         guardados++;
       }
-      if (todo.calificaciones?.length) {
-        setCalificativos(todo.calificaciones);
-        localStorage.setItem('ie_calificativos_v2', JSON.stringify(todo.calificaciones));
-        guardados++;
-      }
       await cargarAsignacion();
       setSyncMsg({ tipo: 'ok', texto: `✅ ${guardados} tablas descargadas de la nube` });
+      // Paso 2: calificaciones y asistencia en segundo plano
+      try {
+        const resto = await cargarTodo('calificaciones,asistencia');
+        if (resto.calificaciones?.length) {
+          setCalificativos(resto.calificaciones);
+          localStorage.setItem('ie_calificativos_v2', JSON.stringify(resto.calificaciones));
+        }
+        if (resto.asistencia?.length) {
+          localStorage.setItem('ie_asistencia', JSON.stringify(resto.asistencia));
+        }
+      } catch { /* silencioso */ }
     } catch (e: any) {
       setSyncMsg({ tipo: 'err', texto: `❌ Error descargando: ${e.message}` });
     } finally {
@@ -976,10 +983,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
 
   const handleRecargar = async () => {
     setSyncMsg(null);
-    await cargar();
-    await cargarAsignacion();
-    setSyncMsg({ tipo: 'ok', texto: '✅ Datos recargados desde el servidor' });
-    setTimeout(() => setSyncMsg(null), 3000);
+    await sincronizarDesdeTurso();
   };
 
   // ── Filtro por asignación del docente ────────────────────────────────────

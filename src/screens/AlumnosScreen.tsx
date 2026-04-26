@@ -162,7 +162,8 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
     setCargando(true);
     try {
       mostrar('ok', '📥 Descargando datos de la nube...');
-      const todo = await cargarTodo();
+      // Paso 1: descargar lo esencial (sin calificaciones ni asistencia que son muy grandes)
+      const todo = await cargarTodo('alumnos,asignaciones,docentes,columnas,unidades,normas');
       let guardados = 0;
       if (todo.asignaciones?.length) {
         localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
@@ -188,13 +189,19 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
         localStorage.setItem('cfg_normas_convivencia', JSON.stringify(todo.normas));
         guardados++;
       }
-      if (todo.calificaciones?.length) {
-        localStorage.setItem('ie_calificativos_v2', JSON.stringify(todo.calificaciones));
-        guardados++;
-      }
       mostrar('ok', `✅ ${guardados} tablas descargadas. Recargando...`);
       cargar();
       cargarAsignacion();
+      // Paso 2: en segundo plano, descargar calificaciones y asistencia
+      try {
+        const resto = await cargarTodo('calificaciones,asistencia');
+        if (resto.calificaciones?.length) {
+          localStorage.setItem('ie_calificativos_v2', JSON.stringify(resto.calificaciones));
+        }
+        if (resto.asistencia?.length) {
+          localStorage.setItem('ie_asistencia', JSON.stringify(resto.asistencia));
+        }
+      } catch { /* silencioso */ }
     } catch (e: any) {
       mostrar('err', '❌ Error descargando: ' + e.message);
     } finally {

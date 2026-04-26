@@ -33,22 +33,27 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       // Solo guardamos el user en sessionStorage para restaurar sesión al recargar
       sessionStorage.setItem('user', JSON.stringify(data.user));
 
-      // Sincronización automática: descargar todo de Turso al login
+      // Sincronización automática: descargar de Turso al login (por partes para evitar timeout)
       try {
-        const todo = await cargarTodo();
+        // Paso 1: lo esencial
+        const todo = await cargarTodo('alumnos,asignaciones,docentes,columnas,unidades,normas');
         if (todo.asignaciones?.length) localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
         if (todo.alumnos?.length) localStorage.setItem('ie_alumnos', JSON.stringify(todo.alumnos));
         if (todo.docentes?.length) localStorage.setItem('ie_docentes', JSON.stringify(todo.docentes));
         if (todo.columnas?.length) localStorage.setItem('cal_columnas', JSON.stringify(todo.columnas));
         if (todo.unidades?.length) localStorage.setItem('cfg_unidades', JSON.stringify(todo.unidades));
         if (todo.normas?.length) localStorage.setItem('cfg_normas_convivencia', JSON.stringify(todo.normas));
-        if (todo.calificaciones?.length) localStorage.setItem('ie_calificativos_v2', JSON.stringify(todo.calificaciones));
-        if (todo.asistencia?.length) localStorage.setItem('ie_asistencia', JSON.stringify(todo.asistencia));
         console.log('✅ Sync automático al login:', {
           alumnos: todo.alumnos?.length || 0,
           asignaciones: todo.asignaciones?.length || 0,
           docentes: todo.docentes?.length || 0,
         });
+        // Paso 2: calificaciones y asistencia en segundo plano
+        try {
+          const resto = await cargarTodo('calificaciones,asistencia');
+          if (resto.calificaciones?.length) localStorage.setItem('ie_calificativos_v2', JSON.stringify(resto.calificaciones));
+          if (resto.asistencia?.length) localStorage.setItem('ie_asistencia', JSON.stringify(resto.asistencia));
+        } catch { /* silencioso */ }
       } catch (syncErr: any) {
         console.warn('⚠️ Sync automático falló (seguimos con localStorage):', syncErr.message);
       }
