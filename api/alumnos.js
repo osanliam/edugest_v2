@@ -58,10 +58,23 @@ export default async function handler(req, res) {
     verifyToken(req.headers.authorization);
     await initializeDatabase();
 
-    // GET → listar alumnos (sin JOIN para evitar timeout con grandes volúmenes)
+    // GET → listar alumnos con datos de apoderados
     if (req.method === 'GET') {
       try {
-        const result = await query('SELECT * FROM alumnos ORDER BY apellidos_nombres ASC');
+        const result = await query(`
+          SELECT
+            a.*,
+            m.apellidos_nombres AS madre_nombres,
+            m.dni AS madre_dni,
+            m.celular AS madre_celular,
+            p.apellidos_nombres AS padre_nombres,
+            p.dni AS padre_dni,
+            p.celular AS padre_celular
+          FROM alumnos a
+          LEFT JOIN apoderados m ON a.madre_id = m.id
+          LEFT JOIN apoderados p ON a.padre_id = p.id
+          ORDER BY a.apellidos_nombres ASC
+        `);
         return res.status(200).json(result.rows || []);
       } catch (err) {
         console.error('Alumnos GET error:', err);

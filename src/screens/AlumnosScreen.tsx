@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Phone, Users } from 'lucide-react';
 import { getAlumnos, crearAlumno, editarAlumno, eliminarAlumno, getAsignaciones, cargarTodo } from '../utils/apiClient';
+import * as XLSX from 'xlsx';
 import HeaderElegante from '../components/HeaderElegante';
 
 interface Apoderado {
@@ -80,6 +81,26 @@ const emptyForm = {
   madre: { ...emptyApod }, padre: { ...emptyApod },
 };
 
+// Helper: ejecuta promesas con concurrencia limitada
+async function asyncPool<T>(concurrency: number, items: T[], fn: (item: T) => Promise<any>) {
+  const results: any[] = [];
+  const executing: Promise<void>[] = [];
+  for (const item of items) {
+    const p = Promise.resolve().then(() => fn(item));
+    results.push(p);
+    if (items.length >= concurrency) {
+      const e: Promise<void> = p.then(() => {
+        executing.splice(executing.indexOf(e), 1);
+      });
+      executing.push(e);
+      if (executing.length >= concurrency) {
+        await Promise.race(executing);
+      }
+    }
+  }
+  return Promise.all(results);
+}
+
 interface AlumnosScreenProps {
   user?: { id: string; name: string; email: string; role: string; schoolId?: string };
 }
@@ -113,15 +134,16 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   const cargar = async () => {
     setCargando(true);
     try {
-      // 1) Intentar descargar desde Turso (servidor)
+      // 1) Cargar desde localStorage inmediatamente
+      const local = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+      if (local.length > 0) setAlumnos(local);
+      // 2) Descargar desde API (ahora trae apoderados con JOIN)
       let lista: Alumno[] = [];
       try {
         lista = await getAlumnos();
-        // Guardar en localStorage para la próxima vez
-        localStorage.setItem('ie_alumnos', JSON.stringify(lista));
+        if (lista.length > 0) localStorage.setItem('ie_alumnos', JSON.stringify(lista));
       } catch {
-        // 2) Fallback a localStorage si el servidor falla
-        lista = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+        lista = local;
       }
       setAlumnos(lista);
     } catch (e: any) {
@@ -161,9 +183,11 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
       }
 
       const docenteId = (user as any).docenteId;
-      const mias = docenteId
-        ? asignaciones.filter((a: any) => a.docenteId === docenteId)
-        : [];
+      const userId    = (user as any).id;
+      const mias = asignaciones.filter((a: any) =>
+        (docenteId && a.docenteId === docenteId) ||
+        (userId    && a.docenteId === userId)
+      );
       if (mias.length > 0) {
         const grados   = [...new Set(mias.flatMap((a: any) => a.grados || []))] as string[];
         const secciones = [...new Set(mias.flatMap((a: any) => a.secciones || []))] as string[];
@@ -287,8 +311,6 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
     if (!file) return;
     e.target.value = '';
     try {
-      // @ts-ignore
-      const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs');
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -319,7 +341,30 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
           return d.toISOString().split('T')[0];
         }
         if (val instanceof Date) return val.toISOString().split('T')[0];
-        return String(val).trim();
+        const s = String(val).trim();
+        const parts = s.split(/[\/\-\.]/);
+        if (parts.length === 3) {
+          const [p1, p2, p3] = parts.map(Number);
+          if (p3 > 999) {
+            const day = p1 > 12 ? p1 : p2;
+            const month = p1 > 12 ? p2 : p1;
+            const d = new Date(p3, month - 1, day);
+            if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+          }
+          if (p1 > 999) {
+            const d = new Date(p1, p2 - 1, p3);
+            if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+          }
+        }
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? s : d.toISOString().split('T')[0];
+      };
+
+      const normalizarSexo = (val: string): string => {
+        const v = val.trim().toUpperCase();
+        if (v.startsWith('M') || v === 'H' || v === 'HOMBRE' || v === 'MASC') return 'Masculino';
+        if (v.startsWith('F') || v === 'MUJER' || v === 'FEM') return 'Femenino';
+        return val;
       };
 
       const gradoMap: Record<string, string> = {
@@ -330,14 +375,10 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
 
       const normalizarGrado = (val: string): string => {
         const v = val.trim().toUpperCase();
-        // Buscar en el mapa directo
         if (gradoMap[v]) return gradoMap[v];
-        // Si ya tiene el formato correcto (ej: "1°", "2°")
         if (/^\d°$/.test(v)) return v;
-        // Extraer solo el número (ej: "1 A", "1°A")
         const match = v.match(/^(\d)/);
         if (match) return gradoMap[match[1]] || val;
-        // Buscar por inicio de palabra (PRIMER, TERCER...)
         for (const [key, mapped] of Object.entries(gradoMap)) {
           if (v.startsWith(key)) return mapped;
         }
@@ -348,9 +389,13 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
         apellidos_nombres: colVal(r, 'APELLIDOS Y NOMBRES', 'APELLIDO'),
         dni:               colVal(r, 'N° DNI DEL ALUMNO', 'DNI DEL ALUMNO', 'DNI'),
         fecha_nacimiento:  toDate(r[headers.findIndex(h => h.includes('NACIMIENTO'))]),
-        sexo:              colVal(r, 'SEXO'),
+        sexo:              normalizarSexo(colVal(r, 'SEXO')),
         grado:             normalizarGrado(colVal(r, 'GRADO DE ESTUDIOS', 'GRADO')),
-        seccion:           (colVal(r, 'SECCI').replace(/^\d+\s*/, '').trim() || colVal(r, 'SECCI').trim()).toUpperCase(),
+        seccion:           (() => {
+          const raw = colVal(r, 'SECCI', 'SECCION', 'SECCIÓN');
+          const m = raw.toUpperCase().match(/[A-Z]/);
+          return m ? m[0] : raw.toUpperCase();
+        })(),
         madre: {
           apellidos_nombres: colVal(r, 'NOMBRES DE LA MADRE', 'MADRE'),
           dni:               colVal(r, 'DNI MADRE'),
@@ -370,26 +415,51 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
 
   const handleImportar = async () => {
     setImportando(true);
-    let ok = 0, err = 0;
     const dniExistentes = new Set(alumnos.map(a => a.dni));
-    for (const r of importRows) {
-      try {
-        if (dniExistentes.has(r.dni)) { err++; continue; }
-        await crearAlumno(r);
-        dniExistentes.add(r.dni);
-        ok++;
-      } catch { err++; }
+    const nuevos = importRows.filter((r: any) => r.apellidos_nombres && r.dni && !dniExistentes.has(r.dni));
+    const duplicados = importRows.length - nuevos.length;
+    let ok = 0, err = 0;
+    const errores: string[] = [];
+
+    try {
+      await asyncPool(5, nuevos, async (r: any) => {
+        try {
+          await crearAlumno({
+            apellidos_nombres: r.apellidos_nombres,
+            dni: r.dni,
+            fecha_nacimiento: r.fecha_nacimiento,
+            sexo: r.sexo,
+            grado: r.grado,
+            seccion: r.seccion,
+            madre: r.madre,
+            padre: r.padre,
+          });
+          ok++;
+        } catch (e: any) {
+          err++;
+          errores.push(`${r.apellidos_nombres} (${r.dni}): ${e.message || 'Error'}`);
+        }
+      });
+      if (errores.length > 0) {
+        console.error('Errores de importación:', errores);
+      }
+      setImportResult({ ok, err: err + duplicados });
+      if (ok > 0) {
+        mostrar('ok', `${ok} alumnos importados correctamente`);
+        cargar();
+      }
+      if (err > 0) mostrar('err', `${err} alumnos no pudieron importarse`);
+    } catch (e: any) {
+      setImportResult({ ok: 0, err: importRows.length });
+      mostrar('err', 'Error general en la importación: ' + e.message);
+    } finally {
+      setImportando(false);
     }
-    setImportResult({ ok, err });
-    setImportando(false);
-    cargar();
   };
 
-  const descargarPlantilla = async () => {
-    // @ts-ignore
-    const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs');
+  const descargarPlantilla = () => {
     const data = [
-      { 'APELLIDOS Y NOMBRES': 'MENDEZ FLORES, Carlos Alberto', 'DNI': '75123456', 'FECHA DE NACIMIENTO': '2010-05-12', 'SEXO': 'Masculino', 'GRADO': '3°', 'SECCI': 'A', 'NOMBRES DE LA MADRE': 'FLORES RÍOS, Ana María', 'DNI MADRE': '41234567', 'CELULAR DE LA MADRE': '987654321', 'NOMBRES DEL PADRE': 'MENDEZ TORRES, Pedro Luis', 'DNI PADRE': '40123456', 'CELULAR DEL PADRE': '976543210' },
+      { 'APELLIDOS Y NOMBRES': 'MENDEZ FLORES, Carlos Alberto', 'DNI': '75123456', 'FECHA DE NACIMIENTO': '2010-05-12', 'SEXO': 'Masculino', 'GRADO': '3°', 'SECCIÓN': 'A', 'NOMBRES DE LA MADRE': 'FLORES RÍOS, Ana María', 'DNI MADRE': '41234567', 'CELULAR DE LA MADRE': '987654321', 'NOMBRES DEL PADRE': 'MENDEZ TORRES, Pedro Luis', 'DNI PADRE': '40123456', 'CELULAR DEL PADRE': '976543210' },
     ];
     const ws = XLSX.utils.json_to_sheet(data);
     ws['!cols'] = Array(12).fill({ wch: 28 });
@@ -428,11 +498,14 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   };
 
   // Si es docente, filtrar solo por sus grados y secciones asignadas
+  const normGrado = (g: string) => String(g || '').trim().replace(/°$/, '');
   const alumnosBase = esDocente && asignacionDocente
-    ? alumnos.filter(a =>
-        asignacionDocente.grados.includes(a.grado) &&
-        asignacionDocente.secciones.includes(a.seccion)
-      )
+    ? alumnos.filter(a => {
+        const gradosNorm    = asignacionDocente.grados.map(normGrado);
+        const seccionesNorm = asignacionDocente.secciones.map(s => s.trim().toUpperCase());
+        return gradosNorm.includes(normGrado(a.grado)) &&
+               seccionesNorm.includes((a.seccion || '').trim().toUpperCase());
+      })
     : alumnos;
 
   const filtrados = alumnosBase.filter(a => {
