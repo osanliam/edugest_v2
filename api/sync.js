@@ -16,9 +16,13 @@ let tablesReady = false;
 
 function getClient() {
   if (!client) {
-    const url = process.env.TURSO_CONNECTION_URL;
+    let url = process.env.TURSO_CONNECTION_URL;
     const authToken = process.env.TURSO_AUTH_TOKEN;
     if (!url || !authToken) return null;
+    // Turso requiere https:// en producción, no libsql://
+    if (url.startsWith('libsql://')) {
+      url = url.replace('libsql://', 'https://');
+    }
     client = createClient({ url, authToken });
   }
   return client;
@@ -223,26 +227,39 @@ export default async function handler(req, res) {
     const diagnosticos = [];
 
     // 1. Verificar variables de entorno
-    const url = process.env.TURSO_CONNECTION_URL;
+    let url = process.env.TURSO_CONNECTION_URL;
     const token = process.env.TURSO_AUTH_TOKEN;
-    diagnosticos.push({ paso: 'env_url', ok: !!url, valor: url ? url.substring(0, 20) + '...' : 'NO DEFINIDO' });
+    diagnosticos.push({ paso: 'env_url', ok: !!url, valor: url ? url.substring(0, 30) + '...' : 'NO DEFINIDO' });
     diagnosticos.push({ paso: 'env_token', ok: !!token, valor: token ? 'Definido (' + token.length + ' chars)' : 'NO DEFINIDO' });
 
     if (!url || !token) {
       return res.status(503).json({ ok: false, error: 'Faltan variables de entorno', diagnosticos });
     }
 
-    // 2. Intentar crear cliente
+    // 2. Intentar crear cliente (probar con https:// si libsql:// falla)
     let testClient = null;
+    let urlUsada = url;
     try {
       testClient = createClient({ url, authToken: token });
-      diagnosticos.push({ paso: 'crear_cliente', ok: true });
+      diagnosticos.push({ paso: 'crear_cliente_libsql', ok: true });
     } catch (e) {
-      diagnosticos.push({ paso: 'crear_cliente', ok: false, error: e.message });
-      return res.status(500).json({ ok: false, error: 'No se pudo crear cliente: ' + e.message, diagnosticos });
+      diagnosticos.push({ paso: 'crear_cliente_libsql', ok: false, error: e.message });
+      // Intentar con https://
+      if (url.startsWith('libsql://')) {
+        urlUsada = url.replace('libsql://', 'https://');
+        try {
+          testClient = createClient({ url: urlUsada, authToken: token });
+          diagnosticos.push({ paso: 'crear_cliente_https', ok: true, url: urlUsada });
+        } catch (e2) {
+          diagnosticos.push({ paso: 'crear_cliente_https', ok: false, error: e2.message });
+          return res.status(500).json({ ok: false, error: 'No se pudo crear cliente con ninguna URL', diagnosticos });
+        }
+      } else {
+        return res.status(500).json({ ok: false, error: 'No se pudo crear cliente: ' + e.message, diagnosticos });
+      }
     }
 
-    // 3. Intentar ejecutar una query simple
+    // 3. Intentar ejecutar una query simple SIN crear tablas
     try {
       const r = await testClient.execute('SELECT 1 as test');
       diagnosticos.push({ paso: 'query_simple', ok: true, resultado: r.rows });
@@ -259,7 +276,7 @@ export default async function handler(req, res) {
       diagnosticos.push({ paso: 'contar_alumnos', ok: false, error: e.message });
     }
 
-    return res.json({ ok: true, mensaje: 'Conexión exitosa', diagnosticos });
+    return res.json({ ok: true, mensaje: 'Conexión exitosa', url_usada: urlUsada, diagnosticos });
   }
 
   // ── GET accion=auditoria → logs de auditoría (solo admin/director) ──────
