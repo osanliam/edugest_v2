@@ -27,7 +27,7 @@ const ROL_CONFIG: Record<string, { label: string; color: string }> = {
 const LS_KEY = 'sistema_usuarios';
 const LS_DOCENTES = 'ie_docentes';
 
-function getToken() { return localStorage.getItem('auth_token') || ''; }
+function getToken() { return sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || ''; }
 function lsCargar(): Usuario[] {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; }
 }
@@ -779,12 +779,12 @@ const importarDatosCompletos = () => {
                   placeholder="juan@manuelfidencio.edu.pe" className={inputCls} />
               </div>
 <div>
-                <label className="block purple-400/80 text-xs font-medium mb-1.5">
+                <label className="block text-purple-400/80 text-xs font-medium mb-1.5">
                   Contraseña {editando ? '(vacío = no cambiar)' : '*'}
                 </label>
                 <div className="relative">
                   <input type={showPassword ? "text" : "password"} value={formData.contraseña} onChange={e => setFormData({...formData, contraseña: e.target.value})}
-                    placeholder="••••••••" className={inputCls} pr-10 />
+                    placeholder="••••••••" className={`${inputCls} pr-10`} />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-400">
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}

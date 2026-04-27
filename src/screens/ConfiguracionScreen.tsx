@@ -627,7 +627,7 @@ function AsignacionesSection() {
     setCursos(cursosLocal);
 
     // Cargar docentes: API primero, fallback localStorage
-    const token = localStorage.getItem('auth_token') || '';
+    const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || '';
     fetch('/api/docentes', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null).catch(() => null)
       .then(data => {
@@ -965,7 +965,7 @@ function ApiStatusSection() {
     setDiagLoading(true);
     setDiag(null);
     try {
-      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
+      const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || '';
       const res = await fetch('/api/sync?accion=verificar_conexion', {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         signal: AbortSignal.timeout(12000)

@@ -83,7 +83,7 @@ export default function DocentesScreen() {
     setTimeout(() => setMsg(null), 3500);
   };
 
-  const getToken = () => localStorage.getItem('auth_token') || '';
+  const getToken = () => sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || '';
 
   const cargar = async () => {
     setCargando(true);
