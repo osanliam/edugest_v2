@@ -218,6 +218,50 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Error inicializando tablas: ' + e.message });
   }
 
+  // ── GET accion=verificar_conexion → diagnóstico de conexión a Turso ──────
+  if (req.method === 'GET' && req.query?.accion === 'verificar_conexion') {
+    const diagnosticos = [];
+
+    // 1. Verificar variables de entorno
+    const url = process.env.TURSO_CONNECTION_URL;
+    const token = process.env.TURSO_AUTH_TOKEN;
+    diagnosticos.push({ paso: 'env_url', ok: !!url, valor: url ? url.substring(0, 20) + '...' : 'NO DEFINIDO' });
+    diagnosticos.push({ paso: 'env_token', ok: !!token, valor: token ? 'Definido (' + token.length + ' chars)' : 'NO DEFINIDO' });
+
+    if (!url || !token) {
+      return res.status(503).json({ ok: false, error: 'Faltan variables de entorno', diagnosticos });
+    }
+
+    // 2. Intentar crear cliente
+    let testClient = null;
+    try {
+      testClient = createClient({ url, authToken: token });
+      diagnosticos.push({ paso: 'crear_cliente', ok: true });
+    } catch (e) {
+      diagnosticos.push({ paso: 'crear_cliente', ok: false, error: e.message });
+      return res.status(500).json({ ok: false, error: 'No se pudo crear cliente: ' + e.message, diagnosticos });
+    }
+
+    // 3. Intentar ejecutar una query simple
+    try {
+      const r = await testClient.execute('SELECT 1 as test');
+      diagnosticos.push({ paso: 'query_simple', ok: true, resultado: r.rows });
+    } catch (e) {
+      diagnosticos.push({ paso: 'query_simple', ok: false, error: e.message });
+      return res.status(500).json({ ok: false, error: 'Query falló: ' + e.message, diagnosticos });
+    }
+
+    // 4. Intentar contar alumnos
+    try {
+      const r = await testClient.execute('SELECT COUNT(*) as n FROM alumnos');
+      diagnosticos.push({ paso: 'contar_alumnos', ok: true, count: r.rows?.[0]?.n });
+    } catch (e) {
+      diagnosticos.push({ paso: 'contar_alumnos', ok: false, error: e.message });
+    }
+
+    return res.json({ ok: true, mensaje: 'Conexión exitosa', diagnosticos });
+  }
+
   // ── GET accion=auditoria → logs de auditoría (solo admin/director) ──────
   if (req.method === 'GET' && req.query?.accion === 'auditoria') {
     const usuarioJWT = parseJWT(req);
