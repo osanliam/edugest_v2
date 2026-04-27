@@ -136,32 +136,37 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
     setCargando(true);
     setCargaProgreso(null);
     try {
-      // 1) Cargar desde localStorage inmediatamente
+      // 1) Cargar desde localStorage PRIMERO (siempre funciona)
       const local = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
-      if (local.length > 0) setAlumnos(local);
+      if (Array.isArray(local) && local.length > 0) {
+        setAlumnos(local);
+      }
 
-      // 2) Descargar desde API en lotes de 200 para evitar timeout
+      // 2) Intentar descargar desde API en lotes de 200 (solo si hay conexión)
       const LOTE = 200;
-      let todos: Alumno[] = [];
-      let offset = 0;
-      let total = 0;
+      let todos: Alumno[] = local || [];
       try {
         const primera = await getAlumnosPaginado(LOTE, 0);
-        todos = primera.alumnos;
-        total = primera.total;
-        setCargaProgreso({ actual: todos.length, total });
-
-        while (todos.length < total) {
-          offset += LOTE;
-          const pag = await getAlumnosPaginado(LOTE, offset);
-          todos = [...todos, ...pag.alumnos];
+        if (primera.alumnos && Array.isArray(primera.alumnos)) {
+          todos = primera.alumnos;
+          let total = primera.total || 0;
           setCargaProgreso({ actual: todos.length, total });
+
+          while (todos.length < total) {
+            const offset = todos.length;
+            const pag = await getAlumnosPaginado(LOTE, offset);
+            if (pag.alumnos && Array.isArray(pag.alumnos)) {
+              todos = [...todos, ...pag.alumnos];
+            }
+            setCargaProgreso({ actual: todos.length, total });
+          }
+          localStorage.setItem('ie_alumnos', JSON.stringify(todos));
+          setAlumnos(todos);
         }
-        if (todos.length > 0) localStorage.setItem('ie_alumnos', JSON.stringify(todos));
-      } catch {
-        todos = local;
+      } catch (e) {
+        // Turso no responde, usar localStorage que ya cargamos arriba
+        console.log('Turso no disponible, usando localStorage:', local.length, 'alumnos');
       }
-      setAlumnos(todos);
     } catch (e: any) {
       mostrar('err', 'Error al cargar alumnos: ' + e.message);
     } finally {
@@ -502,14 +507,21 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
         ok += data.ok || 0;
         err += data.errores || 0;
       }
-      setImportResult({ ok, err: err + duplicados });
-      if (ok > 0) mostrar('ok', `${ok} alumnos guardados en la nube`);
-      if (err > 0) {
-        mostrar('err', `${err} alumnos no subieron a Turso, pero están guardados localmente.`);
+      const yaExistian = duplicados;
+      const fallaron = err;
+      const subieron = ok;
+
+      setImportResult({ ok: subieron + localNuevos.length, err: fallaron });
+
+      if (yaExistian > 0 && subieron === 0 && fallaron === 0) {
+        mostrar('ok', `${yaExistian} alumnos ya estaban importados. Listos para trabajar.`);
+      } else if (subieron > 0) {
+        mostrar('ok', `${subieron} alumnos subidos a Turso. ${yaExistian} ya existían.`);
+      } else if (fallaron > 0) {
+        mostrar('err', `${fallaron} alumnos fallaron en Turso, pero ${localNuevos.length} están guardados localmente.`);
         console.error('Errores Turso:', erroresDetalle);
-      }
-      if (ok === 0 && err === 0) {
-        mostrar('ok', `${localNuevos.length} alumnos guardados localmente (modo offline)`);
+      } else {
+        mostrar('ok', `${localNuevos.length} alumnos guardados localmente. Listos para trabajar.`);
       }
     } catch (e: any) {
       mostrar('ok', `${localNuevos.length} alumnos guardados localmente. Turso no responde.`);
