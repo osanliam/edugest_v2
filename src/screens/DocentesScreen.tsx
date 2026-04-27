@@ -83,30 +83,51 @@ export default function DocentesScreen() {
     setTimeout(() => setMsg(null), 3500);
   };
 
-  const cargar = () => {
+  const getToken = () => localStorage.getItem('auth_token') || '';
+
+  const cargar = async () => {
     setCargando(true);
     try {
+      const res = await fetch('/api/docentes', {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const lista = Array.isArray(data) ? data : [];
+        setDocentes(lista);
+        localStorage.setItem(LS_DOCENTES, JSON.stringify(lista)); // caché local sin re-sync
+      } else {
+        setDocentes(lsCargar());
+      }
+    } catch {
       setDocentes(lsCargar());
-    } catch (e: any) {
-      mostrar('err', 'Error al cargar docentes: ' + e.message);
     } finally {
       setCargando(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.apellidos_nombres || !form.dni || !form.genero || !form.fecha_nacimiento)
       return mostrar('err', 'Completa los campos obligatorios');
     setGuardando(true);
     try {
-      const todos = lsCargar();
+      const token = getToken();
       if (editando) {
-        lsGuardar(todos.map(d => d.id === editando.id ? { ...d, ...form } : d));
+        const res = await fetch(`/api/docentes?id=${editando.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error al actualizar'); }
         mostrar('ok', 'Docente actualizado');
       } else {
-        if (todos.some(d => d.dni === form.dni)) throw new Error('DNI ya registrado');
-        lsGuardar([...todos, { ...form, id: 'doc-' + Date.now() }]);
+        const res = await fetch('/api/docentes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error al crear'); }
         mostrar('ok', 'Docente registrado');
       }
       setShowForm(false); setEditando(null); setForm(emptyForm);
@@ -115,11 +136,15 @@ export default function DocentesScreen() {
     finally { setGuardando(false); }
   };
 
-  const handleEliminar = (id: string) => {
+  const handleEliminar = async (id: string) => {
     if (!confirm('¿Eliminar este docente?')) return;
     setEliminando(id);
     try {
-      lsGuardar(lsCargar().filter(d => d.id !== id));
+      const res = await fetch(`/api/docentes?id=${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Error al eliminar');
       mostrar('ok', 'Docente eliminado');
       cargar();
     } catch (err: any) { mostrar('err', err.message); }

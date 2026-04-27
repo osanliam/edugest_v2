@@ -125,12 +125,19 @@ export default function AdminUsersScreen({ user }: { user?: any }) {
   const cargar = async () => {
     setCargando(true);
     try {
-      const us = await apiUsers('/api/users');
-      const docs = lsDocentes(); // docentes siempre desde localStorage por ahora
+      const [us, docsRes] = await Promise.all([
+        apiUsers('/api/users'),
+        fetch('/api/docentes', { headers: { Authorization: `Bearer ${getToken()}` } })
+          .then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
       setUsuarios(Array.isArray(us) ? us : us.users || []);
-      setDocentes(docs);
+      if (Array.isArray(docsRes) && docsRes.length > 0) {
+        setDocentes(docsRes);
+        localStorage.setItem(LS_DOCENTES, JSON.stringify(docsRes));
+      } else {
+        setDocentes(lsDocentes());
+      }
     } catch {
-      // fallback a localStorage si falla
       setUsuarios(lsCargar());
       setDocentes(lsDocentes());
     } finally {
@@ -415,7 +422,7 @@ const importarDatosCompletos = () => {
           const msgs: string[] = [];
           
           const mergeData = (key: string, newData: any[], idField = 'id') => {
-            if (!newData || !Array(newData)) return 0;
+            if (!newData || !Array.isArray(newData)) return 0;
             const existing = JSON.parse(localStorage.getItem(key) || '[]');
             const existingIds = new Set(existing.map((x: any) => x[idField]));
             let added = 0;
@@ -550,7 +557,7 @@ const importarDatosCompletos = () => {
           <button onClick={descargarPlantilla} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm">
             <Upload size={16} /> Plantilla
           </button>
-          <button onClick={() => { setShowForm(true); setEditando(null); setForm(emptyForm); }}
+          <button onClick={() => { setShowForm(true); setEditando(null); setFormData({ nombre: '', email: '', contraseña: '', rol: 'teacher' as any }); }}
             className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold rounded-lg text-sm hover:opacity-90">
             <Plus size={16} /> Nuevo Usuario
           </button>

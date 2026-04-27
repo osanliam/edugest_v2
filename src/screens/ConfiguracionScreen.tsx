@@ -623,24 +623,45 @@ function AsignacionesSection() {
   const [cursos, setCursos]             = useState<Curso[]>([]);
 
   useEffect(() => {
-    // Cargar asignaciones: intentar Turso primero, fallback a localStorage
+    const cursosLocal: Curso[] = lsGet(LS_CURSOS, []);
+    setCursos(cursosLocal);
+
+    // Cargar docentes: API primero, fallback localStorage
+    const token = localStorage.getItem('auth_token') || '';
+    fetch('/api/docentes', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null).catch(() => null)
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setDocentes(data);
+          localStorage.setItem(LS_DOCENTES_KEY, JSON.stringify(data));
+        } else {
+          setDocentes(lsGet(LS_DOCENTES_KEY, []));
+        }
+      });
+
+    // Cargar asignaciones: Turso primero, fallback localStorage
     (async () => {
-      let asigs: Asignacion[] = [];
-      const localAsigs = lsGet(LS_ASIGNACIONES, []);
+      const localAsigs: Asignacion[] = lsGet(LS_ASIGNACIONES, []);
       try {
-        asigs = await getAsignacionesTurso();
-        // Si Turso está vacío pero localStorage tiene datos, subirlos a Turso
-        if (asigs.length === 0 && localAsigs.length > 0) {
-          syncToTurso('asignaciones', localAsigs);
-          asigs = localAsigs;
+        const fromTurso = await getAsignacionesTurso();
+        if (fromTurso.length > 0) {
+          // Convertir cursos (nombre array) de Turso → cursoId local
+          const asigs: Asignacion[] = fromTurso.map((a: any) => {
+            const cursosArr: string[] = Array.isArray(a.cursos) ? a.cursos : [];
+            const cursoNombre = cursosArr[0] || '';
+            const cursoObj = cursosLocal.find(c => c.nombre === cursoNombre) ||
+                             cursosLocal.find(c => c.id === cursoNombre);
+            return { ...a, cursoId: (a as any).cursoId || cursoObj?.id || cursoNombre };
+          });
+          lsSet(LS_ASIGNACIONES, asigs);
+          setAsignaciones(asigs);
+        } else if (localAsigs.length > 0) {
+          setAsignaciones(localAsigs);
         }
       } catch {
-        asigs = localAsigs;
+        setAsignaciones(localAsigs);
       }
-      setAsignaciones(asigs);
     })();
-    setDocentes(lsGet(LS_DOCENTES_KEY, []));
-    setCursos(lsGet(LS_CURSOS, []));
   }, []);
   const [msg, setMsg] = useState<{tipo:'ok'|'err';texto:string}|null>(null);
 
@@ -655,7 +676,12 @@ function AsignacionesSection() {
   const guardarLS = (data: Asignacion[]) => {
     lsSet(LS_ASIGNACIONES, data);
     setAsignaciones(data);
-    syncToTurso('asignaciones', data);
+    // Convertir cursoId → cursos:[nombre] para que Turso guarde el nombre legible
+    const dataTurso = data.map(a => {
+      const cursoObj = cursos.find(c => c.id === a.cursoId);
+      return { ...a, cursos: cursoObj ? [cursoObj.nombre] : (a.cursoId ? [a.cursoId] : []) };
+    });
+    syncToTurso('asignaciones', dataTurso);
   };
 
   const abrirNueva = () => {
@@ -720,8 +746,12 @@ function AsignacionesSection() {
     flash('ok', '📤 Subiendo asignaciones y alumnos...');
     try {
       const alumnos = lsGet('ie_alumnos', []);
-      const asigs = lsGet('cfg_asignaciones', []);
-      await syncToTurso('asignaciones', asigs);
+      const asigs: Asignacion[] = lsGet('cfg_asignaciones', []);
+      const asigsTurso = asigs.map(a => {
+        const cursoObj = cursos.find(c => c.id === a.cursoId);
+        return { ...a, cursos: cursoObj ? [cursoObj.nombre] : (a.cursoId ? [a.cursoId] : []) };
+      });
+      await syncToTurso('asignaciones', asigsTurso);
       await syncToTurso('alumnos', alumnos);
       flash('ok', `✅ Subidos: ${asigs.length} asignaciones, ${alumnos.length} alumnos`);
     } catch (e: any) {
@@ -935,12 +965,15 @@ function ApiStatusSection() {
     setDiagLoading(true);
     setDiag(null);
     try {
-      const res = await fetch('/api/sync?accion=diagnostico', { signal: AbortSignal.timeout(10000) });
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
+      const res = await fetch('/api/sync?accion=verificar_conexion', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        signal: AbortSignal.timeout(12000)
+      });
       const data = await res.json();
-      if (data.ok) setDiag(data);
-      else setDiag({ error: data.error || 'Error desconocido' });
+      setDiag(data);
     } catch (e: any) {
-      setDiag({ error: e.message });
+      setDiag({ ok: false, error: e.message || 'No se pudo conectar con el servidor' });
     } finally {
       setDiagLoading(false);
     }
