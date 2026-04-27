@@ -275,6 +275,23 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── GET accion=test_write → inserta y borra un registro de prueba ──────────
+  if (req.method === 'GET' && req.query?.accion === 'test_write') {
+    try {
+      const testId = 'test-' + Date.now();
+      await c.execute(
+        `INSERT INTO alumnos (id, apellidos_nombres, dni, fecha_nacimiento, edad, sexo, grado, seccion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [testId, 'TEST CONEXION', '00000000', '2020-01-01', 0, 'Masculino', '1°', 'A']
+      );
+      const verificar = await c.execute('SELECT COUNT(*) as n FROM alumnos WHERE id = ?', [testId]);
+      const count = Number(verificar.rows?.[0]?.n ?? 0);
+      await c.execute('DELETE FROM alumnos WHERE id = ?', [testId]);
+      return res.json({ ok: true, escribio: count === 1, mensaje: count === 1 ? 'Turso escribe correctamente' : 'Turso no escribió el registro de prueba' });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   // ── GET accion=diagnostico → tamaño total + conteos de TODAS las tablas ──
   if (req.method === 'GET' && req.query?.accion === 'diagnostico') {
     try {

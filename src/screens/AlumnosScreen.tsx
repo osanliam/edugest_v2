@@ -438,8 +438,30 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
     let ok = 0, err = 0;
     const erroresDetalle: string[] = [];
 
+    // SIEMPRE guardar en localStorage primero (funciona offline)
+    const localNuevos = nuevos.map((r: any) => ({
+      id: `alu-dni-${r.dni}`,
+      apellidos_nombres: r.apellidos_nombres,
+      dni: r.dni,
+      fecha_nacimiento: r.fecha_nacimiento,
+      edad: calcularEdad(r.fecha_nacimiento),
+      sexo: r.sexo,
+      grado: r.grado,
+      seccion: r.seccion,
+      madre_nombres: r.madre?.apellidos_nombres || '',
+      madre_dni: r.madre?.dni || '',
+      madre_celular: r.madre?.celular || '',
+      padre_nombres: r.padre?.apellidos_nombres || '',
+      padre_dni: r.padre?.dni || '',
+      padre_celular: r.padre?.celular || '',
+    }));
+    const existentes = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+    const todos = [...existentes.filter((a: any) => !localNuevos.find((n: any) => n.dni === a.dni)), ...localNuevos];
+    localStorage.setItem('ie_alumnos', JSON.stringify(todos));
+    setAlumnos(todos);
+
     try {
-      // Usar /api/sync con batches de 100 (MUY rápido)
+      // Intentar subir a Turso via /api/sync con batches de 100
       const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
       const LOTE = 100;
       for (let i = 0; i < nuevos.length; i += LOTE) {
@@ -481,20 +503,21 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
         err += data.errores || 0;
       }
       setImportResult({ ok, err: err + duplicados });
-      if (ok > 0) {
-        mostrar('ok', `${ok} alumnos importados`);
-        cargar();
-      }
+      if (ok > 0) mostrar('ok', `${ok} alumnos guardados en la nube`);
       if (err > 0) {
-        mostrar('err', `${err} alumnos fallaron. Revisa la consola (F12).`);
-        console.error('Errores de importación:', erroresDetalle);
+        mostrar('err', `${err} alumnos no subieron a Turso, pero están guardados localmente.`);
+        console.error('Errores Turso:', erroresDetalle);
+      }
+      if (ok === 0 && err === 0) {
+        mostrar('ok', `${localNuevos.length} alumnos guardados localmente (modo offline)`);
       }
     } catch (e: any) {
-      setImportResult({ ok: 0, err: importRows.length });
-      mostrar('err', 'Error general: ' + e.message);
-      console.error('Error importación:', e);
+      mostrar('ok', `${localNuevos.length} alumnos guardados localmente. Turso no responde.`);
+      console.error('Error Turso:', e);
     } finally {
       setImportando(false);
+      setShowImport(false);
+      setImportRows([]);
     }
   };
 
