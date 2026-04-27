@@ -189,9 +189,9 @@ async function ensureTables(c) {
   await alterSafe(`CREATE INDEX IF NOT EXISTS idx_alumnos_grado ON alumnos(grado, seccion)`);
   await alterSafe(`CREATE INDEX IF NOT EXISTS idx_users_email   ON users(email)`);
 
-  // Garantizar unicidad de DNI (evita duplicados masivos en importaciones)
-  await alterSafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_alumnos_dni ON alumnos(dni)`);
-  await alterSafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_apoderados_dni_parentesco ON apoderados(dni, parentesco)`);
+  // Eliminar índices UNIQUE que bloqueaban inserts con DNIs vacíos o repetidos
+  await alterSafe(`DROP INDEX IF EXISTS idx_alumnos_dni`);
+  await alterSafe(`DROP INDEX IF EXISTS idx_apoderados_dni_parentesco`);
 
   tablesReady = true;
 }
@@ -561,15 +561,26 @@ export default async function handler(req, res) {
       if (tiposSolicitados.includes('docentes'))          data.docentes          = await ejecutar('SELECT * FROM docentes');
       if (tiposSolicitados.includes('alumnos')) {
         const gradoFiltro = req.query?.grado || null;
+        const joinAlumnos = `
+          SELECT a.*,
+            m.apellidos_nombres AS madre_nombres, m.dni AS madre_dni, m.celular AS madre_celular,
+            p.apellidos_nombres AS padre_nombres, p.dni AS padre_dni, p.celular AS padre_celular
+          FROM alumnos a
+          LEFT JOIN apoderados m ON a.madre_id = m.id
+          LEFT JOIN apoderados p ON a.padre_id = p.id
+        `;
         if (gradoFiltro) {
           const grados = gradoFiltro.split(',').map(g => g.trim());
           const placeholders = grados.map(() => '?').join(',');
           try {
-            const r = await c.execute({ sql: `SELECT * FROM alumnos WHERE grado IN (${placeholders})`, args: grados });
+            const r = await c.execute({ sql: `${joinAlumnos} WHERE a.grado IN (${placeholders}) ORDER BY a.apellidos_nombres`, args: grados });
             data.alumnos = r.rows || [];
           } catch { data.alumnos = []; }
         } else {
-          data.alumnos = await ejecutar('SELECT * FROM alumnos');
+          try {
+            const r = await c.execute(`${joinAlumnos} ORDER BY a.apellidos_nombres`);
+            data.alumnos = r.rows || [];
+          } catch { data.alumnos = await ejecutar('SELECT * FROM alumnos'); }
         }
       }
       if (tiposSolicitados.includes('columnas'))          data.columnas          = await ejecutar('SELECT * FROM columnas');
@@ -682,34 +693,72 @@ export default async function handler(req, res) {
       }
 
       else if (tipo === 'alumnos') {
-        // Batch en lotes de 100. Si el lote falla, fallback uno por uno.
+        // ── Paso 1: Recolectar padres únicos desde el campo 'extra' ──────────
+        const parentesMap = {}; // dni → { apellidos_nombres, celular, parentesco }
+        const datosConPadres = datos.map(a => {
+          let extraObj = null;
+          try { extraObj = a.extra ? JSON.parse(a.extra) : null; } catch {}
+          const madre = extraObj?.madre;
+          const padre = extraObj?.padre;
+          if (madre?.dni && madre?.apellidos_nombres) {
+            parentesMap[String(madre.dni).trim()] = { apellidos_nombres: madre.apellidos_nombres, celular: madre.celular || '', parentesco: 'madre' };
+          }
+          if (padre?.dni && padre?.apellidos_nombres) {
+            parentesMap[String(padre.dni).trim()] = { apellidos_nombres: padre.apellidos_nombres, celular: padre.celular || '', parentesco: 'padre' };
+          }
+          return { ...a, _madre: madre, _padre: padre };
+        });
+
+        // ── Paso 2: Buscar padres existentes en chunks de 50 ─────────────────
+        const parentDNIs = Object.keys(parentesMap);
+        const existingParents = {}; // dni → id
+        for (let pi = 0; pi < parentDNIs.length; pi += 50) {
+          const chunk = parentDNIs.slice(pi, pi + 50);
+          const placeholders = chunk.map(() => '?').join(',');
+          try {
+            const r = await c.execute({ sql: `SELECT id, dni FROM apoderados WHERE dni IN (${placeholders})`, args: chunk });
+            (r.rows || []).forEach(row => { existingParents[String(row.dni)] = row.id; });
+          } catch (_) {}
+        }
+
+        // ── Paso 3: Asignar IDs y hacer upsert de padres en batch ───────────
+        const parentIDs = {}; // dni → id
+        const parentStmts = [];
+        for (const [dni, pd] of Object.entries(parentesMap)) {
+          const pid = existingParents[dni] || `apod-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+          parentIDs[dni] = pid;
+          parentStmts.push({
+            sql: `INSERT OR REPLACE INTO apoderados (id, apellidos_nombres, dni, celular, parentesco) VALUES (?, ?, ?, ?, ?)`,
+            args: [pid, pd.apellidos_nombres, dni, pd.celular, pd.parentesco]
+          });
+        }
+        for (let pi = 0; pi < parentStmts.length; pi += 100) {
+          try { await c.batch(parentStmts.slice(pi, pi + 100), 'write'); } catch (_) {}
+        }
+
+        // ── Paso 4: Insertar/reemplazar alumnos con madre_id y padre_id ─────
         const LOTE = 100;
-        const camposConocidos = ['id','apellidos_nombres','nombre','dni','fecha_nacimiento','edad','sexo','grado','seccion','telefono','direccion','apelidosPadre','nombreMadre','email'];
-        for (let i = 0; i < datos.length; i += LOTE) {
-          const lote = datos.slice(i, i + LOTE);
+        const camposBase = ['id','apellidos_nombres','nombre','dni','fecha_nacimiento','edad','sexo','grado','seccion','telefono','direccion','apelidosPadre','nombreMadre','email','extra','_madre','_padre'];
+        for (let i = 0; i < datosConPadres.length; i += LOTE) {
+          const lote = datosConPadres.slice(i, i + LOTE);
           const stmts = lote.map(a => {
-            const extra = {};
-            for (const k of Object.keys(a)) { if (!camposConocidos.includes(k)) extra[k] = a[k]; }
+            const madre_id = a._madre?.dni ? (parentIDs[String(a._madre.dni).trim()] || null) : (a.madre_id || null);
+            const padre_id = a._padre?.dni ? (parentIDs[String(a._padre.dni).trim()] || null) : (a.padre_id || null);
             const alumnoId = a.id || (a.dni ? `alu-dni-${a.dni}` : `alu-${Date.now()}-${Math.random().toString(36).slice(2,7)}`);
+            const extraFields = {};
+            for (const k of Object.keys(a)) { if (!camposBase.includes(k)) extraFields[k] = a[k]; }
             return {
-              sql: `INSERT OR REPLACE INTO alumnos (id, apellidos_nombres, nombre, dni, fecha_nacimiento, edad, sexo, grado, seccion, telefono, direccion, apelidosPadre, nombreMadre, email, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              args: [alumnoId, a.apellidos_nombres||'', a.nombre||'', a.dni||'', a.fecha_nacimiento||a.fechaNac||'', a.edad?String(a.edad):'', a.sexo||'', a.grado||'', a.seccion||'', a.telefono||'', a.direccion||'', a.apelidosPadre||'', a.nombreMadre||'', a.email||'', Object.keys(extra).length>0?JSON.stringify(extra):null]
+              sql: `INSERT OR REPLACE INTO alumnos (id, apellidos_nombres, nombre, dni, fecha_nacimiento, edad, sexo, grado, seccion, telefono, direccion, apelidosPadre, nombreMadre, email, extra, madre_id, padre_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              args: [alumnoId, a.apellidos_nombres||'', a.nombre||'', a.dni||'', a.fecha_nacimiento||a.fechaNac||'', a.edad?String(a.edad):'', a.sexo||'', a.grado||'', a.seccion||'', a.telefono||'', a.direccion||'', a.apelidosPadre||a._padre?.apellidos_nombres||'', a.nombreMadre||a._madre?.apellidos_nombres||'', a.email||'', Object.keys(extraFields).length>0?JSON.stringify(extraFields):null, madre_id, padre_id]
             };
           });
           try {
             await c.batch(stmts, 'write');
             ok += lote.length;
           } catch (batchErr) {
-            // Si el batch falla, intentar uno por uno para no perder todo el lote
-            for (const a of lote) {
-              const extra = {};
-              for (const k of Object.keys(a)) { if (!camposConocidos.includes(k)) extra[k] = a[k]; }
-              const alumnoId = a.id || (a.dni ? `alu-dni-${a.dni}` : `alu-${Date.now()}-${Math.random().toString(36).slice(2,7)}`);
-              const e = await safeExec(c,
-                `INSERT OR REPLACE INTO alumnos (id, apellidos_nombres, nombre, dni, fecha_nacimiento, edad, sexo, grado, seccion, telefono, direccion, apelidosPadre, nombreMadre, email, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [alumnoId, a.apellidos_nombres||'', a.nombre||'', a.dni||'', a.fecha_nacimiento||a.fechaNac||'', a.edad?String(a.edad):'', a.sexo||'', a.grado||'', a.seccion||'', a.telefono||'', a.direccion||'', a.apelidosPadre||'', a.nombreMadre||'', a.email||'', Object.keys(extra).length>0?JSON.stringify(extra):null]
-              );
-              e ? errores.push(`alumno ${a.dni}: ${e}`) : ok++;
+            for (const stmt of stmts) {
+              const e = await safeExec(c, stmt.sql, stmt.args);
+              e ? errores.push(`alumno: ${e}`) : ok++;
             }
           }
         }

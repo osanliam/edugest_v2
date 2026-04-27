@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search, RefreshCw, Download } from 'lucide-react';
-import { cargarTodo, guardarCalificativos, guardarColumnas, getAsignaciones } from '../utils/apiClient';
+import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
+import { cargarTodo, guardarCalificativos, guardarUnCalificativo, guardarColumnas, getAsignaciones, getCalificacionesDesdeFecha, cargarCalPaginado, getCacheCalificaciones, setCacheCalificaciones, actualizarCalEnCache } from '../utils/apiClient';
+import { exportarColumna, exportarTodas } from '../utils/exportCalificativos';
 
 // ── Competencias ──────────────────────────────────────────────────────────────
 const COMPETENCIAS = [
-  { id: 'comp1', label: 'C1', nombre: 'Lee diversos tipos de textos escritos en lengua materna',  color: 'from-cyan-500 to-blue-600',       text: 'text-cyan-300',    bg: 'bg-cyan-500/10',    headerBg: 'bg-cyan-900/40',    promBg: 'bg-cyan-500/20 border-cyan-400/50 text-cyan-200'       },
-  { id: 'comp2', label: 'C2', nombre: 'Escribe diversos tipos de textos en lengua materna',       color: 'from-emerald-500 to-teal-600',    text: 'text-emerald-300', bg: 'bg-emerald-500/10', headerBg: 'bg-emerald-900/40', promBg: 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200' },
-  { id: 'comp3', label: 'C3', nombre: 'Se comunica oralmente en lengua materna',                  color: 'from-violet-500 to-purple-600',  text: 'text-violet-300',  bg: 'bg-violet-500/10',  headerBg: 'bg-violet-900/40',  promBg: 'bg-violet-500/20 border-violet-400/50 text-violet-200' },
+  { id: 'comp3', label: 'C1', nombre: 'Se comunica oralmente en lengua materna',             color: 'from-violet-500 to-purple-600',  text: 'text-violet-300',  bg: 'bg-violet-500/10',  headerBg: 'bg-violet-900/40',  promBg: 'bg-violet-500/20 border-violet-400/50 text-violet-200' },
+  { id: 'comp1', label: 'C2', nombre: 'Lee diversos tipos de textos escritos en lengua materna', color: 'from-cyan-500 to-blue-600',   text: 'text-cyan-300',    bg: 'bg-cyan-500/10',    headerBg: 'bg-cyan-900/40',    promBg: 'bg-cyan-500/20 border-cyan-400/50 text-cyan-200'       },
+  { id: 'comp2', label: 'C3', nombre: 'Escribe diversos tipos de textos en lengua materna',   color: 'from-emerald-500 to-teal-600',   text: 'text-emerald-300', bg: 'bg-emerald-500/10', headerBg: 'bg-emerald-900/40', promBg: 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200' },
 ];
 
 // ── Tipos de instrumento ──────────────────────────────────────────────────────
@@ -867,7 +868,11 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const [compExpand,    setCompExpand]    = useState<Record<string, boolean>>({ comp1: true, comp2: true, comp3: true });
   const [syncing,       setSyncing]       = useState(false);
   const [syncMsg,       setSyncMsg]       = useState<{tipo:'ok'|'err';texto:string}|null>(null);
-  const [asignacionDocente, setAsignacionDocente] = useState<{grados:string[]; secciones:string[]} | null>(null);
+  const [asignacionDocente, setAsignacionDocente] = useState<{grados:string[]; secciones:string[]; cursos:string[]} | null>(null);
+  const [ultimaSync,    setUltimaSync]    = useState<Date | null>(null);
+  const [cambiosRemotos, setCambiosRemotos] = useState(0);
+  const [showRespaldo,  setShowRespaldo]  = useState(false);
+  const [calProgreso,   setCalProgreso]   = useState<{ loaded: number; total: number } | null>(null);
 
   // Helper: parsear asignaciones (grados/secciones/cursos pueden venir como JSON string desde Turso)
   const parsearAsignaciones = (asigs: any[]): any[] =>
@@ -878,17 +883,26 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
     }));
 
+  // Helper: normalizar grado para comparación ('1' y '1°' son equivalentes)
+  const normGrado = (g: string) => String(g || '').trim().replace(/°$/, '');
+
   // Helper: aplicar asignaciones al estado del docente
   const aplicarAsignacion = (asigs: any[]) => {
     if (!user?.role || user.role !== 'teacher') return;
     const docenteId = (user as any).docenteId;
-    if (!docenteId) return;
-    const mias = parsearAsignaciones(asigs).filter((a: any) => a.docenteId === docenteId);
+    const userId    = (user as any).id;
+    // Buscar asignaciones por docenteId o, como fallback, por userId
+    const parsed = parsearAsignaciones(asigs);
+    const mias = parsed.filter((a: any) =>
+      (docenteId && a.docenteId === docenteId) ||
+      (userId    && a.docenteId === userId)
+    );
     if (mias.length === 0) return;
     const grados   = [...new Set(mias.flatMap((a: any) => a.grados))] as string[];
     const secciones = [...new Set(mias.flatMap((a: any) => a.secciones))] as string[];
+    const cursos   = [...new Set(mias.flatMap((a: any) => a.cursos || []))] as string[];
     if (grados.length > 0 || secciones.length > 0) {
-      setAsignacionDocente({ grados, secciones });
+      setAsignacionDocente({ grados, secciones, cursos });
     }
   };
 
@@ -896,47 +910,91 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     setSyncing(true);
     try {
       // 1) Base inmediata desde localStorage
-      const localAlumnos   = JSON.parse(localStorage.getItem('ie_alumnos')          || '[]');
-      const localColumnas  = JSON.parse(localStorage.getItem('cal_columnas')         || '[]');
-      const localCalif     = JSON.parse(localStorage.getItem('ie_calificativos_v2')  || '[]');
-      const localUnidades  = JSON.parse(localStorage.getItem('cfg_unidades')         || '[]');
-      const localAsigs     = JSON.parse(localStorage.getItem('cfg_asignaciones')     || '[]');
+      const _parseArr = (key: string) => { try { const d = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(d) ? d : []; } catch { return []; } };
+      const localAlumnos   = _parseArr('ie_alumnos');
+      const localColumnas  = _parseArr('cal_columnas');
+      const localCalif     = _parseArr('ie_calificativos_v2');
+      const localUnidades  = _parseArr('cfg_unidades');
+      const localAsigs     = _parseArr('cfg_asignaciones');
 
       setAlumnos(localAlumnos);
       setColumnas(localColumnas);
       setCalificativos(localCalif);
-      setBimestres((localUnidades || []).filter((u: any) => u.activa !== false && u.activa !== 0));
+      setBimestres(localUnidades.filter((u: any) => u.activa !== false && u.activa !== 0));
       // Aplicar asignación inmediatamente desde localStorage
       if (localAsigs.length > 0) aplicarAsignacion(localAsigs);
 
-      // 2) Descargar desde Turso (solo tipos necesarios para evitar timeout)
+      // 2) Descargar desde Turso — separado para evitar timeout con tablas grandes
       try {
-        const todo = await cargarTodo('alumnos,columnas,unidades,asignaciones');
-        if (todo.alumnos?.length > 0) {
-          setAlumnos(todo.alumnos);
-          localStorage.setItem('ie_alumnos', JSON.stringify(todo.alumnos));
+        // Paso 2a: datos ligeros primero (asignaciones, columnas, unidades)
+        const ligero = await cargarTodo('columnas,unidades,asignaciones');
+        if (ligero.columnas?.length > 0) {
+          setColumnas(ligero.columnas);
+          localStorage.setItem('cal_columnas', JSON.stringify(ligero.columnas));
         }
-        if (todo.columnas?.length > 0) {
-          setColumnas(todo.columnas);
-          localStorage.setItem('cal_columnas', JSON.stringify(todo.columnas));
+        if (ligero.unidades?.length > 0) {
+          setBimestres((ligero.unidades || []).filter((u: any) => u.activa !== false));
+          localStorage.setItem('cfg_unidades', JSON.stringify(ligero.unidades));
         }
-        if (todo.unidades?.length > 0) {
-          setBimestres((todo.unidades || []).filter((u: any) => u.activa !== false));
-          localStorage.setItem('cfg_unidades', JSON.stringify(todo.unidades));
+        if (ligero.asignaciones?.length > 0) {
+          localStorage.setItem('cfg_asignaciones', JSON.stringify(ligero.asignaciones));
+          aplicarAsignacion(ligero.asignaciones);
         }
-        // Actualizar asignaciones desde Turso y reaplicar
-        if (todo.asignaciones?.length > 0) {
-          localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
-          aplicarAsignacion(todo.asignaciones);
+        // Paso 2b: alumnos por separado (tabla grande)
+        // Si es docente y ya tenemos su asignación, filtrar solo sus grados
+        const asigActual = ligero.asignaciones?.find((a: any) =>
+          a.docenteId === (user as any)?.docenteId || a.docenteId === user?.id
+        );
+        const extrasAlumnos: Record<string, string> = {};
+        if (asigActual?.grados?.length > 0) {
+          extrasAlumnos.grado = asigActual.grados.join(',');
         }
-        // Calificaciones en segundo plano
-        try {
-          const resto = await cargarTodo('calificaciones');
-          if (resto.calificaciones?.length > 0) {
-            setCalificativos(resto.calificaciones);
-            localStorage.setItem('ie_calificativos_v2', JSON.stringify(resto.calificaciones));
+        const todoAlumnos = await cargarTodo('alumnos', Object.keys(extrasAlumnos).length ? extrasAlumnos : undefined);
+        if (todoAlumnos.alumnos?.length > 0) {
+          // Si es docente, mergear con los existentes (no reemplazar todo)
+          if (extrasAlumnos.grado) {
+            const existentes = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
+            const gradosFiltro = extrasAlumnos.grado.split(',');
+            const sinEsteGrado = existentes.filter((a: any) => !gradosFiltro.includes(a.grado));
+            const merged = [...sinEsteGrado, ...todoAlumnos.alumnos];
+            setAlumnos(merged);
+            localStorage.setItem('ie_alumnos', JSON.stringify(merged));
+          } else {
+            setAlumnos(todoAlumnos.alumnos);
+            localStorage.setItem('ie_alumnos', JSON.stringify(todoAlumnos.alumnos));
           }
-        } catch { /* silencioso */ }
+        }
+        // Calificaciones — caché de 10 min → paginado 500 por página
+        const cachedCal = getCacheCalificaciones();
+        if (cachedCal) {
+          setCalificativos(cachedCal);
+        } else {
+          try {
+            const PAGE = 500;
+            let page = 0;
+            let acumulado: any[] = [];
+            let total = 0;
+
+            while (true) {
+              const result = await cargarCalPaginado(page, PAGE);
+              if (page === 0 && result.total !== undefined) {
+                total = result.total;
+                setCalProgreso({ loaded: 0, total });
+              }
+              acumulado = [...acumulado, ...result.calificaciones];
+              // Mostrar lo que hay hasta ahora (carga progresiva)
+              setCalificativos([...acumulado]);
+              setCalProgreso({ loaded: acumulado.length, total: total || acumulado.length });
+
+              if (result.calificaciones.length < PAGE) break; // última página
+              page++;
+            }
+
+            setCacheCalificaciones(acumulado);
+            localStorage.setItem('ie_calificativos_v2', JSON.stringify(acumulado));
+          } catch { /* si falla Turso ya tenemos localStorage */ }
+          setCalProgreso(null);
+        }
       } catch {
         // Si falla Turso, ya tenemos localStorage como fallback
       }
@@ -945,6 +1003,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       setTimeout(() => setSyncMsg(null), 4000);
     } finally {
       setSyncing(false);
+      setUltimaSync(new Date());
     }
   };
 
@@ -970,6 +1029,39 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   useEffect(() => {
     cargar();
   }, []);
+
+  // Validación defensiva: garantizar que columnas y calificativos siempre sean arrays
+  useEffect(() => {
+    if (!Array.isArray(columnas)) setColumnas([]);
+    if (!Array.isArray(calificativos)) setCalificativos([]);
+    if (!Array.isArray(alumnos)) setAlumnos([]);
+  }, [columnas, calificativos, alumnos]);
+
+  // Polling cada 30s: detecta cambios de otros docentes en tiempo real
+  useEffect(() => {
+    const intervalo = setInterval(async () => {
+      if (!ultimaSync) return;
+      try {
+        const rawNuevas = await getCalificacionesDesdeFecha(ultimaSync.toISOString());
+        if (rawNuevas.length === 0) return;
+        const toArr = (v: any) => { try { const p = typeof v === 'string' ? JSON.parse(v || '[]') : v; return Array.isArray(p) ? p : []; } catch { return []; } };
+        const nuevas = rawNuevas.map((c: any) => ({ ...c, marcados: toArr(c.marcados), claves: toArr(c.claves) }));
+        setCalificativos(prev => {
+          const actualizados = [...prev];
+          let contadorNuevos = 0;
+          for (const nueva of nuevas) {
+            const idx = actualizados.findIndex(c => c.alumnoId === nueva.alumnoId && c.columnaId === nueva.columnaId);
+            if (idx >= 0) actualizados[idx] = nueva;
+            else { actualizados.push(nueva); contadorNuevos++; }
+          }
+          if (contadorNuevos > 0) setCambiosRemotos(n => n + contadorNuevos);
+          return actualizados;
+        });
+        setUltimaSync(new Date());
+      } catch { /* silencioso — sin conexión */ }
+    }, 30_000);
+    return () => clearInterval(intervalo);
+  }, [ultimaSync]);
 
   // ── Sincronización manual desde Turso ────────────────────────────────────
   const sincronizarDesdeTurso = async () => {
@@ -1007,11 +1099,13 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       // Paso 2: calificaciones y asistencia en segundo plano
       try {
         const resto = await cargarTodo('calificaciones,asistencia');
-        if (resto.calificaciones?.length) {
-          setCalificativos(resto.calificaciones);
-          localStorage.setItem('ie_calificativos_v2', JSON.stringify(resto.calificaciones));
+        const toArr = (v: any) => { try { const p = typeof v === 'string' ? JSON.parse(v || '[]') : v; return Array.isArray(p) ? p : []; } catch { return []; } };
+        if (Array.isArray(resto.calificaciones) && resto.calificaciones.length > 0) {
+          const califs = resto.calificaciones.map((c: any) => ({ ...c, marcados: toArr(c.marcados), claves: toArr(c.claves) }));
+          setCalificativos(califs);
+          localStorage.setItem('ie_calificativos_v2', JSON.stringify(califs));
         }
-        if (resto.asistencia?.length) {
+        if (Array.isArray(resto.asistencia) && resto.asistencia.length > 0) {
           localStorage.setItem('ie_asistencia', JSON.stringify(resto.asistencia));
         }
       } catch { /* silencioso */ }
@@ -1034,9 +1128,11 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   // Base de alumnos: si docente, solo los de sus grados+secciones
   const alumnosBase = React.useMemo(() => {
     if (!esDocente || !asignacionDocente) return alumnos;
+    const gradosNorm    = asignacionDocente.grados.map(normGrado);
+    const seccionesNorm = asignacionDocente.secciones.map(s => s.trim().toUpperCase());
     return alumnos.filter(a =>
-      asignacionDocente.grados.includes((a as any).grado) &&
-      asignacionDocente.secciones.includes((a as any).seccion)
+      gradosNorm.includes(normGrado((a as any).grado)) &&
+      seccionesNorm.includes(((a as any).seccion || '').trim().toUpperCase())
     );
   }, [alumnos, esDocente, asignacionDocente]);
 
@@ -1066,15 +1162,20 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     if (idx >= 0) todos[idx] = cal; else todos.push(cal);
     setCalificativos(todos);
     setPopup(null);
-    // Guardar primero en localStorage (nunca se pierde)
-    localStorage.setItem('ie_calificativos_v2', JSON.stringify(todos));
-    // Backup automático cada 5 notas guardadas
-    if (todos.length % 5 === 0) backupAutomatico();
-    // Intentar sync con Turso en segundo plano
+    // Actualizar caché en memoria para no invalidarlo (evita re-fetch innecesario)
+    actualizarCalEnCache(cal);
+    // Sync directo con Turso: solo el registro que cambió (más rápido + merge correcto en servidor)
     try {
-      await guardarCalificativos(todos);
+      await guardarUnCalificativo(cal);
+      setUltimaSync(new Date());
+      setSyncMsg({ tipo: 'ok', texto: '✅ Guardado en la nube' });
+      setTimeout(() => setSyncMsg(null), 2000);
     } catch (err: any) {
-      console.warn('Sync Turso calificativos falló:', err.message);
+      // Fallback a localStorage si no hay internet
+      localStorage.setItem('ie_calificativos_v2', JSON.stringify(todos));
+      setSyncMsg({ tipo: 'err', texto: `⚠️ Sin internet — guardado local` });
+      setTimeout(() => setSyncMsg(null), 5000);
+      console.warn('Turso fallback:', err.message);
     }
   };
 
@@ -1187,23 +1288,55 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
               className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg text-xs font-bold hover:opacity-90">
               <Plus size={13}/> Nueva columna
             </button>
-            <button onClick={handleRecargar} disabled={syncing}
-              className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg text-xs font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
-              <RefreshCw size={13} className={syncing ? 'animate-spin' : ''}/> {syncing ? 'Cargando...' : 'Recargar'}
+            <button onClick={() => { setCambiosRemotos(0); handleRecargar(); }} disabled={syncing}
+              className="relative flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg text-xs font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+              <RefreshCw size={13} className={syncing ? 'animate-spin' : ''}/>
+              {syncing ? 'Cargando...' : 'Recargar'}
+              {cambiosRemotos > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                  {cambiosRemotos > 9 ? '!' : cambiosRemotos}
+                </span>
+              )}
             </button>
-            <button onClick={backupAutomatico}
-              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">
-              <Download size={13}/> Backup
+            <button onClick={() => setShowRespaldo(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold ${showRespaldo ? 'bg-emerald-500 text-white' : 'bg-emerald-700 hover:bg-emerald-600 text-white'}`}>
+              <FileSpreadsheet size={13}/> Respaldo Excel
             </button>
           </div>
         </div>
 
-        {/* Mensaje de sincronización */}
-        {syncMsg && (
-          <div className={`px-4 py-2 mx-4 rounded-lg ${syncMsg.tipo === 'ok' ? 'bg-green-500/20 border border-green-500/40' : 'bg-red-500/20 border border-red-500/40'}`}>
-            <p className={syncMsg.tipo === 'ok' ? 'text-green-300 text-xs font-bold' : 'text-red-300 text-xs font-bold'}>{syncMsg.texto}</p>
-          </div>
-        )}
+        {/* Mensaje de sincronización + última sync */}
+        <div className="px-4 pb-1 flex items-center gap-3 flex-wrap">
+          {syncMsg && (
+            <div className={`px-3 py-1.5 rounded-lg ${syncMsg.tipo === 'ok' ? 'bg-green-500/20 border border-green-500/40' : 'bg-red-500/20 border border-red-500/40'}`}>
+              <p className={syncMsg.tipo === 'ok' ? 'text-green-300 text-xs font-bold' : 'text-red-300 text-xs font-bold'}>{syncMsg.texto}</p>
+            </div>
+          )}
+          {calProgreso && (
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-32 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-cyan-500 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.round((calProgreso.loaded / Math.max(calProgreso.total, 1)) * 100)}%` }}
+                />
+              </div>
+              <p className="text-cyan-400 text-[11px] font-medium">
+                Cargando {calProgreso.loaded}/{calProgreso.total} calificativos...
+              </p>
+            </div>
+          )}
+          {ultimaSync && !syncMsg && !calProgreso && (
+            <p className="text-slate-500 text-[11px]">
+              🔄 Sincronizado {ultimaSync.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+              <span className="ml-1 text-slate-600">· auto-refresh c/30s</span>
+            </p>
+          )}
+          {cambiosRemotos > 0 && (
+            <span className="px-2 py-1 bg-orange-500/20 border border-orange-500/40 text-orange-300 text-[11px] font-bold rounded-lg animate-pulse">
+              🔔 {cambiosRemotos} cambio{cambiosRemotos > 1 ? 's' : ''} de otro docente
+            </span>
+          )}
+        </div>
 
         {columnas.length > 0 && !filtroUnidad && (
           <div className="px-4 py-2 bg-amber-500/20 border border-amber-500/40 mx-4 rounded-lg">
@@ -1235,7 +1368,8 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
           <span className="text-slate-500 text-xs">{alumnosFiltrados.length} alumnos · {columnas.length} columnas</span>
           {esDocente && asignacionDocente && (
             <span className="text-indigo-400 text-xs bg-indigo-500/10 border border-indigo-500/30 rounded-lg px-2 py-1">
-              🏫 Grados: {asignacionDocente.grados.join(', ')} · Secciones: {asignacionDocente.secciones.join(', ')}
+              🏫 {asignacionDocente.grados.join(', ')} · Sec. {asignacionDocente.secciones.join(', ')}
+              {asignacionDocente.cursos.length > 0 && ` · ${asignacionDocente.cursos.join(', ')}`}
             </span>
           )}
           {esDocente && !asignacionDocente && (
@@ -1247,6 +1381,63 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       </div>
 
       <div className="px-2 py-4">
+
+        {/* ── Panel Respaldo Excel por instrumento ── */}
+        {showRespaldo && (
+          <div className="max-w-5xl mx-auto mb-4 bg-slate-800 border border-emerald-700/50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                  <FileSpreadsheet size={15} className="text-emerald-400"/> Respaldo por instrumento
+                </h3>
+                <p className="text-slate-400 text-xs mt-0.5">
+                  Descarga un Excel con todos los alumnos, sus respuestas pregunta por pregunta y el calificativo.
+                </p>
+              </div>
+              <button onClick={() => exportarTodas(columnas, alumnos, calificativos)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">
+                <Download size={13}/> Exportar TODOS ({columnas.length})
+              </button>
+            </div>
+            {columnas.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-4">Sin columnas configuradas.</p>
+            ) : (
+              <div className="space-y-1">
+                {COMPETENCIAS.map(comp => {
+                  const cols = columnas.filter(c => c.competenciaId === comp.id);
+                  if (cols.length === 0) return null;
+                  return (
+                    <div key={comp.id} className="mb-2">
+                      <p className={`text-xs font-black mb-1 px-2 ${comp.text}`}>{comp.label} — {comp.nombre}</p>
+                      {cols.map(col => {
+                        const registrados = calificativos.filter(c => c.columnaId === col.id).length;
+                        const pct = alumnos.length > 0 ? Math.round(registrados / alumnos.length * 100) : 0;
+                        return (
+                          <div key={col.id} className="flex items-center justify-between bg-slate-700/40 rounded-lg px-3 py-2 mb-1">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span className="text-white text-xs font-medium truncate">{col.nombre}</span>
+                              <span className="text-slate-400 text-xs shrink-0">{col.totalItems} ítems</span>
+                              <span className="text-slate-500 text-xs shrink-0">{registrados}/{alumnos.length} alumnos ({pct}%)</span>
+                              {pct < 100 && <span className="text-amber-400 text-xs shrink-0">⚠ {alumnos.length - registrados} sin registrar</span>}
+                            </div>
+                            <button onClick={() => exportarColumna(col, alumnos, calificativos)}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shrink-0 ml-3">
+                              <Download size={11}/> Excel
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-slate-600 text-xs mt-3">
+              💾 El archivo se descarga en tu carpeta de Descargas. Ábrelo con Excel o LibreOffice Calc.
+              Para exámenes: verde = correcta, rojo = incorrecta.
+            </p>
+          </div>
+        )}
 
         {/* Panel gestión columnas */}
         {showGestion && (

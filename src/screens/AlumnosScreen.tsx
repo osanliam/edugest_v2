@@ -407,9 +407,16 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
         return val;
       };
 
+      const normDNI = (raw: any): string => {
+        const s = String(raw ?? '').trim().replace(/\D/g, '');
+        // DNIs peruanos son 8 dígitos; recuperar cero inicial si XLSX lo leyó como número
+        if (s.length === 7) return '0' + s;
+        return s;
+      };
+
       const rows = dataRows.map((r: any[]) => ({
         apellidos_nombres: colVal(r, 'APELLIDOS Y NOMBRES', 'APELLIDO'),
-        dni:               colVal(r, 'N° DNI DEL ALUMNO', 'DNI DEL ALUMNO', 'DNI'),
+        dni:               normDNI(colVal(r, 'N° DNI DEL ALUMNO', 'DNI DEL ALUMNO', 'DNI', 'N°DNI', 'N° DNI')),
         fecha_nacimiento:  toDate(r[headers.findIndex(h => h.includes('NACIMIENTO'))]),
         sexo:              normalizarSexo(colVal(r, 'SEXO')),
         grado:             normalizarGrado(colVal(r, 'GRADO DE ESTUDIOS', 'GRADO')),
@@ -419,14 +426,14 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
           return m ? m[0] : raw.toUpperCase();
         })(),
         madre: {
-          apellidos_nombres: colVal(r, 'NOMBRES DE LA MADRE', 'MADRE'),
-          dni:               colVal(r, 'DNI MADRE'),
-          celular:           colVal(r, 'CELULAR  DE LA MADRE', 'CELULAR DE LA MADRE'),
+          apellidos_nombres: colVal(r, 'APELLIDOS Y NOMBRES DE LA MADRE', 'NOMBRES DE LA MADRE', 'MADRE'),
+          dni:               normDNI(colVal(r, 'DNI MADRE', 'DNI DE LA MADRE')),
+          celular:           colVal(r, 'N° DE CELULAR  DE LA MADRE', 'CELULAR  DE LA MADRE', 'CELULAR DE LA MADRE', 'CELULAR MADRE'),
         },
         padre: {
-          apellidos_nombres: colVal(r, 'NOMBRES DEL PADRE', 'PADRE'),
-          dni:               colVal(r, 'DNI PADRE'),
-          celular:           colVal(r, 'CELULAR DEL PADRE'),
+          apellidos_nombres: colVal(r, 'APELLIDOS Y NOMBRES DEL PADRE', 'NOMBRES DEL PADRE', 'PADRE'),
+          dni:               normDNI(colVal(r, 'DNI PADRE', 'DNI DEL PADRE')),
+          celular:           colVal(r, 'N° DE CELULAR DEL PADRE', 'CELULAR DEL PADRE', 'CELULAR PADRE'),
         },
       }));
       setImportRows(rows.filter((r: any) => r.apellidos_nombres && r.dni));
@@ -437,14 +444,13 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
 
   const handleImportar = async () => {
     setImportando(true);
-    const dniExistentes = new Set(alumnos.map(a => a.dni));
-    const nuevos = importRows.filter((r: any) => r.apellidos_nombres && r.dni && !dniExistentes.has(r.dni));
-    const duplicados = importRows.length - nuevos.length;
+    // Subir TODOS los registros del Excel — INSERT OR REPLACE en el servidor maneja duplicados
+    const filas = importRows.filter((r: any) => r.apellidos_nombres && r.dni);
     let ok = 0, err = 0;
     const erroresDetalle: string[] = [];
 
-    // SIEMPRE guardar en localStorage primero (funciona offline)
-    const localNuevos = nuevos.map((r: any) => ({
+    // Guardar en localStorage inmediatamente (funciona offline)
+    const nuevosLocal = filas.map((r: any) => ({
       id: `alu-dni-${r.dni}`,
       apellidos_nombres: r.apellidos_nombres,
       dni: r.dni,
@@ -461,16 +467,15 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
       padre_celular: r.padre?.celular || '',
     }));
     const existentes = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
-    const todos = [...existentes.filter((a: any) => !localNuevos.find((n: any) => n.dni === a.dni)), ...localNuevos];
-    localStorage.setItem('ie_alumnos', JSON.stringify(todos));
-    setAlumnos(todos);
+    const combinados = [...existentes.filter((a: any) => !nuevosLocal.find((n: any) => n.dni === a.dni)), ...nuevosLocal];
+    localStorage.setItem('ie_alumnos', JSON.stringify(combinados));
+    setAlumnos(combinados);
 
     try {
-      // Intentar subir a Turso via /api/sync con batches de 100
       const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
       const LOTE = 100;
-      for (let i = 0; i < nuevos.length; i += LOTE) {
-        const lote = nuevos.slice(i, i + LOTE).map((r: any) => ({
+      for (let i = 0; i < filas.length; i += LOTE) {
+        const lote = filas.slice(i, i + LOTE).map((r: any) => ({
           id: `alu-dni-${r.dni}`,
           apellidos_nombres: r.apellidos_nombres,
           nombre: '',
@@ -495,36 +500,23 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
         if (!res.ok) {
           const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
           err += lote.length;
-          erroresDetalle.push(`Lote ${i}-${i+lote.length}: ${body.error || 'Error desconocido'}`);
+          erroresDetalle.push(`Lote ${Math.floor(i/LOTE)+1}: ${body.error || 'Error desconocido'}`);
           continue;
         }
         const data = await res.json();
-        if (data.success === false || data.error) {
-          err += lote.length;
-          erroresDetalle.push(`Lote ${i}-${i+lote.length}: ${data.error || 'Error del servidor'}`);
-          continue;
-        }
-        ok += data.ok || 0;
-        err += data.errores || 0;
+        ok += data.ok || lote.length;
+        err += data.errores?.length || 0;
       }
-      const yaExistian = duplicados;
-      const fallaron = err;
-      const subieron = ok;
 
-      setImportResult({ ok: subieron + localNuevos.length, err: fallaron });
-
-      if (yaExistian > 0 && subieron === 0 && fallaron === 0) {
-        mostrar('ok', `${yaExistian} alumnos ya estaban importados. Listos para trabajar.`);
-      } else if (subieron > 0) {
-        mostrar('ok', `${subieron} alumnos subidos a Turso. ${yaExistian} ya existían.`);
-      } else if (fallaron > 0) {
-        mostrar('err', `${fallaron} alumnos fallaron en Turso, pero ${localNuevos.length} están guardados localmente.`);
-        console.error('Errores Turso:', erroresDetalle);
+      setImportResult({ ok, err });
+      if (err === 0) {
+        mostrar('ok', `${filas.length} alumnos importados correctamente a Turso.`);
       } else {
-        mostrar('ok', `${localNuevos.length} alumnos guardados localmente. Listos para trabajar.`);
+        mostrar('err', `${ok} OK, ${err} con errores. Revisa la consola.`);
+        console.error('Errores importación:', erroresDetalle);
       }
     } catch (e: any) {
-      mostrar('ok', `${localNuevos.length} alumnos guardados localmente. Turso no responde.`);
+      mostrar('ok', `${nuevosLocal.length} alumnos guardados localmente. Turso no disponible.`);
       console.error('Error Turso:', e);
     } finally {
       setImportando(false);
@@ -657,7 +649,7 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
                     <p className="text-white text-xl font-bold">Importación completada</p>
                     <div className="flex justify-center gap-8">
                       <div><div className="text-3xl font-black text-green-400">{importResult.ok}</div><div className="text-slate-400 text-sm">registrados</div></div>
-                      <div><div className="text-3xl font-black text-red-400">{importResult.err}</div><div className="text-slate-400 text-sm">errores (DNI duplicado)</div></div>
+                      <div><div className="text-3xl font-black text-red-400">{importResult.err}</div><div className="text-slate-400 text-sm">con errores</div></div>
                     </div>
                     <button onClick={() => { setShowImport(false); setImportRows([]); setImportResult(null); }}
                       className="mt-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold">Cerrar</button>
