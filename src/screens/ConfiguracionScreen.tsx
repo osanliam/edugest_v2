@@ -1008,6 +1008,23 @@ function ApiStatusSection() {
     }
   };
 
+  const resetAlumnos = async () => {
+    if (!confirm('⚠️ ¿BORRAR TODOS los alumnos y apoderados?\n\nEsta acción no se puede deshacer. Asegúrate de tener tu Excel listo para reimportar.')) return;
+    setCleaning(true);
+    setCleanResult(null);
+    try {
+      const res = await fetch('/api/sync?accion=reset_alumnos', { signal: AbortSignal.timeout(30000) });
+      const data = await res.json();
+      setCleanResult(data);
+      detectarDuplicados();
+      diagnosticarTurso();
+    } catch (e: any) {
+      setCleanResult({ error: e.message });
+    } finally {
+      setCleaning(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
 
@@ -1221,6 +1238,17 @@ function ApiStatusSection() {
               <button onClick={() => limpiarTabla('limpiar_auditoria', 30)} disabled={cleaning}
                 className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
                 🗑️ Borrar auditoría &gt; 30 días
+              </button>
+            </div>
+
+            <div className="rounded-lg p-3 bg-red-500/10 border border-red-500/30 mt-2">
+              <p className="text-xs text-red-300 font-bold mb-2">⚠️ Opción Nuclear</p>
+              <p className="text-xs text-slate-400 mb-2">
+                Si el deduplicador no funciona y tienes miles de alumnos repetidos, puedes borrar TODOS los alumnos y apoderados e importar limpio desde tu Excel. Esto NO afecta usuarios, docentes, calificaciones ni configuraciones.
+              </p>
+              <button onClick={resetAlumnos} disabled={cleaning}
+                className="px-3 py-2 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+                💥 BORRAR TODOS los alumnos y reimportar
               </button>
             </div>
 

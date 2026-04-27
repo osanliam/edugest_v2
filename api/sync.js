@@ -382,14 +382,41 @@ export default async function handler(req, res) {
     try {
       let sql = '';
       if (tabla === 'alumnos') {
-        sql = 'DELETE FROM alumnos WHERE rowid NOT IN (SELECT MAX(rowid) FROM alumnos GROUP BY dni)';
+        sql = `DELETE FROM alumnos WHERE id IN (
+          SELECT id FROM (
+            SELECT id, ROW_NUMBER() OVER (PARTITION BY dni ORDER BY rowid DESC) as rn
+            FROM alumnos
+          ) WHERE rn > 1
+        )`;
       } else if (tabla === 'apoderados') {
-        sql = 'DELETE FROM apoderados WHERE rowid NOT IN (SELECT MAX(rowid) FROM apoderados GROUP BY dni, parentesco)';
+        sql = `DELETE FROM apoderados WHERE id IN (
+          SELECT id FROM (
+            SELECT id, ROW_NUMBER() OVER (PARTITION BY dni || '-' || parentesco ORDER BY rowid DESC) as rn
+            FROM apoderados
+          ) WHERE rn > 1
+        )`;
       } else if (tabla === 'columnas') {
-        sql = 'DELETE FROM columnas WHERE rowid NOT IN (SELECT MAX(rowid) FROM columnas GROUP BY nombre, bimestreId)';
+        sql = `DELETE FROM columnas WHERE id IN (
+          SELECT id FROM (
+            SELECT id, ROW_NUMBER() OVER (PARTITION BY nombre || '-' || COALESCE(bimestreId,'') ORDER BY rowid DESC) as rn
+            FROM columnas
+          ) WHERE rn > 1
+        )`;
       }
       const r = await c.execute(sql);
       return res.json({ ok: true, tabla, eliminados: r.rowsAffected });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── GET accion=reset_alumnos → BORRA TODOS los alumnos y apoderados ─────────
+  if (req.method === 'GET' && req.query?.accion === 'reset_alumnos') {
+    try {
+      // Borrar en orden por foreign keys
+      await c.execute('DELETE FROM alumnos');
+      await c.execute('DELETE FROM apoderados');
+      return res.json({ ok: true, mensaje: 'Tablas alumnos y apoderados vaciadas. Puedes reimportar desde Excel.' });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
