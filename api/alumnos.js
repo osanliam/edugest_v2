@@ -58,10 +58,13 @@ export default async function handler(req, res) {
     verifyToken(req.headers.authorization);
     await initializeDatabase();
 
-    // GET → listar alumnos con datos de apoderados
+    // GET → listar alumnos con datos de apoderados (paginado opcional)
     if (req.method === 'GET') {
       try {
-        const result = await query(`
+        const limit = parseInt(req.query?.limit || '0');
+        const offset = parseInt(req.query?.offset || '0');
+
+        let sql = `
           SELECT
             a.*,
             m.apellidos_nombres AS madre_nombres,
@@ -74,7 +77,28 @@ export default async function handler(req, res) {
           LEFT JOIN apoderados m ON a.madre_id = m.id
           LEFT JOIN apoderados p ON a.padre_id = p.id
           ORDER BY a.apellidos_nombres ASC
-        `);
+        `;
+        const args = [];
+        if (limit > 0) {
+          sql += ' LIMIT ?';
+          args.push(limit);
+          if (offset > 0) {
+            sql += ' OFFSET ?';
+            args.push(offset);
+          }
+        }
+
+        const result = args.length
+          ? await query(sql, args)
+          : await query(sql);
+
+        // Si pidieron paginación, también devolver el total
+        if (limit > 0) {
+          const countResult = await query('SELECT COUNT(*) as n FROM alumnos');
+          const total = Number(countResult.rows?.[0]?.n ?? 0);
+          return res.status(200).json({ alumnos: result.rows || [], total });
+        }
+
         return res.status(200).json(result.rows || []);
       } catch (err) {
         console.error('Alumnos GET error:', err);

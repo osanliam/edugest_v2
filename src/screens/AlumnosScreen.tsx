@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Phone, Users } from 'lucide-react';
-import { getAlumnos, crearAlumno, editarAlumno, eliminarAlumno, getAsignaciones, cargarTodo } from '../utils/apiClient';
+import { getAlumnosPaginado, crearAlumno, editarAlumno, eliminarAlumno, getAsignaciones, cargarTodo } from '../utils/apiClient';
 import * as XLSX from 'xlsx';
 import HeaderElegante from '../components/HeaderElegante';
 
@@ -125,6 +125,7 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   const [importRows, setImportRows] = useState<any[]>([]);
   const [importando, setImportando] = useState(false);
   const [importResult, setImportResult] = useState<{ ok: number; err: number } | null>(null);
+  const [cargaProgreso, setCargaProgreso] = useState<{ actual: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const mostrar = (tipo: 'ok' | 'err', texto: string) => {
@@ -133,23 +134,39 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
 
   const cargar = async () => {
     setCargando(true);
+    setCargaProgreso(null);
     try {
       // 1) Cargar desde localStorage inmediatamente
       const local = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
       if (local.length > 0) setAlumnos(local);
-      // 2) Descargar desde API (ahora trae apoderados con JOIN)
-      let lista: Alumno[] = [];
+
+      // 2) Descargar desde API en lotes de 200 para evitar timeout
+      const LOTE = 200;
+      let todos: Alumno[] = [];
+      let offset = 0;
+      let total = 0;
       try {
-        lista = await getAlumnos();
-        if (lista.length > 0) localStorage.setItem('ie_alumnos', JSON.stringify(lista));
+        const primera = await getAlumnosPaginado(LOTE, 0);
+        todos = primera.alumnos;
+        total = primera.total;
+        setCargaProgreso({ actual: todos.length, total });
+
+        while (todos.length < total) {
+          offset += LOTE;
+          const pag = await getAlumnosPaginado(LOTE, offset);
+          todos = [...todos, ...pag.alumnos];
+          setCargaProgreso({ actual: todos.length, total });
+        }
+        if (todos.length > 0) localStorage.setItem('ie_alumnos', JSON.stringify(todos));
       } catch {
-        lista = local;
+        todos = local;
       }
-      setAlumnos(lista);
+      setAlumnos(todos);
     } catch (e: any) {
       mostrar('err', 'Error al cargar alumnos: ' + e.message);
     } finally {
       setCargando(false);
+      setCargaProgreso(null);
     }
   };
 
@@ -723,7 +740,19 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
         {cargando ? (
           <div className="text-center py-16">
             <RefreshCw size={30} className="animate-spin text-green-400 mx-auto mb-3" />
-            <p className="text-slate-400">Cargando alumnos...</p>
+            <p className="text-slate-400">
+              {cargaProgreso
+                ? `Cargando alumnos... ${cargaProgreso.actual} de ${cargaProgreso.total}`
+                : 'Cargando alumnos...'}
+            </p>
+            {cargaProgreso && (
+              <div className="w-64 h-2 bg-slate-700 rounded-full mx-auto mt-3 overflow-hidden">
+                <div
+                  className="h-full bg-green-400 transition-all"
+                  style={{ width: `${Math.min((cargaProgreso.actual / cargaProgreso.total) * 100, 100)}%` }}
+                />
+              </div>
+            )}
           </div>
         ) : filtrados.length === 0 ? (
           <div className="text-center py-16 space-y-4">
