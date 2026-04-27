@@ -882,6 +882,8 @@ function ApiStatusSection() {
   const [diagLoading, setDiagLoading] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [cleanResult, setCleanResult] = useState<any | null>(null);
+  const [dupes, setDupes] = useState<any | null>(null);
+  const [dupesLoading, setDupesLoading] = useState(false);
   const storage = getStorageStats();
   const cloud = isSyncedToCloud();
 
@@ -967,6 +969,37 @@ function ApiStatusSection() {
       const data = await res.json();
       setCleanResult(data);
       if (data.dbSizeKB) setDbSize(`${data.dbSizeKB} KB`);
+      diagnosticarTurso();
+    } catch (e: any) {
+      setCleanResult({ error: e.message });
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  const detectarDuplicados = async () => {
+    setDupesLoading(true);
+    setDupes(null);
+    try {
+      const res = await fetch('/api/sync?accion=duplicados', { signal: AbortSignal.timeout(10000) });
+      const data = await res.json();
+      if (data.ok) setDupes(data.duplicados);
+      else setDupes({ error: data.error });
+    } catch (e: any) {
+      setDupes({ error: e.message });
+    } finally {
+      setDupesLoading(false);
+    }
+  };
+
+  const deduplicar = async (tabla: string) => {
+    setCleaning(true);
+    setCleanResult(null);
+    try {
+      const res = await fetch(`/api/sync?accion=deduplicar&tabla=${tabla}`, { signal: AbortSignal.timeout(30000) });
+      const data = await res.json();
+      setCleanResult(data);
+      detectarDuplicados();
       diagnosticarTurso();
     } catch (e: any) {
       setCleanResult({ error: e.message });
@@ -1113,18 +1146,50 @@ function ApiStatusSection() {
               Diagnóstico y Limpieza de Turso
             </h2>
             <p className="text-slate-400 text-xs mt-1">
-              Revisa qué tablas ocupan espacio y limpia historial/auditoría antigua.
+              Revisa qué tablas ocupan espacio, detecta duplicados y limpia datos innecesarios.
             </p>
           </div>
-          <button onClick={diagnosticarTurso} disabled={diagLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
-            <RefreshCw size={13} className={diagLoading ? 'animate-spin' : ''} />
-            {diagLoading ? 'Analizando...' : '🔍 Diagnosticar'}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={detectarDuplicados} disabled={dupesLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+              <RefreshCw size={13} className={dupesLoading ? 'animate-spin' : ''} />
+              {dupesLoading ? 'Analizando...' : '⚠️ Buscar Duplicados'}
+            </button>
+            <button onClick={diagnosticarTurso} disabled={diagLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
+              <RefreshCw size={13} className={diagLoading ? 'animate-spin' : ''} />
+              {diagLoading ? 'Analizando...' : '🔍 Diagnosticar'}
+            </button>
+          </div>
         </div>
 
+        {/* Duplicados */}
+        {dupes && !dupes.error && (
+          <div className="space-y-3 mt-4">
+            <p className="text-xs text-red-400 uppercase font-bold">Duplicados detectados</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {(['alumnos','apoderados','columnas'] as const).map((t) => {
+                const d = dupes[t];
+                if (!d || d.duplicados === 0) return null;
+                return (
+                  <div key={t} className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+                    <p className="text-xs text-red-300 uppercase font-bold">{t}</p>
+                    <p className="text-white font-bold text-lg">{d.total} total</p>
+                    <p className="text-red-400 text-sm font-bold">{d.duplicados} duplicados</p>
+                    <p className="text-slate-400 text-[10px]">Deberían ser ~{d.unicos}</p>
+                    <button onClick={() => deduplicar(t)} disabled={cleaning}
+                      className="mt-2 w-full px-2 py-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-lg text-[10px] font-bold transition-all">
+                      {cleaning ? 'Procesando...' : `🗑️ Eliminar ${d.duplicados} duplicados`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {diag && !diag.error && (
-          <div className="space-y-4">
+          <div className="space-y-4 mt-4">
             <div className="flex items-center gap-3">
               <div className="bg-slate-700/40 rounded-xl p-3 flex-1">
                 <p className="text-xs text-slate-400 uppercase">Tamaño total</p>
@@ -1157,10 +1222,10 @@ function ApiStatusSection() {
                 className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
                 🗑️ Borrar auditoría &gt; 30 días
               </button>
-              <button onClick={vacuumTurso} disabled={cleaning}
-                className="px-3 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
-                💾 VACUUM (compactar)
-              </button>
+            </div>
+
+            <div className="rounded-lg p-3 bg-slate-700/30 border border-slate-600/40 text-xs text-slate-400">
+              <strong className="text-slate-300">Nota sobre VACUUM:</strong> Turso no permite ejecutar VACUUM manualmente desde SQL. El espacio liberado por los duplicados eliminados se reutilizará automáticamente en futuras inserciones. Si necesitas reducir el tamaño físico, contacta al soporte de Turso.
             </div>
           </div>
         )}

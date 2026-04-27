@@ -324,16 +324,79 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── GET accion=vacuum → recompacta la base de datos ────────────────────────
-  if (req.method === 'GET' && req.query?.accion === 'vacuum') {
+  // ── GET accion=duplicados → cuenta duplicados en alumnos/apoderados/columnas ─
+  if (req.method === 'GET' && req.query?.accion === 'duplicados') {
     try {
-      await c.execute('VACUUM');
-      const r = await c.execute('SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()');
-      const dbSize = r.rows?.[0]?.size || 0;
-      return res.json({ ok: true, mensaje: 'VACUUM completado', dbSize, dbSizeKB: Math.round(dbSize/1024*10)/10 });
+      const resultado = {};
+
+      // Alumnos por DNI
+      try {
+        const total = await c.execute('SELECT COUNT(*) as n FROM alumnos');
+        const unicos = await c.execute('SELECT COUNT(DISTINCT dni) as n FROM alumnos');
+        resultado.alumnos = {
+          total: Number(total.rows?.[0]?.n ?? 0),
+          unicos: Number(unicos.rows?.[0]?.n ?? 0),
+          duplicados: Number(total.rows?.[0]?.n ?? 0) - Number(unicos.rows?.[0]?.n ?? 0),
+        };
+      } catch (e) { resultado.alumnos = { error: e.message }; }
+
+      // Apoderados por DNI + parentesco
+      try {
+        const total = await c.execute('SELECT COUNT(*) as n FROM apoderados');
+        const unicos = await c.execute('SELECT COUNT(DISTINCT dni || "-" || parentesco) as n FROM apoderados');
+        resultado.apoderados = {
+          total: Number(total.rows?.[0]?.n ?? 0),
+          unicos: Number(unicos.rows?.[0]?.n ?? 0),
+          duplicados: Number(total.rows?.[0]?.n ?? 0) - Number(unicos.rows?.[0]?.n ?? 0),
+        };
+      } catch (e) { resultado.apoderados = { error: e.message }; }
+
+      // Columnas por nombre + bimestreId
+      try {
+        const total = await c.execute('SELECT COUNT(*) as n FROM columnas');
+        const unicos = await c.execute('SELECT COUNT(DISTINCT nombre || "-" || COALESCE(bimestreId,"")) as n FROM columnas');
+        resultado.columnas = {
+          total: Number(total.rows?.[0]?.n ?? 0),
+          unicos: Number(unicos.rows?.[0]?.n ?? 0),
+          duplicados: Number(total.rows?.[0]?.n ?? 0) - Number(unicos.rows?.[0]?.n ?? 0),
+        };
+      } catch (e) { resultado.columnas = { error: e.message }; }
+
+      return res.json({ ok: true, duplicados: resultado });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
+  }
+
+  // ── GET accion=deduplicar&tabla=alumnos|apoderados|columnas ─────────────────
+  if (req.method === 'GET' && req.query?.accion === 'deduplicar') {
+    const tabla = req.query?.tabla;
+    const permitidas = ['alumnos', 'apoderados', 'columnas'];
+    if (!permitidas.includes(tabla)) {
+      return res.status(400).json({ error: `Tabla no permitida: ${tabla}` });
+    }
+    try {
+      let sql = '';
+      if (tabla === 'alumnos') {
+        sql = 'DELETE FROM alumnos WHERE rowid NOT IN (SELECT MAX(rowid) FROM alumnos GROUP BY dni)';
+      } else if (tabla === 'apoderados') {
+        sql = 'DELETE FROM apoderados WHERE rowid NOT IN (SELECT MAX(rowid) FROM apoderados GROUP BY dni, parentesco)';
+      } else if (tabla === 'columnas') {
+        sql = 'DELETE FROM columnas WHERE rowid NOT IN (SELECT MAX(rowid) FROM columnas GROUP BY nombre, bimestreId)';
+      }
+      const r = await c.execute(sql);
+      return res.json({ ok: true, tabla, eliminados: r.rowsAffected });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── GET accion=vacuum → Turso no permite VACUUM desde SQL ──────────────────
+  if (req.method === 'GET' && req.query?.accion === 'vacuum') {
+    return res.status(400).json({
+      ok: false,
+      error: 'Turso no permite ejecutar VACUUM directamente. Los duplicados deben eliminarse con "Eliminar duplicados". El espacio se libera automáticamente con el tiempo en Turso.',
+    });
   }
 
   // ── GET accion=borrar_cal → borra TODAS las calificaciones ─────────────────
