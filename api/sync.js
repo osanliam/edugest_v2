@@ -189,6 +189,10 @@ async function ensureTables(c) {
   await alterSafe(`CREATE INDEX IF NOT EXISTS idx_alumnos_grado ON alumnos(grado, seccion)`);
   await alterSafe(`CREATE INDEX IF NOT EXISTS idx_users_email   ON users(email)`);
 
+  // Garantizar unicidad de DNI (evita duplicados masivos en importaciones)
+  await alterSafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_alumnos_dni ON alumnos(dni)`);
+  await alterSafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_apoderados_dni_parentesco ON apoderados(dni, parentesco)`);
+
   tablesReady = true;
 }
 
@@ -585,9 +589,11 @@ export default async function handler(req, res) {
           const stmts = lote.map(a => {
             const extra = {};
             for (const k of Object.keys(a)) { if (!camposConocidos.includes(k)) extra[k] = a[k]; }
+            // ID determinista por DNI para que INSERT OR REPLACE reemplace duplicados
+            const alumnoId = a.id || (a.dni ? `alu-dni-${a.dni}` : `alu-${Date.now()}-${Math.random().toString(36).slice(2,7)}`);
             return {
               sql: `INSERT OR REPLACE INTO alumnos (id, apellidos_nombres, nombre, dni, fecha_nacimiento, edad, sexo, grado, seccion, telefono, direccion, apelidosPadre, nombreMadre, email, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              args: [a.id, a.apellidos_nombres||'', a.nombre||'', a.dni||'', a.fecha_nacimiento||a.fechaNac||'', a.edad?String(a.edad):'', a.sexo||'', a.grado||'', a.seccion||'', a.telefono||'', a.direccion||'', a.apelidosPadre||'', a.nombreMadre||'', a.email||'', Object.keys(extra).length>0?JSON.stringify(extra):null]
+              args: [alumnoId, a.apellidos_nombres||'', a.nombre||'', a.dni||'', a.fecha_nacimiento||a.fechaNac||'', a.edad?String(a.edad):'', a.sexo||'', a.grado||'', a.seccion||'', a.telefono||'', a.direccion||'', a.apelidosPadre||'', a.nombreMadre||'', a.email||'', Object.keys(extra).length>0?JSON.stringify(extra):null]
             };
           });
           try { await c.batch(stmts, 'write'); ok += lote.length; } catch(e) { errores.push(`lote ${i}: ${e.message}`); }

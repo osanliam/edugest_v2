@@ -93,6 +93,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Faltan campos obligatorios del alumno' });
 
       const edad = calcularEdad(fecha_nacimiento);
+
+      // Validar que el DNI no exista ya
+      const existente = await query('SELECT id FROM alumnos WHERE dni = ?', [dni]);
+      if (existente.rows?.length > 0) {
+        return res.status(409).json({ error: 'El DNI ya está registrado', id: existente.rows[0].id });
+      }
+
       const madre_id = await upsertApoderado(madre, 'madre');
       const padre_id = await upsertApoderado(padre, 'padre');
 
@@ -117,6 +124,13 @@ export default async function handler(req, res) {
       } = req.body;
 
       const edad = calcularEdad(fecha_nacimiento);
+
+      // Validar que el nuevo DNI no pertenezca a otro alumno
+      const existente = await query('SELECT id FROM alumnos WHERE dni = ? AND id != ?', [dni, id]);
+      if (existente.rows?.length > 0) {
+        return res.status(409).json({ error: 'El DNI ya pertenece a otro alumno', id: existente.rows[0].id });
+      }
+
       const madre_id = await upsertApoderado(madre, 'madre');
       const padre_id = await upsertApoderado(padre, 'padre');
 
