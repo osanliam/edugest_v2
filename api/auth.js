@@ -14,29 +14,33 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // GET /api/auth → inicializar DB y seed de usuarios demo
+  // GET /api/auth?action=fix-admin → reactivar/crear cuenta admin de emergencia
+  if (req.method === 'GET' && req.query?.action === 'fix-admin') {
+    const { email, password, nombre } = req.query;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Parámetros requeridos: email, password' });
+    }
+    try {
+      await initializeDatabase();
+      const existe = await query('SELECT id FROM users WHERE email = ?', [email]);
+      if (existe.rows?.length > 0) {
+        await execute('UPDATE users SET contraseña = ?, activo = 1, rol = ? WHERE email = ?', [password, 'admin', email]);
+        return res.json({ ok: true, accion: 'reactivada', mensaje: `Cuenta ${email} reactivada. Ya puedes iniciar sesión.` });
+      } else {
+        const id = `admin-${crypto.randomUUID()}`;
+        await execute('INSERT INTO users (id, nombre, email, contraseña, rol, activo) VALUES (?, ?, ?, ?, ?, 1)', [id, nombre || 'Administrador', email, password, 'admin']);
+        return res.json({ ok: true, accion: 'creada', mensaje: `Cuenta ${email} creada. Ya puedes iniciar sesión.` });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  // GET /api/auth → inicializar DB
   if (req.method === 'GET') {
     try {
       await initializeDatabase();
-
-      // Insertar usuarios demo si no existen
-      const demoUsers = [
-        { id: 'user-admin', nombre: 'Administrador del Sistema', email: 'admin@escuela.edu',       contraseña: 'admin123',    rol: 'admin' },
-        { id: 'user-001',   nombre: 'Dr. Fernando López',        email: 'director@escuela.edu',    contraseña: 'director123', rol: 'director' },
-        { id: 'user-002',   nombre: 'Mg. María García',          email: 'subdirector@escuela.edu', contraseña: 'sub123',      rol: 'subdirector' },
-        { id: 'user-003',   nombre: 'Lic. Juan Pérez',           email: 'profesor@escuela.edu',    contraseña: 'prof123',     rol: 'teacher' },
-        { id: 'user-004',   nombre: 'Carlos Mendez',             email: 'estudiante@escuela.edu',  contraseña: 'est123',      rol: 'student' },
-        { id: 'user-005',   nombre: 'Pedro Mendez',              email: 'apoderado@escuela.edu',   contraseña: 'apod123',     rol: 'parent' },
-      ];
-
-      for (const u of demoUsers) {
-        await execute(
-          `INSERT OR IGNORE INTO users (id, nombre, email, contraseña, rol, activo) VALUES (?, ?, ?, ?, ?, 1)`,
-          [u.id, u.nombre, u.email, u.contraseña, u.rol]
-        );
-      }
-
-      return res.status(200).json({ ok: true, message: 'Base de datos inicializada con usuarios demo' });
+      return res.status(200).json({ ok: true, message: 'Base de datos lista' });
     } catch (error) {
       console.error('Init error:', error);
       return res.status(500).json({ error: error.message });
