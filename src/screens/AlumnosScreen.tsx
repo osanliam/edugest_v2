@@ -436,29 +436,37 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
     const nuevos = importRows.filter((r: any) => r.apellidos_nombres && r.dni && !dniExistentes.has(r.dni));
     const duplicados = importRows.length - nuevos.length;
     let ok = 0, err = 0;
-    const errores: string[] = [];
 
     try {
-      await asyncPool(5, nuevos, async (r: any) => {
-        try {
-          await crearAlumno({
-            apellidos_nombres: r.apellidos_nombres,
-            dni: r.dni,
-            fecha_nacimiento: r.fecha_nacimiento,
-            sexo: r.sexo,
-            grado: r.grado,
-            seccion: r.seccion,
-            madre: r.madre,
-            padre: r.padre,
-          });
-          ok++;
-        } catch (e: any) {
-          err++;
-          errores.push(`${r.apellidos_nombres} (${r.dni}): ${e.message || 'Error'}`);
-        }
-      });
-      if (errores.length > 0) {
-        console.error('Errores de importación:', errores);
+      // Usar /api/sync con batches de 100 (MUY rápido)
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
+      const LOTE = 100;
+      for (let i = 0; i < nuevos.length; i += LOTE) {
+        const lote = nuevos.slice(i, i + LOTE).map((r: any) => ({
+          id: `alu-dni-${r.dni}`,
+          apellidos_nombres: r.apellidos_nombres,
+          nombre: '',
+          dni: r.dni,
+          fecha_nacimiento: r.fecha_nacimiento,
+          edad: calcularEdad(r.fecha_nacimiento),
+          sexo: r.sexo,
+          grado: r.grado,
+          seccion: r.seccion,
+          telefono: '',
+          direccion: '',
+          apelidosPadre: r.padre?.apellidos_nombres || '',
+          nombreMadre: r.madre?.apellidos_nombres || '',
+          email: '',
+          extra: JSON.stringify({ madre: r.madre, padre: r.padre }),
+        }));
+        const res = await fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ tipo: 'alumnos', datos: lote }),
+        });
+        const data = await res.json();
+        ok += data.ok || lote.length;
+        err += data.errores || 0;
       }
       setImportResult({ ok, err: err + duplicados });
       if (ok > 0) {
