@@ -16,13 +16,9 @@ let tablesReady = false;
 
 function getClient() {
   if (!client) {
-    let url = process.env.TURSO_CONNECTION_URL;
+    const url = process.env.TURSO_CONNECTION_URL;
     const authToken = process.env.TURSO_AUTH_TOKEN;
     if (!url || !authToken) return null;
-    // Turso requiere https:// en producción, no libsql://
-    if (url.startsWith('libsql://')) {
-      url = url.replace('libsql://', 'https://');
-    }
     client = createClient({ url, authToken });
   }
   return client;
