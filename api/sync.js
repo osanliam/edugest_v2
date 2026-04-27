@@ -608,7 +608,7 @@ export default async function handler(req, res) {
       }
 
       else if (tipo === 'alumnos') {
-        // Batch en lotes de 100 para evitar timeout
+        // Batch en lotes de 100. Si el lote falla, fallback uno por uno.
         const LOTE = 100;
         const camposConocidos = ['id','apellidos_nombres','nombre','dni','fecha_nacimiento','edad','sexo','grado','seccion','telefono','direccion','apelidosPadre','nombreMadre','email'];
         for (let i = 0; i < datos.length; i += LOTE) {
@@ -616,14 +616,28 @@ export default async function handler(req, res) {
           const stmts = lote.map(a => {
             const extra = {};
             for (const k of Object.keys(a)) { if (!camposConocidos.includes(k)) extra[k] = a[k]; }
-            // ID determinista por DNI para que INSERT OR REPLACE reemplace duplicados
             const alumnoId = a.id || (a.dni ? `alu-dni-${a.dni}` : `alu-${Date.now()}-${Math.random().toString(36).slice(2,7)}`);
             return {
               sql: `INSERT OR REPLACE INTO alumnos (id, apellidos_nombres, nombre, dni, fecha_nacimiento, edad, sexo, grado, seccion, telefono, direccion, apelidosPadre, nombreMadre, email, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               args: [alumnoId, a.apellidos_nombres||'', a.nombre||'', a.dni||'', a.fecha_nacimiento||a.fechaNac||'', a.edad?String(a.edad):'', a.sexo||'', a.grado||'', a.seccion||'', a.telefono||'', a.direccion||'', a.apelidosPadre||'', a.nombreMadre||'', a.email||'', Object.keys(extra).length>0?JSON.stringify(extra):null]
             };
           });
-          try { await c.batch(stmts, 'write'); ok += lote.length; } catch(e) { errores.push(`lote ${i}: ${e.message}`); }
+          try {
+            await c.batch(stmts, 'write');
+            ok += lote.length;
+          } catch (batchErr) {
+            // Si el batch falla, intentar uno por uno para no perder todo el lote
+            for (const a of lote) {
+              const extra = {};
+              for (const k of Object.keys(a)) { if (!camposConocidos.includes(k)) extra[k] = a[k]; }
+              const alumnoId = a.id || (a.dni ? `alu-dni-${a.dni}` : `alu-${Date.now()}-${Math.random().toString(36).slice(2,7)}`);
+              const e = await safeExec(c,
+                `INSERT OR REPLACE INTO alumnos (id, apellidos_nombres, nombre, dni, fecha_nacimiento, edad, sexo, grado, seccion, telefono, direccion, apelidosPadre, nombreMadre, email, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [alumnoId, a.apellidos_nombres||'', a.nombre||'', a.dni||'', a.fecha_nacimiento||a.fechaNac||'', a.edad?String(a.edad):'', a.sexo||'', a.grado||'', a.seccion||'', a.telefono||'', a.direccion||'', a.apelidosPadre||'', a.nombreMadre||'', a.email||'', Object.keys(extra).length>0?JSON.stringify(extra):null]
+              );
+              e ? errores.push(`alumno ${a.dni}: ${e}`) : ok++;
+            }
+          }
         }
       }
 

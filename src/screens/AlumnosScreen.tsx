@@ -436,6 +436,7 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
     const nuevos = importRows.filter((r: any) => r.apellidos_nombres && r.dni && !dniExistentes.has(r.dni));
     const duplicados = importRows.length - nuevos.length;
     let ok = 0, err = 0;
+    const erroresDetalle: string[] = [];
 
     try {
       // Usar /api/sync con batches de 100 (MUY rápido)
@@ -464,19 +465,34 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ tipo: 'alumnos', datos: lote }),
         });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          err += lote.length;
+          erroresDetalle.push(`Lote ${i}-${i+lote.length}: ${body.error || 'Error desconocido'}`);
+          continue;
+        }
         const data = await res.json();
-        ok += data.ok || lote.length;
+        if (data.success === false || data.error) {
+          err += lote.length;
+          erroresDetalle.push(`Lote ${i}-${i+lote.length}: ${data.error || 'Error del servidor'}`);
+          continue;
+        }
+        ok += data.ok || 0;
         err += data.errores || 0;
       }
       setImportResult({ ok, err: err + duplicados });
       if (ok > 0) {
-        mostrar('ok', `${ok} alumnos importados correctamente`);
+        mostrar('ok', `${ok} alumnos importados`);
         cargar();
       }
-      if (err > 0) mostrar('err', `${err} alumnos no pudieron importarse`);
+      if (err > 0) {
+        mostrar('err', `${err} alumnos fallaron. Revisa la consola (F12).`);
+        console.error('Errores de importación:', erroresDetalle);
+      }
     } catch (e: any) {
       setImportResult({ ok: 0, err: importRows.length });
-      mostrar('err', 'Error general en la importación: ' + e.message);
+      mostrar('err', 'Error general: ' + e.message);
+      console.error('Error importación:', e);
     } finally {
       setImportando(false);
     }
