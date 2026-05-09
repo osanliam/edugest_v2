@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crear Asignaciones Masivas — EduGest</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; margin: 0; padding: 20px; min-height: 100vh; }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { text-align: center; color: #38bdf8; margin-bottom: 10px; }
+  .subtitle { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 30px; }
+  .card { background: rgba(30,41,59,0.8); border: 1px solid rgba(56,189,248,0.2); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+  .card h2 { color: #7dd3fc; font-size: 18px; margin-top: 0; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(14,165,233,0.3); }
+  .btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
+  .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(34,197,94,0.3); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.1); }
+  th { color: #94a3b8; font-weight: 600; position: sticky; top: 0; background: rgba(30,41,59,0.95); }
+  .checkbox-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .checkbox-item { display: flex; align-items: center; gap: 4px; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+  .checkbox-item:hover { background: rgba(56,189,248,0.2); }
+  .checkbox-item input { cursor: pointer; }
+  .checkbox-item.active { background: rgba(34,197,94,0.2); border-color: rgba(34,197,94,0.4); color: #86efac; }
+  .docente-row:hover { background: rgba(56,189,248,0.05); }
+  .success-box { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 12px; padding: 16px; color: #86efac; font-size: 14px; margin-top: 20px; }
+  .warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); border-radius: 12px; padding: 16px; color: #fcd34d; font-size: 14px; margin-bottom: 20px; }
+  .stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(148,163,184,0.1); }
+  .filtros { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+  .filtros input, .filtros select { background: rgba(15,23,42,0.6); border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 8px 12px; color: #e2e8f0; font-size: 13px; }
+  .filtros input::placeholder { color: #64748b; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🏫 Crear Asignaciones Docente-Grado-Sección</h1>
+  <p class="subtitle">Asigna a cada docente los grados y secciones que le corresponden</p>
+
+  <div class="warning">
+    ⚠️ <strong>Importante:</strong> Los docentes solo verán alumnos de los grados y secciones que les asignes aquí.<br>
+    Si un docente no tiene asignación, verá TODOS los alumnos (modo fallback).
+  </div>
+
+  <div class="card">
+    <h2>📊 Resumen del sistema</h2>
+    <div id="resumen"></div>
+  </div>
+
+  <div class="card">
+    <h2>✏️ Asignaciones</h2>
+    <div class="filtros">
+      <input type="text" id="buscarDocente" placeholder="🔍 Buscar docente..." oninput="filtrarDocentes()">
+      <select id="filtroAsignado" onchange="filtrarDocentes()">
+        <option value="todos">Todos los docentes</option>
+        <option value="sin">Sin asignar</option>
+        <option value="con">Con asignación</option>
+      </select>
+      <button class="btn btn-success" onclick="guardarTodo()">💾 Guardar todas las asignaciones</button>
+    </div>
+    <div style="overflow-x:auto; max-height: 60vh; overflow-y: auto;">
+      <table id="tablaDocentes">
+        <thead>
+          <tr>
+            <th>Docente</th>
+            <th>Grados</th>
+            <th>Secciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyDocentes"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="resultado"></div>
+</div>
+
+<script>
+// ── Cargar datos ─────────────────────────────────────────────────────────────
+function getLS(key) {
+  try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
+}
+
+const docentes = getLS('ie_docentes') || [];
+const alumnos = getLS('ie_alumnos') || [];
+const asignacionesExistentes = getLS('cfg_asignaciones') || [];
+
+// Estado de asignaciones (en memoria)
+let asignaciones = {};
+
+// Inicializar con las asignaciones existentes
+for (const a of asignacionesExistentes) {
+  if (!asignaciones[a.docenteId]) asignaciones[a.docenteId] = { grados: [], secciones: [] };
+  for (const g of (a.grados || [])) {
+    if (!asignaciones[a.docenteId].grados.includes(g)) asignaciones[a.docenteId].grados.push(g);
+  }
+  for (const s of (a.secciones || [])) {
+    if (!asignaciones[a.docenteId].secciones.includes(s)) asignaciones[a.docenteId].secciones.push(s);
+  }
+}
+
+// Detectar grados y secciones disponibles
+const gradosDisponibles = [...new Set(alumnos.map(a => a.grado).filter(Boolean))].sort((a,b) => parseInt(a)-parseInt(b));
+const seccionesDisponibles = [...new Set(alumnos.map(a => a.seccion).filter(Boolean))].sort();
+
+// ── Mostrar resumen ──────────────────────────────────────────────────────────
+const resumenDiv = document.getElementById('resumen');
+resumenDiv.innerHTML = `
+  <div class="stat"><span>Docentes:</span> <strong>${docentes.length}</strong></div>
+  <div class="stat"><span>Alumnos:</span> <strong>${alumnos.length}</strong></div>
+  <div class="stat"><span>Grados disponibles:</span> <strong>${gradosDisponibles.join(', ')}</strong></div>
+  <div class="stat"><span>Secciones disponibles:</span> <strong>${seccionesDisponibles.join(', ')}</strong></div>
+  <div class="stat"><span>Docentes con asignación:</span> <strong>${Object.keys(asignaciones).length} de ${docentes.length}</strong></div>
+`;
+
+// ── Renderizar tabla ─────────────────────────────────────────────────────────
+function renderTabla(docentesFiltrados) {
+  const tbody = document.getElementById('tbodyDocentes');
+  tbody.innerHTML = '';
+
+  for (const d of docentesFiltrados) {
+    const asig = asignaciones[d.id] || { grados: [], secciones: [] };
+    const tr = document.createElement('tr');
+    tr.className = 'docente-row';
+
+    // Nombre
+    const tdNombre = document.createElement('td');
+    tdNombre.innerHTML = `<strong>${d.apellidos_nombres || d.nombre}</strong><br><span style="font-size:11px;color:#64748b">${d.id}</span>`;
+    tr.appendChild(tdNombre);
+
+    // Grados
+    const tdGrados = document.createElement('td');
+    const divGrados = document.createElement('div');
+    divGrados.className = 'checkbox-group';
+    for (const g of gradosDisponibles) {
+      const item = document.createElement('label');
+      item.className = 'checkbox-item' + (asig.grados.includes(g) ? ' active' : '');
+      item.innerHTML = `<input type="checkbox" ${asig.grados.includes(g) ? 'checked' : ''} onchange="toggleGrado('${d.id}', '${g}', this.checked)"> ${g}`;
+      divGrados.appendChild(item);
+    }
+    tdGrados.appendChild(divGrados);
+    tr.appendChild(tdGrados);
+
+    // Secciones
+    const tdSecciones = document.createElement('td');
+    const divSecciones = document.createElement('div');
+    divSecciones.className = 'checkbox-group';
+    for (const s of seccionesDisponibles) {
+      const item = document.createElement('label');
+      item.className = 'checkbox-item' + (asig.secciones.includes(s) ? ' active' : '');
+      item.innerHTML = `<input type="checkbox" ${asig.secciones.includes(s) ? 'checked' : ''} onchange="toggleSeccion('${d.id}', '${s}', this.checked)"> ${s}`;
+      divSecciones.appendChild(item);
+    }
+    tdSecciones.appendChild(divSecciones);
+    tr.appendChild(tdSecciones);
+
+    tbody.appendChild(tr);
+  }
+}
+
+function filtrarDocentes() {
+  const buscar = document.getElementById('buscarDocente').value.toLowerCase();
+  const filtro = document.getElementById('filtroAsignado').value;
+
+  let filtrados = docentes.filter(d => {
+    const nombre = (d.apellidos_nombres || d.nombre || '').toLowerCase();
+    return nombre.includes(buscar);
+  });
+
+  if (filtro === 'sin') {
+    filtrados = filtrados.filter(d => !asignaciones[d.id] || (asignaciones[d.id].grados.length === 0 && asignaciones[d.id].secciones.length === 0));
+  } else if (filtro === 'con') {
+    filtrados = filtrados.filter(d => asignaciones[d.id] && asignaciones[d.id].grados.length > 0);
+  }
+
+  renderTabla(filtrados);
+}
+
+function toggleGrado(docenteId, grado, checked) {
+  if (!asignaciones[docenteId]) asignaciones[docenteId] = { grados: [], secciones: [] };
+  if (checked) {
+    if (!asignaciones[docenteId].grados.includes(grado)) asignaciones[docenteId].grados.push(grado);
+  } else {
+    asignaciones[docenteId].grados = asignaciones[docenteId].grados.filter(g => g !== grado);
+  }
+  filtrarDocentes(); // refrescar para mostrar estado
+}
+
+function toggleSeccion(docenteId, seccion, checked) {
+  if (!asignaciones[docenteId]) asignaciones[docenteId] = { grados: [], secciones: [] };
+  if (checked) {
+    if (!asignaciones[docenteId].secciones.includes(seccion)) asignaciones[docenteId].secciones.push(seccion);
+  } else {
+    asignaciones[docenteId].secciones = asignaciones[docenteId].secciones.filter(s => s !== seccion);
+  }
+  filtrarDocentes();
+}
+
+function guardarTodo() {
+  // Convertir asignaciones al formato del sistema
+  const asigsArray = [];
+  for (const [docenteId, data] of Object.entries(asignaciones)) {
+    const a = data;
+    if (a.grados.length > 0 || a.secciones.length > 0) {
+      asigsArray.push({
+        id: 'asig-' + docenteId + '-' + Date.now(),
+        docenteId: docenteId,
+        cursoId: '',
+        grados: a.grados,
+        secciones: a.secciones,
+        cursos: []
+      });
+    }
+  }
+
+  // Guardar en localStorage
+  localStorage.setItem('cfg_asignaciones', JSON.stringify(asigsArray));
+
+  // Contar
+  const conAsig = Object.values(asignaciones).filter(a => a.grados.length > 0 || a.secciones.length > 0).length;
+
+  document.getElementById('resultado').innerHTML = `
+    <div class="success-box">
+      ✅ <strong>¡Asignaciones guardadas!</strong><br>
+      Se guardaron ${asigsArray.length} asignaciones para ${conAsig} docentes en localStorage.<br><br>
+      <strong>Próximos pasos:</strong>
+      <ol style="margin-top:8px; padding-left:20px;">
+        <li>Abre EduGest y ve a <strong>Configuración → Asignaciones</strong> para verificar.</li>
+        <li>Usa <strong>"Subir datos a Turso"</strong> para sincronizar todo a la nube.</li>
+        <li>Pide a cada docente que cierre sesión y vuelva a entrar.</li>
+      </ol>
+    </div>
+  `;
+
+  // Refrescar resumen
+  resumenDiv.innerHTML = `
+    <div class="stat"><span>Docentes:</span> <strong>${docentes.length}</strong></div>
+    <div class="stat"><span>Alumnos:</span> <strong>${alumnos.length}</strong></div>
+    <div class="stat"><span>Grados disponibles:</span> <strong>${gradosDisponibles.join(', ')}</strong></div>
+    <div class="stat"><span>Secciones disponibles:</span> <strong>${seccionesDisponibles.join(', ')}</strong></div>
+    <div class="stat"><span>Docentes con asignación:</span> <strong>${conAsig} de ${docentes.length}</strong></div>
+  `;
+}
+
+// Inicializar
+filtrarDocentes();
+</script>
+</body>
+</html>

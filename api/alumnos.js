@@ -110,7 +110,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const {
         apellidos_nombres, dni, fecha_nacimiento, sexo, grado, seccion,
-        madre, padre, user_id
+        madre, padre, user_id, foto
       } = req.body;
 
       if (!apellidos_nombres || !dni || !fecha_nacimiento || !sexo || !grado || !seccion)
@@ -129,10 +129,10 @@ export default async function handler(req, res) {
 
       const id = `alu-${crypto.randomUUID()}`;
       await execute(
-        `INSERT INTO alumnos (id, apellidos_nombres, dni, fecha_nacimiento, edad, sexo, grado, seccion, madre_id, padre_id, user_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO alumnos (id, apellidos_nombres, dni, fecha_nacimiento, edad, sexo, grado, seccion, madre_id, padre_id, user_id, foto)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, apellidos_nombres, dni, fecha_nacimiento, edad, sexo, grado, seccion,
-         madre_id, padre_id, user_id || null]
+         madre_id, padre_id, user_id || null, foto || null]
       );
       return res.status(201).json({ ok: true, id });
     }
@@ -144,7 +144,7 @@ export default async function handler(req, res) {
 
       const {
         apellidos_nombres, dni, fecha_nacimiento, sexo, grado, seccion,
-        madre, padre
+        madre, padre, foto
       } = req.body;
 
       const edad = calcularEdad(fecha_nacimiento);
@@ -159,9 +159,9 @@ export default async function handler(req, res) {
       const padre_id = await upsertApoderado(padre, 'padre');
 
       await execute(
-        `UPDATE alumnos SET apellidos_nombres=?, dni=?, fecha_nacimiento=?, edad=?, sexo=?, grado=?, seccion=?, madre_id=?, padre_id=? WHERE id=?`,
+        `UPDATE alumnos SET apellidos_nombres=?, dni=?, fecha_nacimiento=?, edad=?, sexo=?, grado=?, seccion=?, madre_id=?, padre_id=?, foto=? WHERE id=?`,
         [apellidos_nombres, dni, fecha_nacimiento, edad, sexo, grado, seccion,
-         madre_id, padre_id, id]
+         madre_id, padre_id, foto || null, id]
       );
       return res.status(200).json({ ok: true });
     }
@@ -177,6 +177,22 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
     console.error('Alumnos API error:', error);
+    if (error.code === 'TURSO_NOT_CONFIGURED' || error.message?.includes('TURSO_NOT_CONFIGURED')) {
+      return res.status(503).json({
+        error: 'Base de datos no configurada',
+        code: 'TURSO_NOT_CONFIGURED',
+        solucion: 'Configura TURSO_CONNECTION_URL y TURSO_AUTH_TOKEN en Vercel: Settings > Environment Variables',
+        diagnostico: '/api/diagnostico'
+      });
+    }
+    if (error.code === 'TURSO_CONNECTION_ERROR' || error.message?.includes('TURSO_CONNECTION_ERROR')) {
+      return res.status(503).json({
+        error: 'No se pudo conectar a Turso',
+        code: 'TURSO_CONNECTION_ERROR',
+        detalle: error.message,
+        diagnostico: '/api/diagnostico'
+      });
+    }
     if (error.message?.includes('Token') || error.name === 'JsonWebTokenError')
       return res.status(401).json({ error: 'No autorizado' });
     if (error.message?.includes('UNIQUE'))

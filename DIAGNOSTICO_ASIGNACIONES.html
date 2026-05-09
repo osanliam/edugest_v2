@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico EduGest — Asignaciones</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body { background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { color: #38bdf8; text-align: center; }
+  .card { background: rgba(30,41,59,0.8); border: 1px solid rgba(56,189,248,0.2); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card h2 { color: #7dd3fc; font-size: 16px; margin-top: 0; }
+  .ok { color: #4ade80; }
+  .err { color: #f87171; }
+  .warn { color: #fcd34d; }
+  .info { color: #38bdf8; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+  th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+  th { color: #94a3b8; font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+  .badge-green { background: #22c55e; color: white; }
+  .badge-red { background: #ef4444; color: white; }
+  .badge-amber { background: #f59e0b; color: white; }
+  pre { background: rgba(15,23,42,0.8); padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 11px; }
+  .section { margin-bottom: 8px; }
+  .section strong { color: #7dd3fc; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔍 Diagnóstico de Asignaciones EduGest</h1>
+  <p style="text-align:center;color:#94a3b8;font-size:13px;">Abre esto en el navegador donde usas EduGest</p>
+
+  <div class="card">
+    <h2>👤 Usuario Logueado</h2>
+    <div id="userInfo"></div>
+  </div>
+
+  <div class="card">
+    <h2>🏫 Asignaciones en localStorage</h2>
+    <div id="asignacionesInfo"></div>
+  </div>
+
+  <div class="card">
+    <h2>👨‍🎓 Alumnos en localStorage</h2>
+    <div id="alumnosInfo"></div>
+  </div>
+
+  <div class="card">
+    <h2>🧪 Test de Filtro</h2>
+    <div id="filtroTest"></div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Docentes en localStorage</h2>
+    <div id="docentesInfo"></div>
+  </div>
+</div>
+
+<script>
+function getLS(key) {
+  try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
+}
+
+function normGrado(g) {
+  return String(g || '').trim().replace(/°$/, '');
+}
+
+// 1. Usuario
+const user = getLS('user') || getLS('sistema_usuarios')?.[0];
+const sessionUser = (() => {
+  try { return JSON.parse(sessionStorage.getItem('user') || 'null'); } catch { return null; }
+})();
+
+const userDiv = document.getElementById('userInfo');
+if (sessionUser) {
+  userDiv.innerHTML = `
+    <div class="section"><strong>ID:</strong> <span class="info">${sessionUser.id || '—'}</span></div>
+    <div class="section"><strong>Nombre:</strong> ${sessionUser.name || '—'}</div>
+    <div class="section"><strong>Email:</strong> ${sessionUser.email || '—'}</div>
+    <div class="section"><strong>Rol:</strong> ${sessionUser.role || '—'}</div>
+    <div class="section"><strong>docenteId:</strong> <span class="${sessionUser.docenteId ? 'ok' : 'err'}">${sessionUser.docenteId || 'NO TIENE (null/undefined)'}</span></div>
+    <div class="section"><strong>schoolId:</strong> ${sessionUser.schoolId || '—'}</div>
+  `;
+} else if (user) {
+  userDiv.innerHTML = `
+    <div class="section"><strong>ID:</strong> <span class="info">${user.id || '—'}</span></div>
+    <div class="section"><strong>Nombre:</strong> ${user.nombre || user.name || '—'}</div>
+    <div class="section"><strong>Email:</strong> ${user.email || '—'}</div>
+    <div class="section"><strong>Rol:</strong> ${user.rol || user.role || '—'}</div>
+    <div class="section"><strong>docenteId:</strong> <span class="${user.docenteId ? 'ok' : 'err'}">${user.docenteId || 'NO TIENE (null/undefined)'}</span></div>
+  `;
+} else {
+  userDiv.innerHTML = '<p class="err">⚠️ No hay usuario logueado en sessionStorage ni en localStorage</p>';
+}
+
+// 2. Asignaciones
+const asigs = getLS('cfg_asignaciones') || [];
+const asigDiv = document.getElementById('asignacionesInfo');
+if (asigs.length === 0) {
+  asigDiv.innerHTML = '<p class="err">❌ No hay asignaciones en localStorage (cfg_asignaciones)</p>';
+} else {
+  let html = `<p class="ok">✅ ${asigs.length} asignaciones encontradas</p><table><tr><th>ID</th><th>docenteId</th><th>Grados</th><th>Secciones</th><th>Cursos</th></tr>`;
+  for (const a of asigs) {
+    const grados = Array.isArray(a.grados) ? a.grados.join(', ') : a.grados;
+    const secciones = Array.isArray(a.secciones) ? a.secciones.join(', ') : a.secciones;
+    const cursos = Array.isArray(a.cursos) ? a.cursos.join(', ') : (a.cursoId || '—');
+    html += `<tr><td>${a.id}</td><td class="info">${a.docenteId}</td><td>${grados}</td><td>${secciones}</td><td>${cursos}</td></tr>`;
+  }
+  html += '</table>';
+  asigDiv.innerHTML = html;
+}
+
+// 3. Alumnos
+const alumnos = getLS('ie_alumnos') || [];
+const aluDiv = document.getElementById('alumnosInfo');
+if (alumnos.length === 0) {
+  aluDiv.innerHTML = '<p class="err">❌ No hay alumnos en localStorage (ie_alumnos)</p>';
+} else {
+  const gradosUnicos = [...new Set(alumnos.map(a => a.grado).filter(Boolean))].sort();
+  const seccionesUnicas = [...new Set(alumnos.map(a => a.seccion).filter(Boolean))].sort();
+  aluDiv.innerHTML = `
+    <p class="ok">✅ ${alumnos.length} alumnos encontrados</p>
+    <div class="section"><strong>Grados disponibles:</strong> ${gradosUnicos.join(', ') || '—'}</div>
+    <div class="section"><strong>Secciones disponibles:</strong> ${seccionesUnicas.join(', ') || '—'}</div>
+    <p style="font-size:11px;color:#94a3b8;margin-top:8px;">Primeros 5 alumnos:</p>
+    <table>
+      <tr><th>Nombre</th><th>Grado</th><th>Sección</th></tr>
+      ${alumnos.slice(0, 5).map(a => `<tr><td>${a.apellidos_nombres || a.nombre}</td><td>${a.grado}</td><td>${a.seccion}</td></tr>`).join('')}
+    </table>
+  `;
+}
+
+// 4. Test de filtro
+const filtroDiv = document.getElementById('filtroTest');
+if (sessionUser?.role === 'teacher' && asigs.length > 0 && alumnos.length > 0) {
+  const docenteId = sessionUser.docenteId || sessionUser.id;
+  const userEmail = sessionUser.email;
+
+  // Buscar asignaciones como lo hace el sistema
+  let mias = asigs.filter(a =>
+    (docenteId && a.docenteId === docenteId) ||
+    (sessionUser.id && a.docenteId === sessionUser.id)
+  );
+  if (mias.length === 0 && userEmail) {
+    mias = asigs.filter(a => a.docenteId === userEmail || a.docenteId?.includes(userEmail));
+  }
+
+  if (mias.length === 0) {
+    filtroDiv.innerHTML = `
+      <p class="err">❌ No se encontró ninguna asignación para este docente</p>
+      <div class="section"><strong>Buscando por:</strong> docenteId="${docenteId}" o id="${sessionUser.id}" o email="${userEmail}"</div>
+      <p class="warn">💡 Solución: Ve a Configuración → Asignaciones y asegúrate de que el docenteId en la asignación coincida con: <strong>${docenteId}</strong></p>
+    `;
+  } else {
+    const grados = [...new Set(mias.flatMap(a => a.grados || []))];
+    const secciones = [...new Set(mias.flatMap(a => a.secciones || []))];
+    const gradosNorm = grados.map(normGrado);
+    const seccionesNorm = secciones.map(s => s.trim().toUpperCase());
+
+    const filtrados = alumnos.filter(a =>
+      gradosNorm.includes(normGrado(a.grado)) &&
+      seccionesNorm.includes((a.seccion || '').trim().toUpperCase())
+    );
+
+    filtroDiv.innerHTML = `
+      <p class="ok">✅ Asignación encontrada</p>
+      <div class="section"><strong>Grados asignados:</strong> ${grados.join(', ')} (normalizados: ${gradosNorm.join(', ')})</div>
+      <div class="section"><strong>Secciones asignadas:</strong> ${secciones.join(', ')} (normalizadas: ${seccionesNorm.join(', ')})</div>
+      <div class="section"><strong>Alumnos que coinciden:</strong> <span class="${filtrados.length > 0 ? 'ok' : 'err'}">${filtrados.length} de ${alumnos.length}</span></div>
+      ${filtrados.length === 0 ? `
+        <p class="err">⚠️ El filtro deja 0 alumnos. Posibles causas:</p>
+        <ul style="color:#fca5a5;font-size:12px;">
+          <li>Los grados en la asignación no coinciden con los grados de los alumnos</li>
+          <li>Las secciones en la asignación no coinciden con las secciones de los alumnos</li>
+          <li>Formato diferente: asignación dice "1" pero alumno dice "1°"</li>
+        </ul>
+        <p class="info" style="font-size:12px;">Primeros 5 alumnos: ${alumnos.slice(0,5).map(a=>`${a.apellidos_nombres?.split(' ')[0]}(${a.grado}${a.seccion})`).join(', ')}</p>
+      ` : `
+        <p class="ok" style="font-size:12px;">El sistema debería mostrar estos ${filtrados.length} alumnos correctamente.</p>
+      `}
+    `;
+  }
+} else if (sessionUser?.role !== 'teacher') {
+  filtroDiv.innerHTML = '<p class="warn">ℹ️ El usuario logueado no es docente (role=' + sessionUser?.role + '). Este test solo aplica para docentes.</p>';
+} else {
+  filtroDiv.innerHTML = '<p class="err">⚠️ Faltan asignaciones o alumnos para hacer el test</p>';
+}
+
+// 5. Docentes
+const docentes = getLS('ie_docentes') || [];
+const docDiv = document.getElementById('docentesInfo');
+if (docentes.length === 0) {
+  docDiv.innerHTML = '<p class="err">❌ No hay docentes en localStorage (ie_docentes)</p>';
+} else {
+  docDiv.innerHTML = `
+    <p class="ok">✅ ${docentes.length} docentes encontrados</p>
+    <table>
+      <tr><th>ID</th><th>Nombre</th><th>Email</th></tr>
+      ${docentes.slice(0, 10).map(d => `<tr><td class="info">${d.id}</td><td>${d.apellidos_nombres || d.nombre}</td><td>${d.email || '—'}</td></tr>`).join('')}
+    </table>
+    ${docentes.length > 10 ? `<p style="font-size:11px;color:#94a3b8;">...y ${docentes.length - 10} más</p>` : ''}
+  `;
+}
+</script>
+</body>
+</html>

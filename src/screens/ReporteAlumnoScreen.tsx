@@ -469,8 +469,8 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
                   </div>
                   {pg ? (
                     <div>
-                      <span className={`text-2xl font-black px-3 py-1 rounded-lg border ${CAL_BG[pg]}`}>{pg}</span>
-                      <p className="text-slate-400 text-xs mt-1">{CAL_LABEL[pg]}</p>
+                      <span className={`text-2xl font-black px-3 py-1 rounded-lg border ${CAL_BG[pg]}`} translate="no">{pg}</span>
+                      <p className="text-slate-400 text-xs mt-1" translate="no">{CAL_LABEL[pg]}</p>
                     </div>
                   ) : (
                     <p className="text-2xl font-black text-slate-600">—</p>
@@ -535,7 +535,7 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
                             <p className="text-slate-400 text-xs">{comp.nombre}</p>
                           </div>
                           {prom ? (
-                            <span className={`text-xl font-black border-2 rounded-lg px-2 py-0.5 ${CAL_BG[prom]}`}>{prom}</span>
+                            <span className={`text-xl font-black border-2 rounded-lg px-2 py-0.5 ${CAL_BG[prom]}`} translate="no">{prom}</span>
                           ) : (
                             <span className="text-slate-600 font-bold text-xl">—</span>
                           )}
@@ -608,7 +608,7 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
                       </div>
                       {prom && (
                         <div className="text-right">
-                          <span className={`text-2xl font-black border-2 rounded-xl px-3 py-1 ${CAL_BG[prom]}`}>{prom}</span>
+                          <span className={`text-2xl font-black border-2 rounded-xl px-3 py-1 ${CAL_BG[prom]}`} translate="no">{prom}</span>
                           <p className="text-slate-400 text-xs mt-1">{CAL_LABEL[prom]}</p>
                         </div>
                       )}
@@ -626,7 +626,7 @@ export default function ReporteAlumnoScreen({ user }: ReporteAlumnoProps) {
                                 {col.tipo && <p className="text-slate-500 text-xs">{col.tipo}</p>}
                               </div>
                               {cal ? (
-                                <span className={`text-sm font-bold border rounded-lg px-2 py-0.5 ${CAL_BG[cal.calificativo]}`}>
+                                <span className={`text-sm font-bold border rounded-lg px-2 py-0.5 ${CAL_BG[cal.calificativo]}`} translate="no">
                                   {cal.calificativo}
                                 </span>
                               ) : (

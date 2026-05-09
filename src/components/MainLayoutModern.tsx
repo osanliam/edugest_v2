@@ -20,9 +20,10 @@ interface MainLayoutModernProps {
 
 const allNavigationItems = [
   // SISTEMA
-  { id: 'panel-admin',        label: 'Panel Admin',        icon: <Shield className="w-5 h-5" />,       roles: ['admin'],                                    category: 'Sistema' },
-  { id: 'gestionar-usuarios', label: 'Gestionar Usuarios', icon: <Users className="w-5 h-5" />,        roles: ['admin'],                                    category: 'Sistema' },
-  { id: 'configuracion',      label: 'Configuración',      icon: <Cog className="w-5 h-5" />,          roles: ['admin', 'director', 'subdirector'],          category: 'Sistema' },
+  { id: 'panel-admin',        label: 'Panel Admin',        icon: <Shield className="w-5 h-5" />,       roles: ['admin'],                                              category: 'Sistema' },
+  { id: 'gestionar-usuarios', label: 'Gestionar Usuarios', icon: <Users className="w-5 h-5" />,        roles: ['admin'],                                              category: 'Sistema' },
+  { id: 'auditoria',          label: 'Auditoría',          icon: <Shield className="w-5 h-5" />,       roles: ['admin', 'director', 'subdirector'],                    category: 'Sistema' },
+  { id: 'configuracion',      label: 'Configuración',      icon: <Cog className="w-5 h-5" />,          roles: ['admin', 'director', 'subdirector'],                    category: 'Sistema' },
 
   // PRINCIPAL
   { id: 'inicio',       label: 'Inicio',       icon: <Home className="w-5 h-5" />,        roles: ['admin', 'director', 'subdirector', 'teacher', 'student', 'parent'], category: 'Principal' },

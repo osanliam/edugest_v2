@@ -180,6 +180,97 @@ async function ensureTables(c) {
   await alterSafe(`ALTER TABLE calificaciones ADD COLUMN docenteId TEXT`);
   await alterSafe(`ALTER TABLE calificaciones ADD COLUMN updated_at DATETIME`);
 
+  // ── Aula Virtual ──────────────────────────────────────────────────────
+  await alterSafe(`CREATE TABLE IF NOT EXISTS aulas (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    descripcion TEXT,
+    docenteId TEXT,
+    grado TEXT,
+    seccion TEXT,
+    curso TEXT,
+    imagen TEXT,
+    estado TEXT DEFAULT 'activa',
+    creado DATETIME DEFAULT CURRENT_TIMESTAMP,
+    actualizado DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await alterSafe(`CREATE TABLE IF NOT EXISTS materiales (
+    id TEXT PRIMARY KEY,
+    aulaId TEXT NOT NULL,
+    tipo TEXT NOT NULL,
+    titulo TEXT NOT NULL,
+    descripcion TEXT,
+    contenido TEXT,
+    url TEXT,
+    nombreArchivo TEXT,
+    tipoArchivo TEXT,
+    pesoArchivo INTEGER DEFAULT 0,
+    fechaEntrega TEXT,
+    creadoPor TEXT,
+    creado DATETIME DEFAULT CURRENT_TIMESTAMP,
+    actualizado DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await alterSafe(`CREATE TABLE IF NOT EXISTS entregas (
+    id TEXT PRIMARY KEY,
+    materialId TEXT NOT NULL,
+    alumnoId TEXT NOT NULL,
+    aulaId TEXT NOT NULL,
+    contenido TEXT,
+    nombreArchivo TEXT,
+    tipoArchivo TEXT,
+    pesoArchivo INTEGER DEFAULT 0,
+    nota REAL,
+    comentarioDoc TEXT,
+    estado TEXT DEFAULT 'pendiente',
+    creado DATETIME DEFAULT CURRENT_TIMESTAMP,
+    actualizado DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await alterSafe(`CREATE TABLE IF NOT EXISTS comentarios (
+    id TEXT PRIMARY KEY,
+    materialId TEXT NOT NULL,
+    aulaId TEXT NOT NULL,
+    userId TEXT,
+    userName TEXT,
+    contenido TEXT NOT NULL,
+    creado DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_materiales_aula ON materiales(aulaId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_entregas_material ON entregas(materialId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_entregas_alumno ON entregas(alumnoId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_comentarios_material ON comentarios(materialId)`);
+
+  // ── Mensajes ──────────────────────────────────────────────────────────
+  await alterSafe(`CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    senderId TEXT NOT NULL,
+    senderName TEXT DEFAULT '',
+    receiverId TEXT,
+    subject TEXT DEFAULT '',
+    text TEXT NOT NULL,
+    date TEXT NOT NULL,
+    read INTEGER DEFAULT 0,
+    isBroadcast INTEGER DEFAULT 0,
+    priority TEXT DEFAULT 'normal',
+    category TEXT DEFAULT 'general'
+  )`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(senderId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiverId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_messages_date ON messages(date)`);
+
+  // ── Notificaciones ──────────────────────────────────────────────
+  await alterSafe(`CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    data TEXT,
+    read INTEGER DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(userId)`);
+  await alterSafe(`CREATE INDEX IF NOT EXISTS idx_notif_read ON notifications(userId, read)`);
+
   // Índices para acelerar las queries más frecuentes
   await alterSafe(`CREATE INDEX IF NOT EXISTS idx_cal_alumno    ON calificaciones(alumnoId)`);
   await alterSafe(`CREATE INDEX IF NOT EXISTS idx_cal_columna   ON calificaciones(columnaId)`);
@@ -207,9 +298,17 @@ async function safeExec(c, sql, args) {
 }
 
 export default async function handler(req, res) {
-  const c = getClient();
-  if (!c) {
-    return res.status(503).json({ error: 'Turso no configurado — faltan TURSO_CONNECTION_URL o TURSO_AUTH_TOKEN en las variables de entorno' });
+  let c;
+  try {
+    c = getClient();
+  } catch (error) {
+    if (error.code === 'TURSO_NOT_CONFIGURED' || error.message?.includes('TURSO_NOT_CONFIGURED')) {
+      return res.status(503).json({ error: 'Base de datos no configurada', code: 'TURSO_NOT_CONFIGURED', solucion: 'Configura TURSO_CONNECTION_URL y TURSO_AUTH_TOKEN en Vercel', diagnostico: '/api/diagnostico' });
+    }
+    if (error.code === 'TURSO_CONNECTION_ERROR' || error.message?.includes('TURSO_CONNECTION_ERROR')) {
+      return res.status(503).json({ error: 'No se pudo conectar a Turso', code: 'TURSO_CONNECTION_ERROR', detalle: error.message, diagnostico: '/api/diagnostico' });
+    }
+    return res.status(500).json({ error: 'Error conectando a Turso: ' + error.message });
   }
 
   try {
@@ -547,7 +646,43 @@ export default async function handler(req, res) {
       const tiposParam = req.query?.tipos || '';
       const tiposSolicitados = tiposParam
         ? tiposParam.split(',').map(t => t.trim()).filter(Boolean)
-        : ['usuarios','docentes','alumnos','columnas','calificaciones','asistencia','unidades','normas','registros_normas','asignaciones'];
+        : ['usuarios','docentes','alumnos','columnas','calificaciones','asistencia','unidades','normas','registros_normas','asignaciones','aulas','materiales','entregas','comentarios','mensajes','notificaciones'];
+
+      // Incremental: solo cambios desde una fecha dada
+      const desde = req.query?.desde || null;
+
+      // ── Filtrado por maestro: si el usuario es teacher, solo ve datos de sus grados/secciones ──
+      const usuarioGET = parseJWT(req);
+      const userRole = usuarioGET?.role || null;
+      const userId = usuarioGET?.id || usuarioGET?.docenteId || null;
+      let filtroGrados = null; // null = sin filtro (admin/director), array = grados asignados
+      let filtroSecciones = null;
+
+      if (userRole === 'teacher' && userId) {
+        try {
+          const asigs = await c.execute({ sql: 'SELECT grados, secciones FROM asignaciones WHERE docenteId = ?', args: [userId] });
+          if (asigs.rows && asigs.rows.length > 0) {
+            filtroGrados = [];
+            filtroSecciones = [];
+            for (const a of asigs.rows) {
+              try {
+                const grados = typeof a.grados === 'string' ? JSON.parse(a.grados || '[]') : (a.grados || []);
+                const secciones = typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []);
+                filtroGrados.push(...grados);
+                filtroSecciones.push(...secciones);
+              } catch {}
+            }
+          }
+        } catch {}
+        // Si no tiene asignaciones, ver sus propios alumnos (grado vacío = sin filtro temporal)
+        if (!filtroGrados || filtroGrados.length === 0) {
+          filtroGrados = null; // sin restricción temporal, ve todo
+        }
+      }
+      // Para student: solo ve sus propias calificaciones y datos
+      if (userRole === 'student' && userId) {
+        // Se maneja más abajo filtrando calificaciones
+      }
 
       // Incremental: solo cambios desde una fecha dada
       const desde = req.query?.desde || null;
@@ -560,7 +695,7 @@ export default async function handler(req, res) {
       if (tiposSolicitados.includes('usuarios'))          data.usuarios          = await ejecutar('SELECT * FROM users');
       if (tiposSolicitados.includes('docentes'))          data.docentes          = await ejecutar('SELECT * FROM docentes');
       if (tiposSolicitados.includes('alumnos')) {
-        const gradoFiltro = req.query?.grado || null;
+        const gradoFiltro = req.query?.grado || filtroGrados;
         const joinAlumnos = `
           SELECT a.*,
             m.apellidos_nombres AS madre_nombres, m.dni AS madre_dni, m.celular AS madre_celular,
@@ -570,7 +705,7 @@ export default async function handler(req, res) {
           LEFT JOIN apoderados p ON a.padre_id = p.id
         `;
         if (gradoFiltro) {
-          const grados = gradoFiltro.split(',').map(g => g.trim());
+          const grados = Array.isArray(gradoFiltro) ? gradoFiltro : gradoFiltro.split(',').map(g => g.trim());
           const placeholders = grados.map(() => '?').join(',');
           try {
             const r = await c.execute({ sql: `${joinAlumnos} WHERE a.grado IN (${placeholders}) ORDER BY a.apellidos_nombres`, args: grados });
@@ -583,7 +718,16 @@ export default async function handler(req, res) {
           } catch { data.alumnos = await ejecutar('SELECT * FROM alumnos'); }
         }
       }
-      if (tiposSolicitados.includes('columnas'))          data.columnas          = await ejecutar('SELECT * FROM columnas');
+      if (tiposSolicitados.includes('columnas')) {
+        const rawCols = await ejecutar('SELECT * FROM columnas');
+        const toArr = (v) => { try { const p = typeof v === 'string' ? JSON.parse(v || '[]') : v; return Array.isArray(p) ? p : []; } catch { return []; } };
+        data.columnas = rawCols.map(c => ({
+          ...c,
+          itemsExamen: toArr(c.itemsExamen),
+          items: toArr(c.items),
+          columnasEval: toArr(c.columnasEval),
+        }));
+      }
       if (tiposSolicitados.includes('calificaciones')) {
         const page  = parseInt(req.query?.page  || '0');
         const limit = parseInt(req.query?.limit || '0'); // 0 = sin límite (retro-compat)
@@ -620,18 +764,37 @@ export default async function handler(req, res) {
       }
       if (tiposSolicitados.includes('asistencia'))        data.asistencia        = await ejecutar('SELECT * FROM asistencia');
       if (tiposSolicitados.includes('unidades'))          data.unidades          = await ejecutar('SELECT * FROM unidades');
-      if (tiposSolicitados.includes('normas'))            data.normas            = await ejecutar('SELECT * FROM normas');
+      if (tiposSolicitados.includes('normas'))            data.normas            = await ejecutar('SELECT * FROM normas_convivencia');
       if (tiposSolicitados.includes('registros_normas'))  data.registros_normas  = await ejecutar('SELECT * FROM registros_normas');
+      if (tiposSolicitados.includes('cursos'))            data.cursos            = await ejecutar('SELECT * FROM cursos');
+      if (tiposSolicitados.includes('configuraciones')) {
+        const configs = await ejecutar('SELECT * FROM configuraciones');
+        data.configuraciones = configs.reduce((acc, c) => {
+          try { acc[c.clave] = JSON.parse(c.valor); } catch { acc[c.clave] = c.valor; }
+          return acc;
+        }, {});
+      }
       if (tiposSolicitados.includes('asignaciones')) {
         const rawAsigs = await ejecutar('SELECT * FROM asignaciones');
         // Parsear campos JSON que Turso devuelve como string
-        data.asignaciones = rawAsigs.map(a => ({
-          ...a,
-          grados:    typeof a.grados    === 'string' ? JSON.parse(a.grados    || '[]') : (a.grados    || []),
-          secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
-          cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
-        }));
+        data.asignaciones = rawAsigs.map(a => {
+          let extra = {};
+          try { extra = a.extra ? JSON.parse(a.extra) : {}; } catch {}
+          return {
+            ...a,
+            grados:    typeof a.grados    === 'string' ? JSON.parse(a.grados    || '[]') : (a.grados    || []),
+            secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
+            cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
+            cursoId:   extra.cursoId || a.cursoId || '',
+          };
+        });
       }
+      if (tiposSolicitados.includes('aulas'))              data.aulas              = await ejecutar('SELECT * FROM aulas');
+      if (tiposSolicitados.includes('materiales'))          data.materiales          = await ejecutar('SELECT * FROM materiales');
+      if (tiposSolicitados.includes('entregas'))            data.entregas            = await ejecutar('SELECT * FROM entregas');
+      if (tiposSolicitados.includes('comentarios'))         data.comentarios         = await ejecutar('SELECT * FROM comentarios');
+      if (tiposSolicitados.includes('mensajes'))            data.mensajes            = await ejecutar('SELECT * FROM messages');
+      if (tiposSolicitados.includes('notificaciones'))      data.notificaciones      = await ejecutar('SELECT * FROM notifications');
 
       return res.json(data);
     } catch (e) {
@@ -661,6 +824,14 @@ export default async function handler(req, res) {
 
   // ── POST sync ─────────────────────────────────────────────────────────────
   if (req.method === 'POST') {
+    const usuarioJWT = parseJWT(req);
+    if (!usuarioJWT) {
+      return res.status(401).json({ error: 'Autenticación requerida. Envía token JWT en Authorization header.' });
+    }
+    const docenteId = usuarioJWT.id || usuarioJWT.docenteId || null;
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+    const ahora = new Date().toISOString();
+
     const { tipo, datos } = req.body;
     if (!tipo || !Array.isArray(datos)) {
       return res.status(400).json({ error: 'Falta tipo o datos' });
@@ -668,6 +839,16 @@ export default async function handler(req, res) {
 
     const errores = [];
     let ok = 0;
+
+    // ── Helper: auditoría ──
+    const auditar = async (accion, tabla, registro_id, cambios) => {
+      try {
+        await c.execute({
+          sql: `INSERT INTO auditoria (id, timestamp, usuario_id, accion, tabla, registro_id, cambios, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [`aud-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, new Date().toISOString(), docenteId || userId || 'anonymous', accion, tabla, registro_id, typeof cambios === 'string' ? cambios : JSON.stringify(cambios), ip]
+        });
+      } catch (_) {}
+    };
 
     try {
       if (tipo === 'usuarios') {
@@ -684,11 +865,11 @@ export default async function handler(req, res) {
       else if (tipo === 'docentes') {
         for (const d of datos) {
           const e = await safeExec(c,
-            `INSERT OR REPLACE INTO docentes (id, apellidos_nombres, dni, genero, fecha_nacimiento, celular, cargo, email)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT OR REPLACE INTO docentes (id, apellidos_nombres, dni, genero, fecha_nacimiento, celular, cargo, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [d.id, d.apellidos_nombres || d.nombre || '', d.dni || '', d.genero || '', d.fecha_nacimiento || '', d.celular || d.telefono || '', d.cargo || '', d.email || '']
           );
           e ? errores.push(`docente ${d.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'docentes', d.id, { nombre: d.apellidos_nombres, dni: d.dni });
         }
       }
 
@@ -776,8 +957,6 @@ export default async function handler(req, res) {
       }
 
       else if (tipo === 'calificativos') {
-        const usuarioJWT = parseJWT(req);
-        const docenteId = usuarioJWT?.id || usuarioJWT?.docenteId || null;
         const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
         const ahora = new Date().toISOString();
 
@@ -854,6 +1033,7 @@ export default async function handler(req, res) {
             [a.id, a.alumnoId, a.fecha, a.estado, a.modo || null, a.hora || null]
           );
           e ? errores.push(`asistencia ${a.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'asistencia', a.id, { alumnoId: a.alumnoId, fecha: a.fecha, estado: a.estado });
         }
       }
 
@@ -867,6 +1047,7 @@ export default async function handler(req, res) {
             [u.id, u.numero || 0, u.nombre || '', u.bimestreId || null, u.activa !== false ? 1 : 0]
           );
           e ? errores.push(`unidad ${u.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'unidades', u.id, { nombre: u.nombre });
         }
         if (datos.length === 0) ok = 0; // borrado exitoso aunque no haya inserts
       }
@@ -879,6 +1060,7 @@ export default async function handler(req, res) {
             [n.id, n.titulo || '', n.descripcion || '', n.categoria || '', n.puntos || 1, n.visible !== false ? 1 : 0]
           );
           e ? errores.push(`norma ${n.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'normas', n.id, { titulo: n.titulo });
         }
       }
 
@@ -890,6 +1072,7 @@ export default async function handler(req, res) {
             [r.id, r.alumnoId, r.conductaId, r.ejeId, r.fecha, r.cumplimiento, r.puntos || 0, r.observacion || '', r.registradoPor || '']
           );
           e ? errores.push(`registro_norma ${r.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'registros_normas', r.id, { alumnoId: r.alumnoId });
         }
       }
 
@@ -897,6 +1080,8 @@ export default async function handler(req, res) {
         // Full-replace: eliminar todas y re-insertar para que las bajas se propaguen
         await c.execute('DELETE FROM asignaciones');
         for (const a of datos) {
+          // Guardar cursoId en extra para recuperarlo al cargar
+          const extra = { ...(a.extra || {}), cursoId: a.cursoId || '' };
           const e = await safeExec(c,
             `INSERT INTO asignaciones (id, docenteId, grados, secciones, cursos, extra)
              VALUES (?, ?, ?, ?, ?, ?)`,
@@ -906,12 +1091,103 @@ export default async function handler(req, res) {
               JSON.stringify(Array.isArray(a.grados) ? a.grados : []),
               JSON.stringify(Array.isArray(a.secciones) ? a.secciones : []),
               JSON.stringify(Array.isArray(a.cursos) ? a.cursos : []),
-              a.extra ? JSON.stringify(a.extra) : null,
+              JSON.stringify(extra),
             ]
           );
           e ? errores.push(`asignacion ${a.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'asignaciones', a.id, { docenteId: a.docenteId });
         }
         if (datos.length === 0) ok = 0;
+      }
+
+      else if (tipo === 'cursos') {
+        for (const cur of datos) {
+          const e = await safeExec(c,
+            `INSERT OR REPLACE INTO cursos (id, nombre, color, creado) VALUES (?, ?, ?, ?)`,
+            [cur.id, cur.nombre || '', cur.color || '', cur.creado || new Date().toISOString()]
+          );
+          e ? errores.push(`curso ${cur.id}: ${e}`) : ok++;
+        }
+      }
+
+      else if (tipo === 'unidades') {
+        for (const u of datos) {
+          const e = await safeExec(c,
+            `INSERT OR REPLACE INTO unidades (id, nombre, activa, creado) VALUES (?, ?, ?, ?)`,
+            [u.id, u.nombre || '', u.activa !== false ? 1 : 0, u.creado || new Date().toISOString()]
+          );
+          e ? errores.push(`unidad ${u.id}: ${e}`) : ok++;
+        }
+      }
+
+      else if (tipo === 'configuraciones') {
+        for (const [clave, valor] of Object.entries(datos)) {
+          const e = await safeExec(c,
+            `INSERT OR REPLACE INTO configuraciones (clave, valor) VALUES (?, ?)`,
+            [clave, typeof valor === 'string' ? valor : JSON.stringify(valor)]
+          );
+          e ? errores.push(`config ${clave}: ${e}`) : ok++;
+        }
+      }
+
+      else if (tipo === 'aulas') {
+        for (const a of datos) {
+          const e = await safeExec(c,
+            `INSERT OR REPLACE INTO aulas (id, nombre, descripcion, docenteId, grado, seccion, curso, imagen, estado, creado, actualizado)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [a.id, a.nombre || '', a.descripcion || '', a.docenteId || '', a.grado || '', a.seccion || '', a.curso || '', a.imagen || '', a.estado || 'activa', a.creado || new Date().toISOString(), a.actualizado || new Date().toISOString()]
+          );
+          e ? errores.push(`aula ${a.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'aulas', a.id, { nombre: a.nombre, docenteId: a.docenteId });
+        }
+      }
+
+      else if (tipo === 'materiales') {
+        for (const m of datos) {
+          const e = await safeExec(c,
+            `INSERT OR REPLACE INTO materiales (id, aulaId, tipo, titulo, descripcion, contenido, url, nombreArchivo, tipoArchivo, pesoArchivo, fechaEntrega, creadoPor, creado, actualizado)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [m.id, m.aulaId, m.tipo, m.titulo || '', m.descripcion || '', m.contenido || '', m.url || '', m.nombreArchivo || '', m.tipoArchivo || '', m.pesoArchivo || 0, m.fechaEntrega || '', m.creadoPor || '', m.creado || new Date().toISOString(), m.actualizado || new Date().toISOString()]
+          );
+          e ? errores.push(`material ${m.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'materiales', m.id, { titulo: m.titulo, aulaId: m.aulaId });
+        }
+      }
+
+      else if (tipo === 'entregas') {
+        for (const e2 of datos) {
+          const e = await safeExec(c,
+            `INSERT OR REPLACE INTO entregas (id, materialId, alumnoId, aulaId, contenido, nombreArchivo, tipoArchivo, pesoArchivo, nota, comentarioDoc, estado, creado, actualizado)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [e2.id, e2.materialId, e2.alumnoId, e2.aulaId, e2.contenido || '', e2.nombreArchivo || '', e2.tipoArchivo || '', e2.pesoArchivo || 0, e2.nota ?? null, e2.comentarioDoc || '', e2.estado || 'pendiente', e2.creado || new Date().toISOString(), e2.actualizado || new Date().toISOString()]
+          );
+          e ? errores.push(`entrega ${e2.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'entregas', e2.id, { alumnoId: e2.alumnoId, materialId: e2.materialId });
+        }
+      }
+
+      else if (tipo === 'comentarios') {
+        for (const com of datos) {
+          const e = await safeExec(c,
+            `INSERT OR REPLACE INTO comentarios (id, materialId, aulaId, userId, userName, contenido, creado)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [com.id, com.materialId, com.aulaId, com.userId || '', com.userName || '', com.contenido || '', com.creado || new Date().toISOString()]
+          );
+          e ? errores.push(`comentario ${com.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'comentarios', com.id, { userId: com.userId, materialId: com.materialId });
+        }
+      }
+
+      else if (tipo === 'mensajes') {
+        for (const m of datos) {
+          const e = await safeExec(c,
+            `INSERT OR REPLACE INTO messages (id, senderId, senderName, receiverId, subject, text, date, read, isBroadcast, priority, category)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [m.id, m.senderId || '', m.senderName || '', m.receiverId || null, m.subject || '', m.text || '', m.date || new Date().toISOString(), m.read ? 1 : 0, m.isBroadcast ? 1 : 0, m.priority || 'normal', m.category || 'general']
+          );
+          e ? errores.push(`mensaje ${m.id}: ${e}`) : ok++;
+          if (!e) await auditar('guardar', 'mensajes', m.id, { senderId: m.senderId, receiverId: m.receiverId, isBroadcast: m.isBroadcast });
+        }
       }
 
       else {

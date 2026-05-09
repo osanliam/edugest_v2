@@ -83,16 +83,28 @@ export default function AttendanceScreenModern({ user }: AttendanceScreenModernP
   const [gradoBuscador, setGradoBuscador] = useState('');
   const [seccionBuscador, setSeccionBuscador] = useState('');
 
-  // Cargar datos
+  // Cargar datos: Firebase primero, luego Turso, luego localStorage
   useEffect(() => {
     (async () => {
       let stored: Alumno[] = [];
-      // 1) Intentar descargar desde Turso
+      // 1) Firebase primero
       try {
-        stored = await getAlumnos();
-        localStorage.setItem('ie_alumnos', JSON.stringify(stored));
-      } catch {
-        // 2) Fallback a localStorage
+        const { getAlumnosFB } = await import('../services/firebaseDataService');
+        const fb = await getAlumnosFB();
+        if (fb.length > 0) {
+          stored = fb;
+          localStorage.setItem('ie_alumnos', JSON.stringify(stored));
+        }
+      } catch { /* sigue */ }
+      // 2) Turso si Firebase vacío
+      if (stored.length === 0) {
+        try {
+          stored = await getAlumnos();
+          localStorage.setItem('ie_alumnos', JSON.stringify(stored));
+        } catch { /* sigue */ }
+      }
+      // 3) localStorage último recurso
+      if (stored.length === 0) {
         stored = lsGet<Alumno[]>('ie_alumnos', []);
       }
       setAlumnos(stored);

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Edit2, Search, Upload, Download, X, Check, AlertCircle, RefreshCw, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { guardarDocentes } from '../services/dataService';
+import { getDocentesFB, guardarDocenteFB, eliminarDocenteFB } from '../services/firebaseDataService';
+import { isFirebaseConfigured } from '../lib/firebase';
 import HeaderElegante from '../components/HeaderElegante';
 
 interface Docente {
@@ -14,6 +16,7 @@ interface Docente {
   cargo: string;
   email: string;
   user_id?: string;
+  foto?: string;
 }
 
 const GENEROS = ['Masculino', 'Femenino'];
@@ -87,6 +90,17 @@ export default function DocentesScreen() {
 
   const cargar = async () => {
     setCargando(true);
+    // 1. Firebase primero
+    try {
+      const fb = await getDocentesFB();
+      if (fb.length > 0) {
+        setDocentes(fb);
+        localStorage.setItem(LS_DOCENTES, JSON.stringify(fb));
+        setCargando(false);
+        return;
+      }
+    } catch { /* sigue */ }
+    // 2. Turso (legacy)
     try {
       const res = await fetch('/api/docentes', {
         headers: { Authorization: `Bearer ${getToken()}` }
@@ -95,44 +109,90 @@ export default function DocentesScreen() {
         const data = await res.json();
         const lista = Array.isArray(data) ? data : [];
         setDocentes(lista);
-        localStorage.setItem(LS_DOCENTES, JSON.stringify(lista)); // caché local sin re-sync
-      } else {
-        setDocentes(lsCargar());
+        localStorage.setItem(LS_DOCENTES, JSON.stringify(lista));
+        setCargando(false);
+        return;
       }
-    } catch {
-      setDocentes(lsCargar());
-    } finally {
-      setCargando(false);
-    }
+    } catch { /* sigue */ }
+    // 3. localStorage fallback
+    setDocentes(lsCargar());
+    setCargando(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.apellidos_nombres || !form.dni || !form.genero || !form.fecha_nacimiento)
-      return mostrar('err', 'Completa los campos obligatorios');
+    if (!form.apellidos_nombres.trim()) return mostrar('err', 'Escribe los apellidos y nombres');
+    if (!form.dni.trim()) return mostrar('err', 'Escribe el DNI');
+    if (!form.genero) return mostrar('err', 'Selecciona el género');
+    if (!form.fecha_nacimiento) return mostrar('err', 'Selecciona la fecha de nacimiento');
     setGuardando(true);
+    const token = getToken();
+    const docenteData = {
+      apellidos_nombres: form.apellidos_nombres.trim(),
+      dni: form.dni.trim(),
+      genero: form.genero,
+      fecha_nacimiento: form.fecha_nacimiento,
+      celular: form.celular || '',
+      cargo: form.cargo || '',
+      email: form.email || '',
+    };
     try {
-      const token = getToken();
-      if (editando) {
-        const res = await fetch(`/api/docentes?id=${editando.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(form),
-        });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error al actualizar'); }
-        mostrar('ok', 'Docente actualizado');
-      } else {
-        const res = await fetch('/api/docentes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(form),
-        });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error al crear'); }
-        mostrar('ok', 'Docente registrado');
+      // 1. Intentar Firebase
+      if (isFirebaseConfigured()) {
+        try {
+          const id = await guardarDocenteFB({ ...form, id: form.id || undefined });
+          mostrar('ok', editando ? 'Docente actualizado' : 'Docente registrado');
+          setShowForm(false); setEditando(null); setForm(emptyForm);
+          cargar();
+          return;
+        } catch (fbErr: any) {
+          console.warn('Firebase falló, intentando Turso:', fbErr.message);
+        }
       }
+      // 2. Intentar Turso API
+      if (token) {
+        try {
+          if (editando) {
+            const res = await fetch(`/api/docentes?id=${editando.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify(docenteData),
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error al actualizar'); }
+            mostrar('ok', 'Docente actualizado');
+          } else {
+            const res = await fetch('/api/docentes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify(docenteData),
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error al crear'); }
+            mostrar('ok', 'Docente registrado');
+          }
+          setShowForm(false); setEditando(null); setForm(emptyForm);
+          cargar();
+          return;
+        } catch (apiErr: any) {
+          console.warn('API falló, guardando localmente:', apiErr.message);
+        }
+      }
+      // 3. Fallback: guardar en localStorage
+      const lista = lsCargar();
+      if (editando) {
+        const idx = lista.findIndex(d => d.id === editando.id);
+        if (idx >= 0) lista[idx] = { ...editando, ...docenteData };
+        mostrar('ok', 'Docente actualizado (local)');
+      } else {
+        const nuevoDocente: Docente = { ...docenteData, id: `doc-local-${Date.now()}` };
+        lista.push(nuevoDocente);
+        mostrar('ok', 'Docente registrado (local)');
+      }
+      lsGuardar(lista);
+      setDocentes(lista);
       setShowForm(false); setEditando(null); setForm(emptyForm);
-      cargar();
-    } catch (err: any) { mostrar('err', err.message); }
+    } catch (err: any) {
+      mostrar('err', err.message || 'Error al guardar docente');
+    }
     finally { setGuardando(false); }
   };
 

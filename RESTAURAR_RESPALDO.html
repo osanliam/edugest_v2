@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Restaurar Respaldo — EduGest</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; margin: 0; padding: 20px; min-height: 100vh; }
+  .container { max-width: 700px; margin: 0 auto; }
+  h1 { text-align: center; color: #38bdf8; margin-bottom: 10px; }
+  .subtitle { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 30px; }
+  .card { background: rgba(30,41,59,0.8); border: 1px solid rgba(56,189,248,0.2); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+  .card h2 { color: #7dd3fc; font-size: 18px; margin-top: 0; display: flex; align-items: center; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: 100%; }
+  .btn-primary { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(14,165,233,0.3); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
+  .file-input { display: none; }
+  .file-label { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 20px; border: 2px dashed rgba(56,189,248,0.3); border-radius: 12px; cursor: pointer; color: #38bdf8; transition: all 0.2s; }
+  .file-label:hover { border-color: #38bdf8; background: rgba(56,189,248,0.05); }
+  .stat { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(148,163,184,0.1); }
+  .stat:last-child { border-bottom: none; }
+  .stat-label { color: #94a3b8; font-size: 14px; }
+  .stat-value { color: #38bdf8; font-weight: bold; font-size: 16px; }
+  .stat-value.empty { color: #ef4444; }
+  .success-box { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 12px; padding: 16px; color: #86efac; font-size: 14px; margin-top: 20px; }
+  .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 16px; color: #fca5a5; font-size: 14px; margin-top: 20px; }
+  .warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); border-radius: 12px; padding: 16px; color: #fcd34d; font-size: 14px; margin-bottom: 20px; }
+  .steps { background: rgba(15,23,42,0.6); border-radius: 12px; padding: 16px; margin-top: 20px; }
+  .steps h3 { margin-top: 0; color: #7dd3fc; }
+  .steps ol { padding-left: 20px; }
+  .steps li { margin-bottom: 8px; color: #cbd5e1; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📦 Restaurar Respaldo EduGest</h1>
+  <p class="subtitle">Carga tu archivo JSON de respaldo y recupera tus notas</p>
+
+  <div class="warning">
+    ⚠️ <strong>Importante:</strong> Abre esta página en el <strong>mismo navegador</strong> donde usas EduGest.
+    Los datos se guardarán en localStorage para que luego puedas sincronizar con Turso.
+  </div>
+
+  <div class="card">
+    <h2>📁 1. Selecciona tu archivo de respaldo</h2>
+    <label for="fileInput" class="file-label" id="fileLabel">
+      📂 Haz clic para elegir el archivo <code>respaldo_edugest_YYYY-MM-DD.json</code>
+    </label>
+    <input type="file" id="fileInput" class="file-input" accept=".json" onchange="onFileSelected(event)">
+    <div id="fileInfo" style="margin-top:12px; color:#94a3b8; font-size:13px;"></div>
+  </div>
+
+  <div class="card" id="previewCard" style="display:none;">
+    <h2>📊 2. Contenido detectado</h2>
+    <div id="stats"></div>
+  </div>
+
+  <button id="btnRestaurar" class="btn btn-primary" style="display:none;" onclick="restaurar()">
+    🚀 Restaurar Datos en Este Navegador
+  </button>
+
+  <div id="resultado"></div>
+
+  <div class="steps" id="nextSteps" style="display:none;">
+    <h3>✅ ¿Y ahora qué?</h3>
+    <ol>
+      <li><strong>Abre tu aplicación EduGest</strong> (en la misma pestaña o recarga la app).</li>
+      <li>Ve a <strong>Configuración → Sincronización</strong> y verifica que los datos carguen.</li>
+      <li>Usa <strong>"SUBIR DATOS A TURSO"</strong> para enviar todo a la nube y no perderlo nunca más.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+// ── Mapeo de campos del respaldo a claves de localStorage ────────────────────
+const MAPEO = [
+  { campo: 'usuarios',       lsKey: 'sistema_usuarios',    nombre: 'Usuarios' },
+  { campo: 'docentes',       lsKey: 'ie_docentes',         nombre: 'Docentes' },
+  { campo: 'alumnos',        lsKey: 'ie_alumnos',          nombre: 'Alumnos' },
+  { campo: 'columnas',       lsKey: 'cal_columnas',        nombre: 'Columnas (Instrumentos)' },
+  { campo: 'calificativos',  lsKey: 'ie_calificativos_v2', nombre: 'Calificaciones/Notas' },
+  { campo: 'asistencia',     lsKey: 'ie_asistencia',       nombre: 'Registros de Asistencia' },
+];
+
+let datosParseados = {};
+
+// ── Parsear valor del respaldo (puede ser string JSON o array directo) ───────
+function parsearValor(raw) {
+  if (raw === null || raw === undefined) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function onFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  document.getElementById('fileLabel').textContent = `📄 ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+  document.getElementById('fileInfo').textContent = 'Leyendo archivo...';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const contenido = JSON.parse(e.target.result);
+      datosParseados = {};
+      const statsDiv = document.getElementById('stats');
+      statsDiv.innerHTML = '';
+      let total = 0;
+
+      for (const map of MAPEO) {
+        const items = parsearValor(contenido[map.campo]);
+        datosParseados[map.lsKey] = items;
+        total += items.length;
+
+        const div = document.createElement('div');
+        div.className = 'stat';
+        div.innerHTML = `
+          <span class="stat-label">${map.nombre}</span>
+          <span class="stat-value ${items.length === 0 ? 'empty' : ''}">${items.length} registros</span>
+        `;
+        statsDiv.appendChild(div);
+      }
+
+      // Mostrar total
+      const totalDiv = document.createElement('div');
+      totalDiv.className = 'stat';
+      totalDiv.style.borderTop = '2px solid rgba(56,189,248,0.3)';
+      totalDiv.style.marginTop = '10px';
+      totalDiv.style.paddingTop = '15px';
+      totalDiv.innerHTML = `
+        <span class="stat-label" style="font-size:16px; color:#e2e8f0;">TOTAL</span>
+        <span class="stat-value" style="font-size:18px;">${total} registros</span>
+      `;
+      statsDiv.appendChild(totalDiv);
+
+      document.getElementById('previewCard').style.display = 'block';
+      document.getElementById('btnRestaurar').style.display = 'inline-flex';
+      document.getElementById('fileInfo').textContent = 'Archivo leído correctamente. Revisa el contenido y presiona Restaurar.';
+    } catch (err) {
+      document.getElementById('fileInfo').textContent = '';
+      document.getElementById('resultado').innerHTML = `
+        <div class="error-box">❌ Error al leer el archivo: ${err.message}</div>
+      `;
+    }
+  };
+  reader.readAsText(file);
+}
+
+function restaurar() {
+  const btn = document.getElementById('btnRestaurar');
+  btn.disabled = true;
+  btn.textContent = '⏳ Restaurando...';
+
+  try {
+    let totalGuardados = 0;
+    for (const map of MAPEO) {
+      const items = datosParseados[map.lsKey] || [];
+      if (items.length > 0) {
+        localStorage.setItem(map.lsKey, JSON.stringify(items));
+        totalGuardados += items.length;
+      }
+    }
+
+    document.getElementById('resultado').innerHTML = `
+      <div class="success-box">
+        ✅ <strong>¡Restauración completada!</strong><br>
+        Se guardaron <strong>${totalGuardados}</strong> registros en localStorage.
+      </div>
+    `;
+    document.getElementById('nextSteps').style.display = 'block';
+    btn.textContent = '✅ Restaurado';
+  } catch (err) {
+    document.getElementById('resultado').innerHTML = `
+      <div class="error-box">❌ Error al guardar: ${err.message}</div>
+    `;
+    btn.disabled = false;
+    btn.textContent = '🚀 Reintentar Restauración';
+  }
+}
+</script>
+</body>
+</html>

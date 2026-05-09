@@ -3,10 +3,78 @@ import { motion } from "motion/react";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
 import { User as UserType } from '../types';
 import { login as apiLogin, setToken, cargarTodo } from '../utils/apiClient';
+import { getUsuariosFB } from '../services/firebaseDataService';
 
-// Siempre usa la API real — directo a Turso
+/* Fallback localStorage: busca en sistema_usuarios guardados localmente. */
+function loginLocal(email: string, password: string): { user: any } | null {
+  try {
+    const raw = localStorage.getItem('sistema_usuarios');
+    if (!raw) return null;
+    const usuarios = JSON.parse(raw);
+    const u = usuarios.find((x: any) =>
+      (x.email?.toLowerCase() === email.toLowerCase() || x.nombre?.toLowerCase() === email.toLowerCase()) &&
+      x.contraseña === password
+    );
+    if (!u) return null;
+    return {
+      user: {
+        id: u.id,
+        name: u.nombre,
+        email: u.email,
+        role: u.rol || 'admin',
+        school_id: '1',
+        docenteId: u.docenteId || null,
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
+/* Fallback Firebase: busca usuarios en Firestore. */
+async function loginFirebase(email: string, password: string): Promise<{ user: any } | null> {
+  try {
+    const usuarios = await getUsuariosFB();
+    const u = usuarios.find((x: any) =>
+      (x.email?.toLowerCase() === email.toLowerCase() || x.nombre?.toLowerCase() === email.toLowerCase()) &&
+      x.contraseña === password
+    );
+    if (!u) return null;
+    return {
+      user: {
+        id: u.id,
+        name: u.nombre,
+        email: u.email,
+        role: u.rol || 'admin',
+        school_id: '1',
+        docenteId: u.docenteId || null,
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function loginRequest(email: string, password: string) {
-  return apiLogin(email, password);
+  // Intentar AMBOS en paralelo: Firebase + Turso
+  // Turso nos da el token necesario para /api/* durante la transición
+  const [fbResult, tursoResult] = await Promise.allSettled([
+    loginFirebase(email, password),
+    apiLogin(email, password)
+  ]);
+
+  const fb = fbResult.status === 'fulfilled' ? fbResult.value : null;
+  const turso = tursoResult.status === 'fulfilled' ? tursoResult.value : null;
+
+  // Prioridad: Turso (tiene token) > Firebase > localStorage
+  if (turso) return turso;
+  if (fb) return fb;
+
+  // Fallback localStorage
+  const local = loginLocal(email, password);
+  if (local) return local;
+
+  throw new Error('Usuario o contraseña incorrectos');
 }
 
 // Sin cuentas demo — todos usan sus credenciales reales registradas en el sistema
@@ -66,8 +134,8 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
       // Cargar cada tipo por separado para evitar timeout (2894 alumnos es pesado)
       // Asignaciones y unidades primero — son pequeñas y críticas para docentes
-      const tiposEsenciales = ['asignaciones', 'unidades', 'columnas', 'alumnos'];
-      const tiposSecundarios = ['docentes', 'normas', 'calificaciones', 'asistencia'];
+      const tiposEsenciales = ['asignaciones', 'unidades', 'columnas', 'alumnos', 'docentes'];
+      const tiposSecundarios = ['normas', 'calificaciones', 'asistencia'];
 
       // PASO 1: Esenciales uno a uno — esperamos antes de entrar
       for (const tipo of tiposEsenciales) {

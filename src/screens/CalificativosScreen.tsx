@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { cargarTodo, guardarCalificativos, guardarUnCalificativo, guardarColumnas, getAsignaciones, getCalificacionesDesdeFecha, cargarCalPaginado, getCacheCalificaciones, setCacheCalificaciones, actualizarCalEnCache } from '../utils/apiClient';
+import { guardarCalificativoFB, guardarCalificativosBatchFB, guardarColumnasFB, eliminarColumnaFB, eliminarCalificativosPorColumnaFB } from '../services/firebaseDataService';
 import { exportarColumna, exportarTodas } from '../utils/exportCalificativos';
 
 // ── Competencias ──────────────────────────────────────────────────────────────
@@ -11,22 +13,22 @@ const COMPETENCIAS = [
 ];
 
 // ── Tipos de instrumento ──────────────────────────────────────────────────────
-type TipoInstrumento = 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica' | 'portafolio-evidencias' | 'registro-anecdotico' | 'escala-valoracion' | 'nota-numerica';
+type TipoInstrumento = 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica' | 'rubrica-2' | 'portafolio-evidencias' | 'registro-anecdotico' | 'escala-valoracion' | 'nota-numerica';
 
 const TIPO_CONFIG: Record<string, { label: string; icono: string; puedeAD: boolean }> = {
-  'examen':                 { label: 'Examen',                 icono: '📝', puedeAD: false },
   'lista-cotejo':           { label: 'Lista de Cotejo',          icono: '☑️', puedeAD: false },
   'ficha-observacion':      { label: 'Ficha de Observación',     icono: '🔍', puedeAD: false },
-  'rubrica':               { label: 'Rúbrica',               icono: '📐', puedeAD: true  },
-  'portafolio-evidencias':  { label: 'Portafolio Evidencias', icono: '📁', puedeAD: false },
+  'examen':                 { label: 'Examen',                  icono: '📝', puedeAD: false },
+  'rubrica':                { label: 'Rúbrica',                  icono: '📐', puedeAD: true  },
+  'rubrica-2':              { label: 'Rúbrica Mixta',             icono: '📋', puedeAD: true  },
+  'portafolio-evidencias':  { label: 'Portafolio Evidencias',   icono: '📁', puedeAD: false },
   'registro-anecdotico':   { label: 'Registro Anecdótico',  icono: '📋', puedeAD: false },
-  'escala-valoracion':    { label: 'Escala de Valoración',icono: '📊', puedeAD: false },
-  'nota-numerica':       { label: 'Nota Numérica',       icono: '🔢', puedeAD: false },
-  'desconocido':          { label: 'Desconocido',          icono: '❓', puedeAD: false },
+  'escala-valoracion':    { label: 'Escala de Valoración', icono: '📊', puedeAD: false },
+  'nota-numerica':       { label: 'Nota Numérica',        icono: '🔢', puedeAD: false },
 };
 
 function getTipoConfig(tipo: string) {
-  return TIPO_CONFIG[tipo] || TIPO_CONFIG['desconocido'];
+  return TIPO_CONFIG[tipo] || TIPO_CONFIG['lista-cotejo'];
 }
 
 // ── Escala ÚNICA para todos los instrumentos ──────────────────────────────────
@@ -48,7 +50,9 @@ interface Alumno {
 }
 
 interface ItemExamen {
-  correcta: string; // 'A'|'B'|'C'|'D'|'E'
+  correcta: string;
+  criterio?: string;
+  descriptores?: string[];
 }
 
 interface Columna {
@@ -68,12 +72,15 @@ interface Columna {
 interface Calificativo {
   alumnoId: string;
   columnaId: string;
-  marcados: boolean[];
+  marcados: any[]; // string[] para examen/claves, string[][] para instrumentos, boolean[] legacy
   claves?: string[];
   notaNumerica?: number; // solo para nota-numerica: 0-20
   calificativo: 'C' | 'B' | 'A' | 'AD';
   esAD: boolean;
   fecha: string;
+  // NUEVO: guardar el estado completo del instrumento para no perder notas/observaciones
+  items?: any[]; // items del instrumento (indicadores, criterios, etc.)
+  observaciones?: string[]; // observaciones por item
 }
 
 // ── Sin localStorage — todo va directo a Turso ────────────────────────────────
@@ -110,7 +117,7 @@ function PopupExamen({ alumno, columna, calActual, onGuardar, onCerrar }: {
   alumno: Alumno; columna: Columna; calActual?: Calificativo;
   onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
-  const items = columna.itemsExamen || Array(columna.totalItems).fill({ correcta: 'A' });
+  const items = Array.isArray(columna.itemsExamen) ? columna.itemsExamen : Array(columna.totalItems).fill({ correcta: 'A' });
   const [claves, setClaves] = useState<string[]>(() => calActual?.claves ?? Array(columna.totalItems).fill(''));
 
   const marcar = (i: number, letra: string) => {
@@ -125,8 +132,10 @@ function PopupExamen({ alumno, columna, calActual, onGuardar, onCerrar }: {
   const nomAlumno   = alumno.apellidos_nombres || alumno.nombre || '—';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-amber-600/50 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <>
+    <div className="fixed inset-0 z-50 bg-black/70" onClick={onCerrar} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-amber-600/50 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[92vh] flex flex-col pointer-events-auto">
 
         {/* Header con datos del alumno SIEMPRE visibles */}
         <div className="px-6 py-4 border-b border-slate-700 flex-shrink-0 bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-2xl">
@@ -204,7 +213,7 @@ function PopupExamen({ alumno, columna, calActual, onGuardar, onCerrar }: {
         {/* Resultado */}
         <div className="px-6 py-4 border-t border-slate-700 flex-shrink-0 space-y-3">
           <div className="flex items-center gap-4 bg-slate-700/50 rounded-xl p-3">
-            <div className={`w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black ${CAL_BG[calAuto]}`}>{calAuto}</div>
+            <div className={`w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black ${CAL_BG[calAuto]}`} translate="no">{calAuto}</div>
             <div className="flex-1">
               <p className="text-white font-bold">{CAL_LABEL[calAuto]}</p>
               <p className="text-slate-400 text-xs">{correctas}/{columna.totalItems} correctas = {pct}% · respondidas: {respondidas}</p>
@@ -223,6 +232,7 @@ function PopupExamen({ alumno, columna, calActual, onGuardar, onCerrar }: {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -262,8 +272,10 @@ function PopupNotaNumerica({ alumno, columna, calActual, onGuardar, onCerrar }: 
   const cal = getCalificativo(nota);
   
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-emerald-600/50 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+    <>
+    <div className="fixed inset-0 z-50 bg-black/70" onClick={onCerrar} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-emerald-600/50 rounded-2xl w-full max-w-md shadow-2xl pointer-events-auto">
         <div className="px-6 py-4 border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-2xl">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -296,9 +308,9 @@ function PopupNotaNumerica({ alumno, columna, calActual, onGuardar, onCerrar }: 
         </div>
         
         <div className="px-6 py-4 border-t border-slate-700 flex items-center gap-4 bg-slate-700/50">
-          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[cal]}`}>{cal}</div>
+          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[cal]}`} translate="no">{cal}</div>
           <div className="flex-1">
-            <p className="text-white font-bold">{CAL_LABEL[cal]}</p>
+            <p className="text-white font-bold" translate="no">{CAL_LABEL[cal]}</p>
             <p className="text-slate-400 text-xs mt-0.5">18-20=A · 14-17=B · 11-13=C · 0-10=C</p>
           </div>
         </div>
@@ -312,6 +324,7 @@ function PopupNotaNumerica({ alumno, columna, calActual, onGuardar, onCerrar }: 
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -377,8 +390,10 @@ function PopupInstrumento({ alumno, columna, calActual, onGuardar, onCerrar }: {
   const colsLabel = getColumnas();
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-cyan-600/50 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <>
+    <div className="fixed inset-0 z-50 bg-black/70" onClick={onCerrar} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-cyan-600/50 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto pointer-events-auto">
 
         <div className="px-6 py-4 border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-2xl sticky top-0 z-10">
           <div className="flex items-start justify-between gap-4">
@@ -470,176 +485,462 @@ function PopupInstrumento({ alumno, columna, calActual, onGuardar, onCerrar }: {
         )}
 
         <div className="px-6 py-4 border-t border-slate-700 flex items-center gap-4 bg-slate-700/50 sticky bottom-0">
-          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[cal]}`}>{cal}</div>
+          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[cal]}`} translate="no">{cal}</div>
           <div className="flex-1">
-            <p className="text-white font-bold">{CAL_LABEL[cal]}</p>
+            <p className="text-white font-bold" translate="no">{CAL_LABEL[cal]}</p>
             <p className="text-slate-400 text-xs mt-0.5">100%=A · 99–55%=B · ≤54%=C</p>
           </div>
         </div>
 
         <div className="px-6 py-4 border-t border-slate-700 flex gap-3">
-          <button onClick={() => onGuardar({ alumnoId: (alumno as any).id, columnaId: columna.id, marcados: items.map(i => i.respuestas), calificativo: cal, esAD: false, fecha: new Date().toISOString().split('T')[0] })}
+          <button onClick={() => onGuardar({
+              alumnoId: (alumno as any).id,
+              columnaId: columna.id,
+              marcados: items.map(i => i.respuestas),
+              calificativo: cal,
+              esAD: false,
+              fecha: new Date().toISOString().split('T')[0],
+              items: items.map(i => ({ indicador: i.indicador, respuestas: i.respuestas })),
+              observaciones: items.map(i => i.observaciones || ''),
+            })}
             className="flex-1 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
             <Save size={15}/> Guardar
           </button>
-          <button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
+<button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pop-up RÚBRICA con estructura C/B/A/AD
+// Rúbrica Mixta types & helpers
 // ─────────────────────────────────────────────────────────────────────────────
-interface ItemRubrica {
+interface ItemRubrica2Row {
   criterio: string;
-  respuestas: string[];
+  clave: string;
+  tipo: 'alternativa' | 'descriptor';
+  respuesta: string;
+  nivel: string;
+  descriptores: string[];
 }
 
-function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
+const RUB2_LEVELS = ['C', 'B', 'A', 'AD'] as const;
+const RUB2_LEVEL_LABELS: Record<string, string> = { C: 'INICIO', B: 'PROCESO', A: 'LOGRO', AD: 'LOGRO DESTACADO' };
+const RUB2_CELL_COLORS: Record<string, string> = {
+  C: 'bg-red-500 border-red-400 text-white',
+  B: 'bg-amber-500 border-amber-400 text-white',
+  A: 'bg-emerald-500 border-emerald-400 text-white',
+  AD: 'bg-blue-500 border-blue-400 text-white',
+};
+
+function calcularCalRubrica2(rows: ItemRubrica2Row[]): { calificativo: 'C'|'B'|'A'|'AD'; pctAlt: number; baseAlt: 'C'|'B'|'A'; rubAvg: number; hasAD: boolean; allAnswered: boolean } {
+  const altRows = rows.filter(r => r.tipo === 'alternativa');
+  const descRows = rows.filter(r => r.tipo === 'descriptor');
+  const altTotalConClave = altRows.filter(r => r.clave && r.clave.trim() !== '').length;
+  const altCorrectas = altRows.filter(r => r.clave && r.respuesta === r.clave).length;
+  const altRespondidas = altRows.filter(r => r.respuesta).length;
+  const altTodasCorrectas = altTotalConClave > 0 && altCorrectas === altTotalConClave && altRespondidas === altTotalConClave;
+  const pctAlt = altTotalConClave > 0 ? altCorrectas / altTotalConClave : 0;
+  const sinAlternativas = altTotalConClave === 0;
+  const sinRubrica = descRows.length === 0;
+  const allAnswered = altRows.every(r => r.respuesta) && descRows.every(r => r.nivel);
+
+  const descPcts = descRows.map(r => {
+    const n = r.nivel;
+    return n === 'AD' ? 4 : n === 'A' ? 3 : n === 'B' ? 2 : n === 'C' ? 1 : 0;
+  });
+  const rubAvg = descPcts.length > 0 ? descPcts.reduce((a, b) => a + b, 0) / descPcts.length : 0;
+  const hasAD = descPcts.some(p => p === 4);
+
+  // baseAlt = calificativo basado solo en alternativas
+  let baseAlt: 'C'|'B'|'A' = 'C';
+  if (sinAlternativas || altTotalConClave === 0) baseAlt = 'C';
+  else if (pctAlt >= 0.75) baseAlt = 'A';
+  else if (pctAlt >= 0.45) baseAlt = 'B';
+
+  if (sinAlternativas && sinRubrica) return { calificativo: 'C', pctAlt: 0, baseAlt: 'C', rubAvg: 0, hasAD: false, allAnswered };
+
+  // Solo alternativas (sin descriptores)
+  if (sinRubrica) {
+    if (altTodasCorrectas) return { calificativo: 'A', pctAlt, baseAlt: 'A', rubAvg: 0, hasAD: false, allAnswered };
+    if (pctAlt >= 0.9) return { calificativo: 'A', pctAlt, baseAlt: 'A', rubAvg: 0, hasAD: false, allAnswered };
+    if (pctAlt >= 0.55) return { calificativo: 'B', pctAlt, baseAlt: 'B', rubAvg: 0, hasAD: false, allAnswered };
+    return { calificativo: 'C', pctAlt, baseAlt: 'C', rubAvg: 0, hasAD: false, allAnswered };
+  }
+
+  // Solo descriptores (sin alternativas)
+  if (sinAlternativas) {
+    if (allAnswered && hasAD) return { calificativo: 'AD', pctAlt, baseAlt: 'C', rubAvg, hasAD, allAnswered };
+    if (allAnswered && rubAvg >= 3) return { calificativo: 'A', pctAlt, baseAlt: 'C', rubAvg, hasAD, allAnswered };
+    if (allAnswered && rubAvg >= 2) return { calificativo: 'B', pctAlt, baseAlt: 'C', rubAvg, hasAD, allAnswered };
+    if (allAnswered) return { calificativo: 'C', pctAlt, baseAlt: 'C', rubAvg, hasAD, allAnswered };
+    return { calificativo: 'C', pctAlt: 0, baseAlt: 'C', rubAvg, hasAD, allAnswered };
+  }
+
+  // Mixto: alternativas + descriptores
+  // Si TODAS las alternativas están correctas (base A) y al menos un descriptor es AD → calificativo AD
+  if (altTodasCorrectas && hasAD) return { calificativo: 'AD', pctAlt, baseAlt: 'A', rubAvg, hasAD, allAnswered };
+  if (altTodasCorrectas && rubAvg >= 3) return { calificativo: 'A', pctAlt, baseAlt: 'A', rubAvg, hasAD, allAnswered };
+  if (altTodasCorrectas && rubAvg >= 2) return { calificativo: 'A', pctAlt, baseAlt: 'A', rubAvg, hasAD, allAnswered };
+  if (altTodasCorrectas) return { calificativo: 'A', pctAlt, baseAlt: 'A', rubAvg, hasAD, allAnswered };
+
+  // baseAlt A (>=75%) con descriptores
+  if (baseAlt === 'A' && hasAD) return { calificativo: 'AD', pctAlt, baseAlt, rubAvg, hasAD, allAnswered };
+  if (baseAlt === 'A' && rubAvg >= 3) return { calificativo: 'A', pctAlt, baseAlt, rubAvg, hasAD, allAnswered };
+  if (baseAlt === 'A') return { calificativo: 'A', pctAlt, baseAlt, rubAvg, hasAD, allAnswered };
+
+  // baseAlt B (45-74%) con descriptores
+  if (baseAlt === 'B' && hasAD) return { calificativo: 'A', pctAlt, baseAlt, rubAvg, hasAD, allAnswered };
+  if (baseAlt === 'B') return { calificativo: 'B', pctAlt, baseAlt, rubAvg, hasAD, allAnswered };
+
+  return { calificativo: 'C', pctAlt, baseAlt: 'C', rubAvg, hasAD, allAnswered };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pop-up RÚBRICA MIXTA — estilo examen: alternativas + descriptores
+// ─────────────────────────────────────────────────────────────────────────────
+function PopupRubrica2({ alumno, columna, calActual, onGuardar, onCerrar }: {
   alumno: Alumno; columna: Columna; calActual?: Calificativo;
   onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
-  const inicialItems = (): ItemRubrica[] => {
-    if (calActual?.items?.length) return calActual.items;
-    return Array(columna.totalItems).fill(null).map((_, i) => ({
-      criterio: `Criterio ${i + 1}`,
-      respuestas: ['', '', '', '']
+  const itemsConfig = Array.isArray(columna.itemsExamen) ? columna.itemsExamen : [];
+  const ALT_LETRAS = ['A', 'B', 'C', 'D'] as const;
+
+  const altItems = itemsConfig.filter((it: any) => it.tipo === 'alternativa');
+  const descItems = itemsConfig.filter((it: any) => it.tipo === 'descriptor');
+
+  const initRows = (): ItemRubrica2Row[] => {
+    const num = itemsConfig.length || columna.totalItems || 2;
+    if (calActual?.items?.length) {
+      return calActual.items.map((it: any, idx: number) => {
+        const cfg = itemsConfig[idx] || {};
+        const tipo = (cfg.tipo as 'alternativa' | 'descriptor') || (cfg.correcta && cfg.correcta.trim() ? 'alternativa' : 'descriptor');
+        return {
+          criterio: it.criterio || cfg.criterio || '',
+          clave: it.clave || it.correcta || cfg.correcta || '',
+          tipo,
+          respuesta: it.respuesta || '',
+          nivel: it.nivel || '',
+          descriptores: cfg.descriptores?.length === 4 ? [...cfg.descriptores] : Array(4).fill('') as string[],
+        };
+      });
+    }
+    if (itemsConfig.length > 0) {
+      return itemsConfig.map((cfg: any) => ({
+        criterio: cfg.criterio || '',
+        clave: cfg.correcta || '',
+        tipo: (cfg.tipo as 'alternativa' | 'descriptor') || (cfg.correcta && cfg.correcta.trim() ? 'alternativa' : 'descriptor'),
+        respuesta: '',
+        nivel: '',
+        descriptores: (cfg.descriptores?.length === 4 ? [...cfg.descriptores] : Array(4).fill('')) as string[],
+      }));
+    }
+    return Array(num).fill(null).map((_, i) => ({
+      criterio: `Ítem ${i + 1}`,
+      clave: '',
+      tipo: 'alternativa' as const,
+      respuesta: '',
+      nivel: '',
+      descriptores: Array(4).fill('') as string[],
     }));
   };
-  
-  const [items, setItems] = useState<ItemRubrica[]>(inicialItems);
+
+  const [rows, setRows] = useState<ItemRubrica2Row[]>(initRows);
   const [esAD, setEsAD] = useState(calActual?.esAD ?? false);
-  const colsLabel = ['C', 'B', 'A', 'AD'];
-
-  const marcar = (i: number, colIdx: number, valor: string) => {
-    const n = [...items];
-    n[i].respuestas[colIdx] = n[i].respuestas[colIdx] === valor ? '' : valor;
-    setItems(n);
-  };
-
-  const calcularCal = (): 'C' | 'B' | 'A' | 'AD' => {
-    let suma = 0, count = 0;
-    items.forEach(item => {
-      const adIdx = item.respuestas.indexOf('AD');
-      const aIdx = item.respuestas.indexOf('A');
-      const bIdx = item.respuestas.indexOf('B');
-      const cIdx = item.respuestas.indexOf('C');
-      if (adIdx >= 0) { suma += 4; count++; }
-      else if (aIdx >= 0) { suma += 3; count++; }
-      else if (bIdx >= 0) { suma += 2; count++; }
-      else if (cIdx >= 0) { suma += 1; count++; }
-    });
-    if (count === 0) return 'C';
-    const prom = Math.round(suma / count);
-    const labels: Record<number, string> = { 1: 'C', 2: 'B', 3: 'A', 4: 'AD' };
-    return labels[Math.min(4, Math.max(1, prom))] as 'C' | 'B' | 'A' | 'AD';
-  };
-  
-  const calAuto = calcularCal();
-  const calFinal: 'C'|'B'|'A'|'AD' = esAD && calAuto === 'A' ? 'AD' : calAuto;
   const nomAlumno = alumno.apellidos_nombres || alumno.nombre || '—';
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-slate-800 border border-purple-500/30 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+  const altRows = rows.filter(r => r.tipo === 'alternativa');
+  const descRows = rows.filter(r => r.tipo === 'descriptor');
 
-        <div className="px-6 py-4 border-b border-slate-700 bg-slate-700/40 rounded-t-2xl sticky top-0 z-10">
+  const marcarAlt = (rowIdx: number, letra: string) => {
+    setRows(prev => {
+      const n = [...prev];
+      n[rowIdx] = { ...n[rowIdx], respuesta: n[rowIdx].respuesta === letra ? '' : letra };
+      return n;
+    });
+  };
+
+  const marcarNivel = (rowIdx: number, nivel: string) => {
+    setRows(prev => {
+      const n = [...prev];
+      n[rowIdx] = { ...n[rowIdx], nivel: n[rowIdx].nivel === nivel ? '' : nivel };
+      return n;
+    });
+  };
+
+  const resultado = calcularCalRubrica2(rows);
+  const altCorrectas = altRows.filter(r => r.clave && r.respuesta === r.clave).length;
+  const altTotalConClave = altRows.filter(r => r.clave && r.clave.trim() !== '').length;
+  const pctAlt = altTotalConClave > 0 ? Math.round(altCorrectas / altTotalConClave * 100) : 0;
+  const calFinal: 'C'|'B'|'A'|'AD' = esAD && resultado.calificativo === 'A' ? 'AD' : resultado.calificativo;
+
+  return (
+    <>
+    <div className="fixed inset-0 z-50 bg-black/70" onClick={onCerrar} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-4xl shadow-2xl max-h-[92vh] flex flex-col pointer-events-auto">
+
+        <div className="px-6 py-4 border-b border-slate-700 flex-shrink-0 bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-2xl">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-white font-black text-base">{nomAlumno}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
+              <p className="text-white font-black text-base" translate="no">{nomAlumno}</p>
+              <p className="text-slate-300 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="px-2 py-1 bg-purple-500/20 border border-purple-500/40 text-purple-300 rounded-lg text-xs font-bold">📐 {columna.nombre}</span>
-                <span className="text-xs text-slate-500">Rúbrica · {items.length} criterios</span>
-                {calAuto === 'A' && <span className="text-xs text-blue-400 font-semibold">⭐ Puede AD</span>}
+                <span className="px-3 py-1.5 bg-purple-800 border border-purple-500/40 text-purple-200 rounded-lg text-xs font-bold">📋 {columna.nombre}</span>
+                <span className="text-xs text-slate-500">Rúbrica Mixta · {rows.length} ítems</span>
+                {altTotalConClave > 0 && <span className="text-xs text-green-400" translate="no">Alt: {altCorrectas}/{altTotalConClave} ({pctAlt}%)</span>}
               </div>
             </div>
             <button onClick={onCerrar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 flex-shrink-0"><X size={18}/></button>
           </div>
         </div>
 
-        <div className="px-6 py-4 space-y-3">
-          <div className="overflow-x-auto">
+        <div className="flex-1 overflow-y-auto px-6 py-3 space-y-4">
+          {/* SECCIÓN 1: Alternativas */}
+          {altRows.length > 0 && (
+          <div>
+            <h4 className="text-xs text-amber-400 font-bold uppercase tracking-wider mb-2">Alternativas — marca la respuesta del alumno</h4>
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-600">
-                  <th className="text-left py-2 px-2 text-slate-400">#</th>
-                  <th className="text-left py-2 px-2 text-slate-400 min-w-[200px]">Criterio</th>
-                  <th className="text-center py-2 px-2 text-red-400">C (Inicio)</th>
-                  <th className="text-center py-2 px-2 text-yellow-400">B (Proceso)</th>
-                  <th className="text-center py-2 px-2 text-green-400">A (Logro)</th>
-                  <th className="text-center py-2 px-2 text-blue-400">AD (Destacado)</th>
+                  <th className="text-left py-2 pr-3 font-semibold w-6 text-slate-400">#</th>
+                  <th className="text-left py-2 font-semibold text-slate-400 min-w-[100px]">Criterio</th>
+                  <th className="text-center py-2 font-semibold text-green-400 w-10">Clave</th>
+                  {ALT_LETRAS.map(l => <th key={l} className="text-center py-2 font-semibold w-9 text-slate-300" translate="no">{l}</th>)}
+                  <th className="text-center py-2 w-8">✓✗</th>
                 </tr>
               </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={i} className="border-b border-slate-700/40">
-                    <td className="py-2 px-2 text-slate-500">{i + 1}</td>
-                    <td className="py-2 px-2">
-                      <input 
-                        type="text" 
-                        value={item.criterio}
-                        onChange={(e) => {
-                          const n = [...items];
-                          n[i].criterio = e.target.value;
-                          setItems(n);
-                        }}
-                        className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs"
-                      />
-                    </td>
-                    {item.respuestas.map((resp, j) => (
-                      <td key={j} className="text-center py-2 px-1">
-                        <button
-                          onClick={() => marcar(i, j, colsLabel[j])}
-                          className={`w-10 h-8 rounded font-bold text-xs transition-all ${
-                            resp === colsLabel[j] 
-                              ? CAL_BG[colsLabel[j]].replace('25', '50').replace('text-', 'text-white bg-')
-                              : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'
-                          }`}
-                        >
-                          {colsLabel[j]}
-                        </button>
+              <tbody className="divide-y divide-slate-700/40">
+                {altRows.map((row, idx) => {
+                  const i = rows.indexOf(row);
+                  const tieneClave = row.clave && row.clave.trim() !== '';
+                  const esCorr = tieneClave && row.respuesta === row.clave;
+                  const esErr = tieneClave && row.respuesta && row.respuesta !== row.clave;
+                  return (
+                    <tr key={i} className="hover:bg-slate-700/20">
+                      <td className="py-1.5 pr-2 text-slate-400 font-bold">{idx + 1}</td>
+                      <td className="py-1.5 text-white text-xs font-medium">{row.criterio || `Ítem ${i + 1}`}</td>
+                      <td className="py-1.5 text-center">
+                        {tieneClave ? (
+                          <span className={`inline-flex w-7 h-7 rounded-full font-black text-xs items-center justify-center ${esCorr ? 'bg-green-500/20 border border-green-500/50 text-green-300' : esErr ? 'bg-red-500/20 border border-red-500/50 text-red-300' : 'bg-slate-600 border border-slate-500 text-slate-400'}`} translate="no">{row.clave}</span>
+                        ) : (
+                          <span className="text-slate-600 text-xs">—</span>
+                        )}
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      {ALT_LETRAS.map(l => {
+                        const esElegida = row.respuesta === l;
+                        const esCorrectaBtn = tieneClave && l === row.clave;
+                        return (
+                          <td key={l} className="py-1 text-center">
+                            <button onClick={() => marcarAlt(i, l)}
+                              className={`w-8 h-8 rounded-lg font-bold text-xs transition-all border-2 ${
+                                esElegida && esCorrectaBtn   ? 'bg-green-500 border-green-400 text-white shadow shadow-green-500/30'
+                              : esElegida && !esCorrectaBtn  ? 'bg-red-500 border-red-400 text-white shadow shadow-red-500/30'
+                              : esCorrectaBtn && row.respuesta !== '' ? 'bg-green-500/15 border-green-500/30 text-green-500'
+                              : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-white'
+                              }`} translate="no">
+                              {l}
+                            </button>
+                          </td>
+                        );
+                      })}
+                      <td className="py-1.5 text-center font-black">
+                        {esCorr && <span className="text-green-400">✓</span>}
+                        {esErr && <span className="text-red-400">✗</span>}
+                        {!row.respuesta && <span className="text-slate-600">—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          
-          <button 
-            onClick={() => setItems([...items, { criterio: `Criterio ${items.length + 1}`, respuestas: ['', '', '', ''] }])}
-            className="text-xs text-purple-400 hover:underline"
-          >
-            + Agregar criterio
-          </button>
-        </div>
+          )}
 
-        <div className="px-6 py-4 border-t border-slate-700 flex items-center gap-4 bg-slate-700/50 sticky bottom-0">
-          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[calFinal]}`}>{calFinal}</div>
-          <div className="flex-1">
-            <p className="text-white font-bold">{CAL_LABEL[calFinal]}</p>
-            <p className="text-slate-400 text-xs mt-0.5">Promedio automático</p>
+          {/* SECCIÓN 2: Descriptores */}
+          {descRows.length > 0 && (
+          <div>
+            <h4 className="text-xs text-purple-400 font-bold uppercase tracking-wider mb-2">Descriptores — marca el nivel alcanzado</h4>
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-600">
+                  <th className="text-left py-2 pr-2 font-semibold w-6 text-slate-400">#</th>
+                  <th className="text-left py-2 font-semibold text-slate-400 min-w-[100px]">Criterio</th>
+                  {RUB2_LEVELS.map(nivel => (
+                    <th key={nivel} className="text-center py-2 font-semibold w-[120px]">
+                      <div className={`font-black text-xs ${nivel === 'AD' ? 'text-blue-400' : nivel === 'A' ? 'text-emerald-400' : nivel === 'B' ? 'text-amber-400' : 'text-red-400'}`} translate="no">{nivel}</div>
+                      <div className="text-[9px] text-slate-500">{RUB2_LEVEL_LABELS[nivel]}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/40">
+                {descRows.map((row, idx) => {
+                  const i = rows.indexOf(row);
+                  const configDesc = itemsConfig[i]?.descriptores?.length === 4 ? [...itemsConfig[i].descriptores] : row.descriptores;
+                  return (
+                    <tr key={i} className="hover:bg-slate-700/20">
+                      <td className="py-1.5 pr-2 text-slate-400 font-bold">{idx + 1}</td>
+                      <td className="py-1.5 text-white text-xs font-medium">{row.criterio || `Ítem ${i + 1}`}</td>
+                      {RUB2_LEVELS.map((nivel, ni) => {
+                        const selected = row.nivel === nivel;
+                        const desc = configDesc[ni] || '';
+                        return (
+                          <td key={nivel} className="py-1.5 text-center">
+                            <button onClick={() => marcarNivel(i, nivel)}
+                              className={`w-full py-2 rounded-lg border-2 text-xs font-bold transition-all ${selected ? RUB2_CELL_COLORS[nivel] : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-400'}`} translate="no">
+                              {nivel}
+                            </button>
+                            {desc && <div className="text-[9px] text-slate-400 leading-tight mt-0.5">{desc}</div>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          {calAuto === 'A' && (
-            <button onClick={() => setEsAD(v => !v)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${esAD ? 'bg-blue-500/30 border-blue-400 text-blue-200' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-blue-500'}`}>
-              ⭐ AD
-            </button>
           )}
         </div>
 
+        <div className="px-6 py-4 border-t border-slate-700 flex-shrink-0 space-y-3">
+          <div className="flex items-center gap-4 bg-slate-700/50 rounded-xl p-3">
+            <div className={`w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black ${CAL_BG[calFinal]}`} translate="no">{calFinal}</div>
+            <div className="flex-1">
+              <p className="text-white font-bold" translate="no">{CAL_LABEL[calFinal]}</p>
+              <p className="text-slate-400 text-xs mt-0.5" translate="no">
+                {altTotalConClave > 0 ? `Alt: ${altCorrectas}/${altTotalConClave} (${pctAlt}%) · ` : ''}Rúbrica: {resultado.rubAvg > 0 ? resultado.rubAvg.toFixed(1) : '—'}
+                {resultado.hasAD ? ' · ⭐ AD' : ''}
+              </p>
+            </div>
+            {resultado.calificativo === 'A' && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={esAD} onChange={e => setEsAD(e.target.checked)} className="w-4 h-4 rounded border-slate-500 text-purple-500" />
+                <span className="text-xs text-purple-300 font-bold">AD global</span>
+              </label>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => onGuardar({
+              alumnoId: (alumno as any).id,
+              columnaId: columna.id,
+              marcados: rows.map(r => r.respuesta || ''),
+              claves: rows.map(r => r.clave),
+              calificativo: calFinal,
+              esAD: calFinal === 'AD',
+              fecha: new Date().toISOString().split('T')[0],
+              items: rows.map(r => ({ criterio: r.criterio, clave: r.clave, respuesta: r.respuesta, nivel: r.nivel, descriptores: r.descriptores })),
+            })}
+              className="flex-1 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
+              <Save size={15}/> Guardar
+            </button>
+            <button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pop-up RÚBRICA con estructura C/B/A/AD
+// ─────────────────────────────────────────────────────────────────────────────
+function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
+  alumno: Alumno; columna: Columna; calActual?: Calificativo;
+  onGuardar: (c: Calificativo) => void; onCerrar: () => void;
+}) {
+  const cols = (columna.columnasEval?.length ? columna.columnasEval : ['C', 'B', 'A', 'AD']) as string[];
+  const items = Array.isArray(columna.itemsExamen) ? columna.itemsExamen : [];
+  const initResp = (): string[] => {
+    if (calActual?.items?.length) return calActual.items.map((it: any) => it.respuesta || '');
+    return Array(items.length || columna.totalItems || cols.length).fill('');
+  };
+  const [respuestas, setRespuestas] = useState<string[]>(initResp);
+  const [esAD, setEsAD] = useState(calActual?.esAD ?? false);
+
+  const getCal = (): 'C'|'B'|'A'|'AD' => {
+    const answered = respuestas.filter(r => r !== '');
+    if (answered.length === 0) return 'C';
+    const maxIdx = respuestas.reduce((max, r, i) => {
+      const idx = cols.indexOf(r);
+      return idx > max ? idx : max;
+    }, -1);
+    const base = cols[maxIdx] || 'C';
+    if (esAD && base === 'A') return 'AD';
+    return base as 'C'|'B'|'A'|'AD';
+  };
+  const cal = getCal();
+  const nomAlumno = alumno.apellidos_nombres || alumno.nombre || '—';
+
+  return (
+    <>
+    <div className="fixed inset-0 z-50 bg-black/70" onClick={onCerrar} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="bg-slate-800 border border-indigo-500/30 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col pointer-events-auto">
+        <div className="px-6 py-4 border-b border-slate-700 flex-shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-white font-bold text-base" translate="no">{nomAlumno}</p>
+              <p className="text-slate-300 text-xs">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
+              <span className="text-xs text-green-400">📋 {columna.nombre}</span>
+            </div>
+            <button onClick={onCerrar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400"><X size={18}/></button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-3">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b border-slate-600">
+                <th className="text-left py-2 text-slate-400">#</th>
+                <th className="text-left py-2 text-slate-400">Indicador</th>
+                {cols.map(c => <th key={c} className="text-center py-2 text-slate-300" translate="no">{c}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {(items.length > 0 ? items : Array(columna.totalItems || cols.length).fill({ indicador: '' })).map((item: any, i: number) => (
+                <tr key={i} className="border-b border-slate-700/50 hover:bg-slate-700/20">
+                  <td className="py-2 text-slate-400 font-bold">{i + 1}</td>
+                  <td className="py-2 text-white text-xs">{item.indicador || item.criterio || `Ítem ${i + 1}`}</td>
+                  {cols.map(c => (
+                    <td key={c} className="text-center py-2">
+                      <button onClick={() => { const n = [...respuestas]; n[i] = n[i] === c ? '' : c; setRespuestas(n); }}
+                        className={`w-10 h-10 rounded-lg font-bold text-sm transition-all border-2 ${respuestas[i] === c ? CAL_BG[c] + ' border-current shadow-lg' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-400'}`} translate="no">
+                        {c}
+                      </button>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <div className="px-6 py-4 border-t border-slate-700 flex gap-3">
-          <button onClick={() => onGuardar({ alumnoId: (alumno as any).id, columnaId: columna.id, marcados: items.map(i => i.respuestas), calificativo: calFinal, esAD, fecha: new Date().toISOString().split('T')[0] })}
-            className="flex-1 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
+          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[cal]}`} translate="no">{cal}</div>
+          <div className="flex-1">
+            <p className="text-white font-bold" translate="no">{CAL_LABEL[cal]}</p>
+            {cal === 'A' && (
+              <label className="flex items-center gap-2 cursor-pointer mt-1">
+                <input type="checkbox" checked={esAD} onChange={e => setEsAD(e.target.checked)} className="w-4 h-4 rounded border-slate-500 text-purple-500" />
+                <span className="text-xs text-purple-300 font-bold">⭐ AD global</span>
+              </label>
+            )}
+          </div>
+          <button onClick={() => onGuardar({
+            alumnoId: (alumno as any).id, columnaId: columna.id, marcados: respuestas, claves: [], calificativo: cal, esAD: cal === 'AD', fecha: new Date().toISOString().split('T')[0],
+            items: respuestas.map((r, i) => ({ indicador: items[i]?.indicador || items[i]?.criterio || `Ítem ${i + 1}`, respuesta: r })),
+          })}
+            className="flex-1 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
             <Save size={15}/> Guardar
           </button>
           <button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -649,34 +950,75 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
 function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres: bimestresProps }: {
   columnaEditar?: Columna; onGuardar: (c: Columna) => void; onCerrar: () => void; userEmail?: string; bimestres?: any[];
 }) {
-  const [nombre,    setNombre]    = useState(columnaEditar?.nombre ?? '');
-  const [tipo,      setTipo]      = useState<TipoInstrumento>(columnaEditar?.tipo ?? 'lista-cotejo');
-  const [total,     setTotal]     = useState(columnaEditar?.totalItems ?? 10);
-  const [compId,    setCompId]    = useState(columnaEditar?.competenciaId ?? 'comp1');
-  const [bimestreId, setBimestreId] = useState(columnaEditar?.bimestreId ?? '');
-  const [promediar, setPromediar] = useState(columnaEditar?.promediar ?? true);
-  const [correctas, setCorrectas] = useState<string[]>(() =>
-    columnaEditar?.itemsExamen ? columnaEditar.itemsExamen.map(i => i.correcta) : Array(columnaEditar?.totalItems ?? 10).fill('A')
-  );
-  const [nuevasColumnasEval, setNuevasColumnasEval] = useState<string>(() => {
-    if (columnaEditar?.columnasEval) return columnaEditar.columnasEval.join(', ');
-    if (tipo === 'lista-cotejo') return 'Sí,No';
-    if (tipo === 'ficha-observacion') return 'Logrado,Parcial,No Logrado';
-    if (tipo === 'rubrica') return 'C,B,A,AD';
-    if (tipo === 'portafolio-evidencias') return 'Presentó,No Presentó';
-    if (tipo === 'registro-anecdotico') return 'Positivo,Negativo';
-    return 'Siempre,Casi siempre,A veces,Rara vez,Nunca';
-  });
+  const [nombre,    setNombre]    = useState('');
+  const [tipo,      setTipo]      = useState<TipoInstrumento>('lista-cotejo');
+  const [total,     setTotal]     = useState(10);
+  const [compId,    setCompId]    = useState('comp1');
+  const [bimestreId, setBimestreId] = useState('');
+  const [promediar, setPromediar] = useState(true);
+  const [correctas, setCorrectas] = useState<string[]>(Array(10).fill('A'));
+  const [nuevasColumnasEval, setNuevasColumnasEval] = useState<string>('Sí,No');
+  const [rub2Rows, setRub2Rows] = useState<ItemRubrica2Row[]>([]);
   const unidades = bimestresProps || [];
+
+  // Resetear todo cuando cambia la columna a editar (evita que datos de un instrumento "contaminen" a otro)
+  useEffect(() => {
+    const t = columnaEditar?.tipo ?? 'lista-cotejo';
+    const tot = columnaEditar?.totalItems ?? 10;
+    const arr = Array.isArray(columnaEditar?.itemsExamen) ? columnaEditar.itemsExamen : [];
+    setNombre(columnaEditar?.nombre ?? '');
+    setTipo(t);
+    setTotal(tot);
+    setCompId(columnaEditar?.competenciaId ?? 'comp1');
+    setBimestreId(columnaEditar?.bimestreId ?? '');
+    setPromediar(columnaEditar?.promediar ?? true);
+    setCorrectas(arr.length > 0 ? arr.map(i => i.correcta) : Array(tot).fill('A'));
+    setNuevasColumnasEval(
+      columnaEditar?.columnasEval ? columnaEditar.columnasEval.join(', ')
+      : t === 'lista-cotejo' ? 'Sí,No'
+      : t === 'ficha-observacion' ? 'Logrado,Parcial,No Logrado'
+      : t === 'rubrica' ? 'C,B,A,AD'
+      : t === 'rubrica-2' ? 'C,B,A,AD'
+      : t === 'portafolio-evidencias' ? 'Presentó,No Presentó'
+      : t === 'registro-anecdotico' ? 'Positivo,Negativo'
+      : 'Siempre,Casi siempre,A veces,Rara vez,Nunca'
+    );
+    if (t === 'rubrica-2' && arr.length > 0) {
+      setRub2Rows(arr.map(i => ({
+        criterio: i.criterio || '',
+        clave: i.correcta || '',
+        tipo: (i.tipo as 'alternativa' | 'descriptor') || (i.correcta && i.correcta.trim() ? 'alternativa' : 'descriptor'),
+        respuesta: '',
+        nivel: '',
+        descriptores: i.descriptores?.length === 4 ? [...(i.descriptores as string[])] : Array(4).fill(''),
+      })));
+    } else if (t === 'rubrica-2') {
+      setRub2Rows(Array(tot).fill(null).map((_, i) => ({
+        criterio: `Pregunta ${i + 1}`, clave: 'A', tipo: 'alternativa' as const, respuesta: '', nivel: '', descriptores: Array(4).fill('') as string[],
+      })));
+    }
+  }, [columnaEditar?.id]);
 
   const ajustarTotal = (n: number) => {
     setTotal(n);
     setCorrectas(prev => n > prev.length ? [...prev, ...Array(n - prev.length).fill('A')] : prev.slice(0, n));
+    setRub2Rows(prev => {
+      if (n > prev.length) return [...prev, ...Array(n - prev.length).fill(null).map((_, i) => ({ criterio: `Pregunta ${prev.length + i + 1}`, clave: 'A', tipo: 'alternativa' as const, respuesta: '', nivel: '', descriptores: Array(4).fill('') as string[] }))];
+      return prev.slice(0, n);
+    });
   };
 
+  const [error, setError] = useState('');
+
   const guardar = () => {
-    if (!nombre.trim()) return;
-    const itemsExamen = tipo === 'examen' ? correctas.map(c => ({ correcta: c })) : undefined;
+    if (!nombre.trim()) {
+      setError('El nombre es obligatorio');
+      return;
+    }
+    setError('');
+    const itemsExamen = tipo === 'examen' ? correctas.map(c => ({ correcta: c }))
+      : tipo === 'rubrica-2' ? rub2Rows.map(r => ({ correcta: r.clave || '', tipo: r.tipo, criterio: r.criterio, descriptores: r.tipo === 'descriptor' ? r.descriptores : undefined }))
+      : undefined;
     const cols = nuevasColumnasEval.split(',').map(c => c.trim()).filter(c => c);
     onGuardar({ id: columnaEditar?.id ?? 'col-' + Date.now(), nombre: nombre.trim(), tipo, totalItems: total, competenciaId: compId, bimestreId: bimestreId || undefined, promediar, itemsExamen, columnasEval: cols.length > 0 ? cols : undefined, creatorId: userEmail || 'admin' });
   };
@@ -684,8 +1026,10 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
   const inp = "w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-500";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCerrar}>
-      <div className="bg-slate-800 border border-indigo-500/30 rounded-2xl w-full max-w-lg max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <>
+    <div className="fixed inset-0 z-50 bg-black/70" onClick={onCerrar} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="bg-slate-800 border border-indigo-500/30 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col pointer-events-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 flex-shrink-0">
           <h3 className="text-white font-bold text-lg">{columnaEditar ? '✏️ Editar columna' : '➕ Nueva columna'}</h3>
           <button onClick={onCerrar}><X size={18} className="text-slate-400"/></button>
@@ -813,8 +1157,122 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
               </div>
             </div>
           )}
+
+          {/* Configuración de Rúbrica Mixta (rubrica-2) — dos secciones separadas */}
+          {tipo === 'rubrica-2' && (
+            <div className="space-y-5">
+              {/* SECCIÓN ALTERNATIVAS */}
+              <div>
+                <label className="block text-xs text-amber-400 font-bold uppercase tracking-wider mb-1">
+                  Alternativas (A/B/C/D)
+                </label>
+                <p className="text-xs text-slate-500 mb-2">Configura las preguntas con clave correcta. El alumno marca su alternativa y se compara con la clave.</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[500px]">
+                    <thead className="sticky top-0 bg-slate-800 z-10">
+                      <tr className="border-b border-slate-600">
+                        <th className="text-left py-2 px-1 text-slate-400 w-6">#</th>
+                        <th className="text-left py-2 px-1 text-slate-400 min-w-[140px]">Pregunta / Criterio</th>
+                        <th className="text-center py-2 px-1 text-green-400 w-10">Clave</th>
+                        <th className="text-center py-2 px-1 text-slate-400 w-8" colSpan={4}>Alternativas</th>
+                        <th className="text-center py-2 px-1 w-6"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/40">
+                      {rub2Rows.filter(r => r.tipo === 'alternativa').map((row, idx) => {
+                        const realIdx = rub2Rows.indexOf(row);
+                        return (
+                          <tr key={realIdx} className="hover:bg-amber-500/5">
+                            <td className="py-1.5 px-1 text-amber-300 font-bold">{idx + 1}</td>
+                            <td className="py-1.5 px-1">
+                              <input type="text" value={row.criterio} onChange={e => { const n = [...rub2Rows]; n[realIdx] = { ...n[realIdx], criterio: e.target.value }; setRub2Rows(n); }}
+                                className="w-full bg-slate-700 border border-amber-500/20 rounded px-2 py-1 text-white text-xs" placeholder={`Pregunta ${idx + 1}...`} />
+                            </td>
+                            <td className="py-1.5 px-1 text-center">
+                              <span className={`inline-flex w-7 h-7 rounded-full font-black text-xs items-center justify-center ${row.clave ? 'bg-green-500/20 border border-green-500/50 text-green-300' : 'bg-slate-700 border border-slate-600 text-slate-500'}`} translate="no">{row.clave || '—'}</span>
+                            </td>
+                            <td className="py-1 px-0.5 text-center" colSpan={4}>
+                              <div className="flex gap-1">
+                                {['A','B','C','D'].map(l => (
+                                  <button key={l} onClick={() => { const n = [...rub2Rows]; n[realIdx] = { ...n[realIdx], clave: l }; setRub2Rows(n); }}
+                                    className={`w-8 h-8 rounded-lg font-bold text-xs transition-all border-2 ${row.clave === l ? 'bg-green-500 border-green-400 text-white shadow shadow-green-500/30' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-400'}`} translate="no">
+                                    {l}
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="py-1.5 px-1 text-center">
+                              <button onClick={() => { const n = [...rub2Rows]; n.splice(realIdx, 1); setRub2Rows(n); }} className="text-red-400 hover:text-red-300 text-xs">✕</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <button onClick={() => setRub2Rows(prev => [...prev, { criterio: `Pregunta ${prev.filter(r => r.tipo === 'alternativa').length + 1}`, clave: 'A', tipo: 'alternativa' as const, respuesta: '', nivel: '', descriptores: Array(4).fill('') as string[] }])}
+                  className="text-xs text-amber-400 hover:underline mt-1 block">+ Agregar alternativa</button>
+              </div>
+
+              {/* SECCIÓN DESCRIPTORES */}
+              <div>
+                <label className="block text-xs text-purple-400 font-bold uppercase tracking-wider mb-1">
+                  Descriptores (INICIO / PROCESO / LOGRO / LOGRO DESTACADO)
+                </label>
+                <p className="text-xs text-slate-500 mb-2">Configura los criterios donde el docente marca el nivel alcanzado y define los descriptores por nivel.</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[600px]">
+                    <thead className="sticky top-0 bg-slate-800 z-10">
+                      <tr className="border-b border-slate-600">
+                        <th className="text-left py-2 px-1 text-slate-400 w-6">#</th>
+                        <th className="text-left py-2 px-1 text-slate-400 min-w-[120px]">Criterio</th>
+                        {RUB2_LEVELS.map(nivel => (
+                          <th key={nivel} className="text-center py-2 px-1 min-w-[100px]">
+                            <div className={`font-black text-xs ${nivel === 'AD' ? 'text-blue-400' : nivel === 'A' ? 'text-emerald-400' : nivel === 'B' ? 'text-amber-400' : 'text-red-400'}`} translate="no">{nivel}</div>
+                            <div className="text-[9px] text-slate-500">{RUB2_LEVEL_LABELS[nivel]}</div>
+                          </th>
+                        ))}
+                        <th className="text-center py-2 px-1 w-6"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/40">
+                      {rub2Rows.filter(r => r.tipo === 'descriptor').map((row, idx) => {
+                        const realIdx = rub2Rows.indexOf(row);
+                        return (
+                          <tr key={realIdx} className="hover:bg-purple-500/5">
+                            <td className="py-1.5 px-1 text-purple-300 font-bold">{idx + 1}</td>
+                            <td className="py-1.5 px-1">
+                              <input type="text" value={row.criterio} onChange={e => { const n = [...rub2Rows]; n[realIdx] = { ...n[realIdx], criterio: e.target.value }; setRub2Rows(n); }}
+                                className="w-full bg-slate-700 border border-purple-500/20 rounded px-2 py-1 text-white text-xs" placeholder={`Criterio ${idx + 1}...`} />
+                            </td>
+                            {RUB2_LEVELS.map((nivel, ni) => (
+                              <td key={nivel} className="py-1.5 px-1">
+                                <input type="text" value={row.descriptores[ni] || ''} onChange={e => { const n = [...rub2Rows]; const d = [...n[realIdx].descriptores]; d[ni] = e.target.value; n[realIdx] = { ...n[realIdx], descriptores: d }; setRub2Rows(n); }}
+                                  className={`w-full bg-slate-700/50 border rounded px-1.5 py-1 text-[10px] text-slate-300 placeholder-slate-500 ${nivel === 'AD' ? 'border-blue-500/30' : nivel === 'A' ? 'border-emerald-500/30' : nivel === 'B' ? 'border-amber-500/30' : 'border-red-500/30'}`}
+                                  placeholder={RUB2_LEVEL_LABELS[nivel]} />
+                              </td>
+                            ))}
+                            <td className="py-1.5 px-1 text-center">
+                              <button onClick={() => { const n = [...rub2Rows]; n.splice(realIdx, 1); setRub2Rows(n); }} className="text-red-400 hover:text-red-300 text-xs">✕</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <button onClick={() => setRub2Rows(prev => [...prev, { criterio: `Criterio ${prev.filter(r => r.tipo === 'descriptor').length + 1}`, clave: '', tipo: 'descriptor' as const, respuesta: '', nivel: '', descriptores: Array(4).fill('') as string[] }])}
+                  className="text-xs text-purple-400 hover:underline mt-1 block">+ Agregar descriptor</button>
+              </div>
+            </div>
+          )}
         </div>
 
+        {error && (
+          <div className="px-6 py-2 bg-red-500/10 border-t border-red-500/30">
+            <p className="text-red-300 text-xs font-bold">{error}</p>
+          </div>
+        )}
         <div className="flex gap-2 px-6 py-4 border-t border-slate-700 flex-shrink-0">
           <button onClick={guardar}
             className="flex-1 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded-xl text-sm hover:opacity-90">
@@ -823,16 +1281,366 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
           <button onClick={onCerrar}
             className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">
             Cancelar
-          </button>
+</button>
         </div>
       </div>
     </div>
+    </>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Celda de promedio por competencia
+// Modal PLANILLA / VISTA EXCEL — registro masivo por columna
 // ─────────────────────────────────────────────────────────────────────────────
+interface PlanillaFila {
+  alumnoId: string;
+  nombre: string;
+  grado: string;
+  seccion: string;
+  respuestas: string[];
+  calificativo: 'C' | 'B' | 'A' | 'AD';
+  esAD: boolean;
+  notaNumerica?: number;
+}
+
+function ModalPlanilla({ columna, alumnos, calificativos, onGuardarTodo, onCerrar }: {
+  columna: Columna; alumnos: Alumno[]; calificativos: Calificativo[];
+  onGuardarTodo: (cals: Calificativo[], idsEliminar?: string[]) => void; onCerrar: () => void;
+}) {
+  const totalItems = columna.totalItems || 1;
+  const tipo = columna.tipo;
+  const itemsExamenArr = Array.isArray(columna.itemsExamen) ? columna.itemsExamen : [];
+  const columnasEval = Array.isArray(columna.columnasEval) && columna.columnasEval.length > 0
+    ? columna.columnasEval
+    : (tipo === 'lista-cotejo' ? ['Sí','No']
+      : tipo === 'ficha-observacion' ? ['Logrado','Parcial','No Logrado']
+      : tipo === 'portafolio-evidencias' ? ['Presentó','No Presentó']
+      : tipo === 'registro-anecdotico' ? ['Positivo','Negativo']
+      : tipo === 'escala-valoracion' ? ['Siempre','Casi siempre','A veces','Rara vez','Nunca']
+      : ['Sí','No']);
+
+  const rubricaLabels = ['C','B','A','AD'];
+  const letrasExamen = ['A','B','C','D','E'];
+
+  const getCal = (alumnoId: string) => calificativos.find(c => c.alumnoId === alumnoId && c.columnaId === columna.id);
+
+  const inicialFilas = (): PlanillaFila[] => alumnos.map(a => {
+    const cal = getCal((a as any).id);
+    let respuestas: string[] = Array(totalItems).fill('');
+    if (tipo === 'examen') {
+      respuestas = cal?.claves ? [...cal.claves] : Array(totalItems).fill('');
+    } else if (tipo === 'rubrica') {
+      const prev = (cal?.marcados || []) as any;
+      respuestas = Array.isArray(prev) && prev.length > 0
+        ? prev.map((r: any) => (typeof r === 'string' ? r : ''))
+        : Array(totalItems).fill('');
+    } else if (tipo === 'nota-numerica') {
+      respuestas = [cal?.notaNumerica !== undefined ? String(cal.notaNumerica) : ''];
+    } else {
+      const prev = (cal?.marcados || []) as any;
+      respuestas = Array.isArray(prev) && prev.length > 0
+        ? prev.map((r: any) => (typeof r === 'string' ? r : ''))
+        : Array(totalItems).fill('');
+    }
+    return {
+      alumnoId: (a as any).id,
+      nombre: a.apellidos_nombres || a.nombre || '—',
+      grado: (a as any).grado || '',
+      seccion: (a as any).seccion || '',
+      respuestas,
+      calificativo: (cal?.calificativo as any) || 'C',
+      esAD: cal?.esAD || false,
+      notaNumerica: cal?.notaNumerica,
+    };
+  });
+
+  const [filas, setFilas] = useState<PlanillaFila[]>(inicialFilas);
+  const [guardando, setGuardando] = useState(false);
+
+  const calcularCalExamen = (respuestas: string[]) => {
+    let correctas = 0;
+    respuestas.forEach((r, i) => {
+      if (r && r === itemsExamenArr[i]?.correcta) correctas++;
+    });
+    const pct = totalItems > 0 ? Math.round((correctas / totalItems) * 100) : 0;
+    return calcularEscala('examen', pct);
+  };
+
+  const calcularCalRubrica = (respuestas: string[]) => {
+    let suma = 0, count = 0;
+    respuestas.forEach(r => {
+      const val = { C: 1, B: 2, A: 3, AD: 4 }[r] || 0;
+      if (val) { suma += val; count++; }
+    });
+    if (count === 0) return 'C';
+    const prom = Math.round(suma / count);
+    const map: Record<number, string> = { 1: 'C', 2: 'B', 3: 'A', 4: 'AD' };
+    return (map[Math.min(4, Math.max(1, prom))] || 'C') as 'C'|'B'|'A'|'AD';
+  };
+
+  const calcularCalNota = (nota: number) => {
+    if (nota >= 18) return 'A';
+    if (nota >= 14) return 'B';
+    return 'C';
+  };
+
+  const calcularCalOtros = (respuestas: string[]) => {
+    let positivos = 0;
+    respuestas.forEach(r => {
+      if (['Sí','Logrado','Presentó','Siempre','Casi siempre'].includes(r)) positivos++;
+    });
+    const pct = totalItems > 0 ? Math.round((positivos / totalItems) * 100) : 0;
+    return calcularEscala(columna.tipo, pct);
+  };
+
+  const actualizarRespuesta = (idx: number, itemIdx: number, valor: string) => {
+    setFilas(prev => {
+      const n = [...prev];
+      const fila = { ...n[idx] };
+      const nuevasResp = [...fila.respuestas];
+      nuevasResp[itemIdx] = nuevasResp[itemIdx] === valor ? '' : valor;
+      fila.respuestas = nuevasResp;
+
+      if (tipo === 'examen') {
+        fila.calificativo = calcularCalExamen(nuevasResp);
+        fila.esAD = false;
+      } else if (tipo === 'rubrica') {
+        const auto = calcularCalRubrica(nuevasResp);
+        fila.calificativo = fila.esAD && auto === 'A' ? 'AD' : auto;
+} else if (tipo === 'rubrica-2') {
+        const cal = getCal(fila.alumnoId);
+        const rows: ItemRubrica2Row[] = nuevasResp.map((resp, i) => ({
+          criterio: (cal?.items as any[])?.[i]?.criterio || '',
+          clave: cal?.claves?.[i] || (cal?.items as any[])?.[i]?.clave || itemsExamenArr[i]?.correcta || '',
+          tipo: (itemsExamenArr[i]?.tipo as 'alternativa' | 'descriptor') || (itemsExamenArr[i]?.correcta ? 'alternativa' : 'descriptor'),
+          respuesta: resp,
+          nivel: (cal?.items as any[])?.[i]?.nivel || '',
+          descriptores: itemsExamenArr[i]?.descriptores?.length === 4 ? [...(itemsExamenArr[i].descriptores as string[])] : Array(4).fill('') as string[],
+        }));
+        const res2 = calcularCalRubrica2(rows);
+        fila.calificativo = res2.calificativo;
+        fila.esAD = res2.calificativo === 'AD';
+      } else if (tipo === 'nota-numerica') {
+        const nota = Math.max(0, Math.min(20, Number(nuevasResp[0] || 0)));
+        fila.notaNumerica = nota;
+        fila.calificativo = calcularCalNota(nota);
+        fila.esAD = false;
+      } else {
+        fila.calificativo = calcularCalOtros(nuevasResp);
+        fila.esAD = false;
+      }
+      n[idx] = fila;
+      return n;
+    });
+  };
+
+  const toggleAD = (idx: number) => {
+    if (tipo !== 'rubrica' && tipo !== 'rubrica-2') return;
+    setFilas(prev => {
+      const n = [...prev];
+      const fila = { ...n[idx] };
+      if (tipo === 'rubrica') {
+        const auto = calcularCalRubrica(fila.respuestas);
+        fila.esAD = !fila.esAD;
+        fila.calificativo = fila.esAD && auto === 'A' ? 'AD' : auto;
+} else if (tipo === 'rubrica-2') {
+        const cal = getCal(fila.alumnoId);
+        const rows: ItemRubrica2Row[] = fila.respuestas.map((resp, i) => ({
+          criterio: (cal?.items as any[])?.[i]?.criterio || '',
+          clave: cal?.claves?.[i] || (cal?.items as any[])?.[i]?.clave || itemsExamenArr[i]?.correcta || '',
+          tipo: (itemsExamenArr[i]?.tipo as 'alternativa' | 'descriptor') || (itemsExamenArr[i]?.correcta ? 'alternativa' : 'descriptor'),
+          respuesta: resp,
+          nivel: (cal?.items as any[])?.[i]?.nivel || '',
+          descriptores: itemsExamenArr[i]?.descriptores?.length === 4 ? [...(itemsExamenArr[i].descriptores as string[])] : Array(4).fill('') as string[],
+        }));
+        const res2 = calcularCalRubrica2(rows);
+        fila.esAD = !fila.esAD;
+        if (fila.esAD && res2.calificativo === 'A') {
+          fila.calificativo = 'AD';
+        } else {
+          fila.calificativo = res2.calificativo;
+        }
+      }
+      n[idx] = fila;
+      return n;
+    });
+  };
+
+  const guardar = async () => {
+    setGuardando(true);
+
+    // Solo enviar filas que tienen datos reales (al menos una respuesta o nota)
+    const tieneDatos = (f: PlanillaFila) => {
+      if (tipo === 'nota-numerica') return f.notaNumerica !== undefined && f.notaNumerica > 0;
+      return f.respuestas.some(r => r && r.trim() !== '');
+    };
+
+    const cals: Calificativo[] = filas.filter(tieneDatos).map(f => {
+      const base: Calificativo = {
+        alumnoId: f.alumnoId,
+        columnaId: columna.id,
+        marcados: [],
+        calificativo: f.calificativo,
+        esAD: f.esAD,
+        fecha: new Date().toISOString().split('T')[0],
+      };
+      if (tipo === 'examen') {
+        base.claves = f.respuestas;
+      } else if (tipo === 'nota-numerica') {
+        base.notaNumerica = f.notaNumerica ?? 0;
+      } else {
+        base.marcados = f.respuestas as any;
+      }
+      return base;
+    });
+
+    // Identificar alumnos que tenían calificación previa pero ahora no tienen datos
+    const idsPrevios = new Set(calificativos.filter(c => c.columnaId === columna.id).map(c => c.alumnoId));
+    const idsConDatos = new Set(cals.map(c => c.alumnoId));
+    const idsAEliminar = Array.from(idsPrevios).filter(id => !idsConDatos.has(id));
+
+    onGuardarTodo(cals, idsAEliminar);
+    setGuardando(false);
+  };
+
+  const exportarExcel = () => {
+    const headers = ['#', 'Alumno', 'Grado', 'Sección'];
+    if (tipo === 'nota-numerica') {
+      headers.push('Nota');
+    } else {
+      for (let i = 1; i <= totalItems; i++) headers.push(`Item ${i}`);
+    }
+    headers.push('Calificación');
+
+    const data: any[][] = [headers];
+    filas.forEach((f, i) => {
+      const row: any[] = [i + 1, f.nombre, f.grado, f.seccion];
+      if (tipo === 'nota-numerica') {
+        row.push(f.notaNumerica ?? '');
+      } else {
+        f.respuestas.forEach(r => row.push(r));
+      }
+      row.push(f.calificativo);
+      data.push(row);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, columna.nombre);
+    XLSX.writeFile(wb, `planilla_${columna.nombre.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const inp = "w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-indigo-500";
+
+  return (
+    <>
+    <div className="fixed inset-0 z-50 bg-black/70" onClick={onCerrar} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="bg-slate-800 border border-emerald-500/30 rounded-2xl w-full max-w-[95vw] max-h-[92vh] flex flex-col pointer-events-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 flex-shrink-0">
+          <div>
+            <h3 className="text-white font-bold text-lg">📋 Planilla: {columna.nombre}</h3>
+            <p className="text-slate-400 text-xs">{TIPO_CONFIG[tipo]?.label} · {totalItems} {tipo==='examen'?'preguntas':'ítems'} · {alumnos.length} alumnos</p>
+          </div>
+          <button onClick={onCerrar}><X size={18} className="text-slate-400"/></button>
+        </div>
+
+        <div className="flex-1 overflow-auto px-6 py-4">
+          <table className="w-full text-xs border-collapse">
+            <thead className="sticky top-0 bg-slate-800 z-10">
+              <tr className="border-b border-slate-600">
+                <th className="text-left py-2 px-2 text-slate-400 w-8">#</th>
+                <th className="text-left py-2 px-2 text-slate-400 min-w-[180px]">Alumno</th>
+                {tipo === 'nota-numerica' ? (
+                  <th className="text-center py-2 px-2 text-slate-400 w-24">Nota (0-20)</th>
+                ) : (
+                  Array.from({ length: totalItems }, (_, i) => (
+                    <th key={i} className="text-center py-2 px-1 text-slate-400 w-16">{tipo==='examen'?`P${i+1}`:`I${i+1}`}</th>
+                  ))
+                )}
+                <th className="text-center py-2 px-2 text-slate-400 w-20">Calif.</th>
+                {tipo === 'rubrica' && <th className="text-center py-2 px-2 text-slate-400 w-16">AD</th>}
+                {tipo === 'rubrica-2' && <th className="text-center py-2 px-2 text-slate-400 w-16">AD</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/40">
+              {filas.map((fila, idx) => (
+                <tr key={fila.alumnoId} className={`hover:bg-slate-700/20 ${idx%2===0?'bg-slate-800/20':'bg-slate-800/40'}`}>
+                  <td className="py-2 px-2 text-slate-500">{idx+1}</td>
+                  <td className="py-2 px-2 text-white font-medium">{fila.nombre}</td>
+                  {tipo === 'nota-numerica' ? (
+                    <td className="py-2 px-1 text-center">
+                      <input type="number" min={0} max={20} value={fila.notaNumerica ?? ''}
+                        onChange={e => actualizarRespuesta(idx, 0, e.target.value)}
+                        className={`${inp} w-16 text-center`} />
+                    </td>
+                  ) : (
+                    fila.respuestas.map((resp, i) => (
+                      <td key={i} className="py-1 px-1 text-center">
+                        {tipo === 'examen' ? (
+                          <select value={resp} onChange={e => actualizarRespuesta(idx, i, e.target.value)} className={`${inp} w-14 text-center`}>
+                            <option value=""></option>
+                            {letrasExamen.map(l => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                        ) : tipo === 'rubrica' || tipo === 'rubrica-2' ? (
+                          <select value={resp} onChange={e => actualizarRespuesta(idx, i, e.target.value)} className={`${inp} w-14 text-center`}>
+                            <option value=""></option>
+                            {rubricaLabels.map(l => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                        ) : (
+                          <select value={resp} onChange={e => actualizarRespuesta(idx, i, e.target.value)} className={`${inp} w-20 text-center`}>
+                            <option value=""></option>
+                            {columnasEval.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        )}
+                      </td>
+                    ))
+                  )}
+                  <td className="py-2 px-2 text-center">
+                    <span className={`inline-block px-2 py-1 rounded font-bold text-xs ${CAL_BG[fila.calificativo]}`} translate="no">
+                      {fila.calificativo}
+                    </span>
+                  </td>
+                  {tipo === 'rubrica' && (
+                    <td className="py-2 px-2 text-center">
+                      <button onClick={() => toggleAD(idx)}
+                        className={`text-xs font-bold px-2 py-1 rounded border-2 ${fila.esAD ? 'bg-blue-500/30 border-blue-400 text-blue-200' : 'bg-slate-700 border-slate-600 text-slate-400'}`}>
+                        ⭐
+                      </button>
+                    </td>
+                  )}
+                  {tipo === 'rubrica-2' && (
+                    <td className="py-2 px-2 text-center">
+                      <button onClick={() => toggleAD(idx)}
+                        className={`text-xs font-bold px-2 py-1 rounded border-2 ${fila.esAD ? 'bg-blue-500/30 border-blue-400 text-blue-200' : 'bg-slate-700 border-slate-600 text-slate-400'}`}>
+                        ⭐
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-slate-700 flex-shrink-0">
+          <button onClick={guardar} disabled={guardando}
+            className={`flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm hover:opacity-90 ${guardando?'opacity-50 cursor-not-allowed':''}`}>
+            {guardando ? 'Guardando...' : '💾 Guardar todo'}
+          </button>
+          <button onClick={exportarExcel}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold">
+            <FileSpreadsheet size={15}/> Exportar Excel
+          </button>
+          <button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cerrar</button>
+        </div>
+      </div>
+    </div>
+    </>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// Celda de promedio
 function CeldaPromedio({ prom, promBg }: { prom: 'C'|'B'|'A'|'AD'|null; promBg: string }) {
   if (!prom) return (
     <td className="px-2 py-2 text-center border-r border-slate-600/50">
@@ -864,6 +1672,9 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const [filtroSeccion, setFiltroSeccion] = useState('');
   const [popup,         setPopup]         = useState<{ alumno: Alumno; columna: Columna } | null>(null);
   const [modalColumna,  setModalColumna]  = useState<{ columna?: Columna } | null>(null);
+  const modalColumnaRef = useRef(modalColumna);
+  useEffect(() => { modalColumnaRef.current = modalColumna; }, [modalColumna]);
+  const [planillaColumna, setPlanillaColumna] = useState<Columna | null>(null);
   const [showGestion,   setShowGestion]   = useState(false);
   const [compExpand,    setCompExpand]    = useState<Record<string, boolean>>({ comp1: true, comp2: true, comp3: true });
   const [syncing,       setSyncing]       = useState(false);
@@ -886,51 +1697,115 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   // Helper: normalizar grado para comparación ('1' y '1°' son equivalentes)
   const normGrado = (g: string) => String(g || '').trim().replace(/°$/, '');
 
+  // Helper: normalizar sección para comparación
+  const normSeccion = (s: string) => String(s || '').trim().replace(/^\d+/, '').toUpperCase();
+
   // Helper: aplicar asignaciones al estado del docente
   const aplicarAsignacion = (asigs: any[]) => {
     if (!user?.role || user.role !== 'teacher') return;
     const docenteId = (user as any).docenteId;
     const userId    = (user as any).id;
+    const userEmail = (user as any).email;
+
+    console.log('[EduGest] Buscando asignación para docente:', { docenteId, userId, userEmail });
+    console.log('[EduGest] Total asignaciones disponibles:', asigs.length);
+    if (asigs.length > 0) {
+      console.log('[EduGest] Primeras 3 asignaciones:', asigs.slice(0, 3).map(a => ({ id: a.id, docenteId: a.docenteId, grados: a.grados, secciones: a.secciones })));
+    }
+
     // Buscar asignaciones por docenteId o, como fallback, por userId
     const parsed = parsearAsignaciones(asigs);
-    const mias = parsed.filter((a: any) =>
+    let mias = parsed.filter((a: any) =>
       (docenteId && a.docenteId === docenteId) ||
       (userId    && a.docenteId === userId)
     );
-    if (mias.length === 0) return;
+
+    // Fallback 2: si no encontramos, buscar por email del usuario
+    if (mias.length === 0 && userEmail) {
+      mias = parsed.filter((a: any) =>
+        a.docenteId === userEmail || a.docenteId?.includes(userEmail)
+      );
+    }
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+    // Fallback 3: buscar por nombre del docente en la lista de docentes
+    if (mias.length === 0) {
+      try {
+        const docentes = JSON.parse(localStorage.getItem('ie_docentes') || '[]');
+        const miDocente = docentes.find((d: any) =>
+          d.id === docenteId || d.id === userId
+        );
+        if (miDocente?.apellidos_nombres) {
+          mias = parsed.filter((a: any) => {
+            const docAsig = docentes.find((d: any) => d.id === a.docenteId);
+            return docAsig?.apellidos_nombres === miDocente.apellidos_nombres;
+          });
+        }
+      } catch { /* silencioso */ }
+    }
+
+    console.log('[EduGest] Asignaciones encontradas:', mias.length);
+
+    if (mias.length === 0) {
+      console.warn('[EduGest] No se encontró asignación para este docente');
+      // Si no hay asignación, mostrar TODOS los alumnos (no vacío)
+      setAsignacionDocente(null);
+      return;
+    }
+
     const grados   = [...new Set(mias.flatMap((a: any) => a.grados))] as string[];
     const secciones = [...new Set(mias.flatMap((a: any) => a.secciones))] as string[];
     const cursos   = [...new Set(mias.flatMap((a: any) => a.cursos || []))] as string[];
+
+    console.log('[EduGest] Grados asignados:', grados);
+    console.log('[EduGest] Secciones asignadas:', secciones);
+
     if (grados.length > 0 || secciones.length > 0) {
       setAsignacionDocente({ grados, secciones, cursos });
+    } else {
+      setAsignacionDocente(null);
     }
   };
 
   const cargar = async () => {
     setSyncing(true);
     try {
-      // 1) Base inmediata desde localStorage
+      // Helper para parsear localStorage
       const _parseArr = (key: string) => { try { const d = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(d) ? d : []; } catch { return []; } };
-      const localAlumnos   = _parseArr('ie_alumnos');
-      const localColumnas  = _parseArr('cal_columnas');
-      const localCalif     = _parseArr('ie_calificativos_v2');
-      const localUnidades  = _parseArr('cfg_unidades');
-      const localAsigs     = _parseArr('cfg_asignaciones');
 
-      setAlumnos(localAlumnos);
-      setColumnas(localColumnas);
-      setCalificativos(localCalif);
-      setBimestres(localUnidades.filter((u: any) => u.activa !== false && u.activa !== 0));
-      // Aplicar asignación inmediatamente desde localStorage
+      // 1) MOSTRAR INMEDIATAMENTE desde localStorage (igual que DocentesScreen/NormasConvivencia)
+      const localAlumnos = _parseArr('ie_alumnos');
+      const localColumnas = _parseArr('cal_columnas');
+      const localUnidades = _parseArr('cfg_unidades');
+      const localAsigs = _parseArr('cfg_asignaciones');
+      const localCals = _parseArr('ie_calificativos_v2');
+
+      if (localAlumnos.length > 0) setAlumnos(localAlumnos);
+      if (localColumnas.length > 0) setColumnas(localColumnas);
+      if (localUnidades.length > 0) setBimestres(localUnidades.filter((u: any) => u.activa !== false));
+      if (localCals.length > 0) setCalificativos(localCals);
       if (localAsigs.length > 0) aplicarAsignacion(localAsigs);
 
-      // 2) Descargar desde Turso — separado para evitar timeout con tablas grandes
+      // 2) EN SEGUNDO PLANO: intentar descargar desde Turso/API
+      let asignacionesCargadas: any[] = localAsigs;
       try {
         // Paso 2a: datos ligeros primero (asignaciones, columnas, unidades)
         const ligero = await cargarTodo('columnas,unidades,asignaciones');
-        if (ligero.columnas?.length > 0) {
-          setColumnas(ligero.columnas);
-          localStorage.setItem('cal_columnas', JSON.stringify(ligero.columnas));
+if (ligero.columnas?.length > 0) {
+            setColumnas(prev => {
+              if (modalColumnaRef.current) return prev;
+              const merged = ligero.columnas.map((sc: any) => {
+                const local = prev.find((lc: any) => lc.id === sc.id);
+                if (local && (local.itemsExamen?.length || 0) > (sc.itemsExamen?.length || 0)) {
+                  return { ...sc, itemsExamen: local.itemsExamen, columnasEval: local.columnasEval || sc.columnasEval };
+                }
+                return sc;
+              });
+              const localOnly = prev.filter((lc: any) => !ligero.columnas.some((sc: any) => sc.id === lc.id));
+              return [...merged, ...localOnly];
+            });
+            localStorage.setItem('cal_columnas', JSON.stringify(ligero.columnas));
         }
         if (ligero.unidades?.length > 0) {
           setBimestres((ligero.unidades || []).filter((u: any) => u.activa !== false));
@@ -938,31 +1813,14 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
         }
         if (ligero.asignaciones?.length > 0) {
           localStorage.setItem('cfg_asignaciones', JSON.stringify(ligero.asignaciones));
-          aplicarAsignacion(ligero.asignaciones);
+          asignacionesCargadas = ligero.asignaciones;
+          aplicarAsignacion(asignacionesCargadas);
         }
         // Paso 2b: alumnos por separado (tabla grande)
-        // Si es docente y ya tenemos su asignación, filtrar solo sus grados
-        const asigActual = ligero.asignaciones?.find((a: any) =>
-          a.docenteId === (user as any)?.docenteId || a.docenteId === user?.id
-        );
-        const extrasAlumnos: Record<string, string> = {};
-        if (asigActual?.grados?.length > 0) {
-          extrasAlumnos.grado = asigActual.grados.join(',');
-        }
-        const todoAlumnos = await cargarTodo('alumnos', Object.keys(extrasAlumnos).length ? extrasAlumnos : undefined);
+        const todoAlumnos = await cargarTodo('alumnos');
         if (todoAlumnos.alumnos?.length > 0) {
-          // Si es docente, mergear con los existentes (no reemplazar todo)
-          if (extrasAlumnos.grado) {
-            const existentes = JSON.parse(localStorage.getItem('ie_alumnos') || '[]');
-            const gradosFiltro = extrasAlumnos.grado.split(',');
-            const sinEsteGrado = existentes.filter((a: any) => !gradosFiltro.includes(a.grado));
-            const merged = [...sinEsteGrado, ...todoAlumnos.alumnos];
-            setAlumnos(merged);
-            localStorage.setItem('ie_alumnos', JSON.stringify(merged));
-          } else {
-            setAlumnos(todoAlumnos.alumnos);
-            localStorage.setItem('ie_alumnos', JSON.stringify(todoAlumnos.alumnos));
-          }
+          setAlumnos(todoAlumnos.alumnos);
+          localStorage.setItem('ie_alumnos', JSON.stringify(todoAlumnos.alumnos));
         }
         // Calificaciones — caché de 10 min → paginado 500 por página
         const cachedCal = getCacheCalificaciones();
@@ -995,9 +1853,15 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
           } catch { /* si falla Turso ya tenemos localStorage */ }
           setCalProgreso(null);
         }
-      } catch {
-        // Si falla Turso, ya tenemos localStorage como fallback
+      } catch (e) {
+        console.warn('[EduGest] Error cargando de Turso:', e);
       }
+
+      // 3) Si aún no hay datos de ningún lado, mostrar mensaje
+      if (localAlumnos.length === 0 && alumnos.length === 0) {
+        // No forzar mensaje de error, dejar que la UI muestre "Sin alumnos"
+      }
+
     } catch (err: any) {
       setSyncMsg({ tipo: 'err', texto: `❌ Error al cargar: ${err.message}` });
       setTimeout(() => setSyncMsg(null), 4000);
@@ -1025,6 +1889,35 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       }
     } catch (_) {}
   };
+
+  // Firebase primero: si hay datos en la nube, úsalos inmediatamente
+  useEffect(() => {
+    (async () => {
+      try {
+        const { getAlumnosFB, getColumnasFB, getUnidadesFB, getAsignacionesFB, getCalificativosFB } = await import('../services/firebaseDataService');
+        const [a, c, u, s, cal] = await Promise.all([
+          getAlumnosFB(), getColumnasFB(), getUnidadesFB(), getAsignacionesFB(), getCalificativosFB()
+        ]);
+        if (a.length) { setAlumnos(a); localStorage.setItem('ie_alumnos', JSON.stringify(a)); }
+        if (c.length) { setColumnas(prev => {
+          if (modalColumnaRef.current) return prev;
+          if (!prev.length) return c;
+          const merged = c.map((sc: any) => {
+            const local = prev.find((lc: any) => lc.id === sc.id);
+            if (local && (local.itemsExamen?.length || 0) > (sc.itemsExamen?.length || 0)) {
+              return { ...sc, itemsExamen: local.itemsExamen, columnasEval: local.columnasEval || sc.columnasEval };
+            }
+            return sc;
+          });
+          const localOnly = prev.filter((lc: any) => !c.some((sc: any) => sc.id === lc.id));
+          return [...merged, ...localOnly];
+        }); localStorage.setItem('cal_columnas', JSON.stringify(c)); }
+        if (u.length) { setBimestres(u.filter((x: any) => x.activa !== false)); localStorage.setItem('cfg_unidades', JSON.stringify(u)); }
+        if (s.length) { localStorage.setItem('cfg_asignaciones', JSON.stringify(s)); aplicarAsignacion(s); }
+        if (cal.length) { setCalificativos(cal); localStorage.setItem('ie_calificativos_v2', JSON.stringify(cal)); }
+      } catch { /* si falla, cargar() intentará Turso/localStorage */ }
+    })();
+  }, []);
 
   useEffect(() => {
     cargar();
@@ -1085,8 +1978,12 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
         guardados++;
       }
       if (todo.columnas?.length) {
-        setColumnas(todo.columnas);
-        localStorage.setItem('cal_columnas', JSON.stringify(todo.columnas));
+        // Solo actualizar si el servidor tiene MÁS columnas que local (evita perder datos no sincronizados)
+        const localCount = parseInt(localStorage.getItem('cal_columnas') || '[]').length || columnas.length;
+        if (todo.columnas.length >= localCount) {
+          setColumnas(todo.columnas);
+          localStorage.setItem('cal_columnas', JSON.stringify(todo.columnas));
+        }
         guardados++;
       }
       if (todo.unidades?.length) {
@@ -1110,7 +2007,9 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
         }
       } catch { /* silencioso */ }
     } catch (e: any) {
-      setSyncMsg({ tipo: 'err', texto: `❌ Error descargando: ${e.message}` });
+      // Durante transición a Firebase, Turso puede no responder — no mostrar error feo
+      console.warn('Turso no disponible (transición a Firebase):', e.message);
+      setSyncMsg({ tipo: 'ok', texto: '✅ Usando datos locales / Firebase' });
     } finally {
       setSyncing(false);
       setTimeout(() => setSyncMsg(null), 4000);
@@ -1130,7 +2029,26 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     if (!esDocente || !asignacionDocente) return alumnos;
     const gradosNorm    = asignacionDocente.grados.map(normGrado);
     const seccionesNorm = asignacionDocente.secciones.map(s => s.trim().toUpperCase());
-    return alumnos.filter(a =>
+    const filtrados = alumnos.filter(a =>
+      gradosNorm.includes(normGrado((a as any).grado)) &&
+      seccionesNorm.includes(((a as any).seccion || '').trim().toUpperCase())
+    );
+    // FALLBACK: si el filtro por asignación deja 0 alumnos, mostrar TODOS
+    // para que el docente no se quede sin ver nada. Esto indica que la
+    // asignación está mal configurada.
+    if (filtrados.length === 0 && alumnos.length > 0) {
+      console.warn('[EduGest] Filtro por asignación dejó 0 alumnos. Mostrando todos como fallback.');
+      return alumnos; // ← fallback crítico: nunca bloquear al docente
+    }
+    return filtrados;
+  }, [alumnos, esDocente, asignacionDocente]);
+
+  // Aviso cuando el filtro real no coincida (sin bloquear la vista)
+  const asignacionSinMatch = React.useMemo(() => {
+    if (!esDocente || !asignacionDocente || alumnos.length === 0) return false;
+    const gradosNorm    = asignacionDocente.grados.map(normGrado);
+    const seccionesNorm = asignacionDocente.secciones.map(s => s.trim().toUpperCase());
+    return !alumnos.some(a =>
       gradosNorm.includes(normGrado((a as any).grado)) &&
       seccionesNorm.includes(((a as any).seccion || '').trim().toUpperCase())
     );
@@ -1144,8 +2062,8 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     : [...new Set(alumnos.map(a => (a as any).seccion).filter(Boolean))].sort();
 
   const alumnosFiltrados = alumnosBase.filter(a => {
-    const matchG = !filtroGrado   || (a as any).grado   === filtroGrado;
-    const matchS = !filtroSeccion || (a as any).seccion === filtroSeccion;
+    const matchG = !filtroGrado   || normGrado((a as any).grado)   === normGrado(filtroGrado);
+    const matchS = !filtroSeccion || normSeccion((a as any).seccion) === normSeccion(filtroSeccion);
     const searchTerm = busqueda.toLowerCase();
     const matchSearch = !busqueda || 
       (a.apellidos_nombres || a.nombre || '').toLowerCase().includes(searchTerm) ||
@@ -1157,41 +2075,103 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     calificativos.find(c => c.alumnoId === alumnoId && c.columnaId === columnaId);
 
   const handleGuardarCal = async (cal: Calificativo) => {
-    const todos = [...calificativos];
+    const todos = Array.isArray(calificativos) ? [...calificativos] : [];
     const idx = todos.findIndex(c => c.alumnoId === cal.alumnoId && c.columnaId === cal.columnaId);
     if (idx >= 0) todos[idx] = cal; else todos.push(cal);
     setCalificativos(todos);
     setPopup(null);
     // Actualizar caché en memoria para no invalidarlo (evita re-fetch innecesario)
     actualizarCalEnCache(cal);
-    // Sync directo con Turso: solo el registro que cambió (más rápido + merge correcto en servidor)
+    // Guardar en localStorage siempre
+    localStorage.setItem('ie_calificativos_v2', JSON.stringify(todos));
+    setSyncMsg({ tipo: 'ok', texto: `✅ Calificación guardada` });
+    setTimeout(() => setSyncMsg(null), 2000);
+    // 1) Firebase primero
     try {
-      await guardarUnCalificativo(cal);
+      await guardarCalificativoFB(cal as any);
       setUltimaSync(new Date());
-      setSyncMsg({ tipo: 'ok', texto: '✅ Guardado en la nube' });
-      setTimeout(() => setSyncMsg(null), 2000);
-    } catch (err: any) {
-      // Fallback a localStorage si no hay internet
-      localStorage.setItem('ie_calificativos_v2', JSON.stringify(todos));
-      setSyncMsg({ tipo: 'err', texto: `⚠️ Sin internet — guardado local` });
-      setTimeout(() => setSyncMsg(null), 5000);
-      console.warn('Turso fallback:', err.message);
+    } catch (fbErr) {
+      // 2) Turso como fallback
+      try {
+        await guardarUnCalificativo(cal);
+        setUltimaSync(new Date());
+      } catch (err: any) {
+        setSyncMsg({ tipo: 'err', texto: `⚠️ Sin internet — guardado local` });
+        setTimeout(() => setSyncMsg(null), 5000);
+        console.warn('Turso fallback:', err.message);
+      }
+    }
+  };
+
+  const handleGuardarTodo = async (cals: Calificativo[], idsEliminar?: string[]) => {
+    let todos = [...calificativos];
+
+    // Eliminar calificaciones de alumnos que quedaron vacíos en la planilla
+    if (idsEliminar && idsEliminar.length > 0 && cals.length > 0) {
+      const colId = cals[0].columnaId;
+      todos = todos.filter(c => !(c.columnaId === colId && idsEliminar.includes(c.alumnoId)));
+    }
+
+    cals.forEach(cal => {
+      const idx = todos.findIndex(c => c.alumnoId === cal.alumnoId && c.columnaId === cal.columnaId);
+      if (idx >= 0) todos[idx] = cal; else todos.push(cal);
+      actualizarCalEnCache(cal);
+    });
+    setCalificativos(todos);
+    setPlanillaColumna(null);
+    localStorage.setItem('ie_calificativos_v2', JSON.stringify(todos));
+    // 1) Firebase primero (batch)
+    try {
+      await guardarCalificativosBatchFB(cals as any);
+      setUltimaSync(new Date());
+      const msg = idsEliminar?.length
+        ? `✅ ${cals.length} guardadas en Firebase · ${idsEliminar.length} limpiadas`
+        : `✅ ${cals.length} calificaciones guardadas en Firebase`;
+      setSyncMsg({ tipo: 'ok', texto: msg });
+      setTimeout(() => setSyncMsg(null), 3000);
+    } catch (fbErr) {
+      // 2) Turso como fallback
+      try {
+        await guardarCalificativos(cals);
+        setUltimaSync(new Date());
+        const msg = idsEliminar?.length
+          ? `✅ ${cals.length} guardadas en Turso · ${idsEliminar.length} limpiadas`
+          : `✅ ${cals.length} calificaciones guardadas en Turso`;
+        setSyncMsg({ tipo: 'ok', texto: msg });
+        setTimeout(() => setSyncMsg(null), 3000);
+      } catch (err: any) {
+        setSyncMsg({ tipo: 'err', texto: `⚠️ Guardado local — sin internet` });
+        setTimeout(() => setSyncMsg(null), 5000);
+        console.warn('Error guardando calificativos:', err.message);
+      }
     }
   };
 
   const handleGuardarColumna = async (col: Columna) => {
-    const todas = [...columnas];
+    const todas = Array.isArray(columnas) ? [...columnas] : [];
     const idx = todas.findIndex(c => c.id === col.id);
     if (idx >= 0) todas[idx] = col; else todas.push(col);
+
+    // Actualizar estado React y cerrar modal primero
     setColumnas(todas);
     setModalColumna(null);
-    // Guardar primero en localStorage
+    setSyncMsg({ tipo: 'ok', texto: `✅ Columna "${col.nombre}" ${idx >= 0 ? 'actualizada' : 'creada'}` });
+    setTimeout(() => setSyncMsg(null), 3000);
+
+    // Guardar en localStorage (persiste incluso si algo falla después)
     localStorage.setItem('cal_columnas', JSON.stringify(todas));
-    // Intentar sync con Turso en segundo plano
+
+    // 1) Firebase primero
     try {
-      await guardarColumnas(todas);
-    } catch (err: any) {
-      console.warn('Sync Turso columnas falló:', err.message);
+      await guardarColumnasFB(todas as any);
+      setUltimaSync(new Date());
+    } catch (fbErr) {
+      // 2) Turso como fallback
+      try {
+        await guardarColumnas(todas);
+      } catch (err: any) {
+        console.warn('Sync columnas falló:', err.message);
+      }
     }
   };
 
@@ -1228,12 +2208,19 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     // Guardar primero en localStorage
     localStorage.setItem('cal_columnas', JSON.stringify(todas));
     localStorage.setItem('ie_calificativos_v2', JSON.stringify(cals));
-    // Intentar sync con Turso en segundo plano
+    // 1) Firebase primero
     try {
-      await guardarColumnas(todas);
-      await guardarCalificativos(cals);
-    } catch (err: any) {
-      console.warn('Sync Turso eliminar falló:', err.message);
+      await eliminarColumnaFB(id);
+      await eliminarCalificativosPorColumnaFB(id);
+      setUltimaSync(new Date());
+    } catch (fbErr) {
+      // 2) Turso como fallback
+      try {
+        await guardarColumnas(todas);
+        await guardarCalificativos(cals);
+      } catch (err: any) {
+        console.warn('Sync Turso eliminar falló:', err.message);
+      }
     }
   };
 
@@ -1257,14 +2244,19 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       {popup && (
         popup.columna.tipo === 'examen'
           ? <PopupExamen alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
-          : popup.columna.tipo === 'rubrica'
-            ? <PopupRubrica alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
-            : popup.columna.tipo === 'nota-numerica'
-              ? <PopupNotaNumerica alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
-              : <PopupInstrumento alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
+          : popup.columna.tipo === 'rubrica-2'
+            ? <PopupRubrica2 alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
+            : popup.columna.tipo === 'rubrica'
+              ? <PopupRubrica alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
+              : popup.columna.tipo === 'nota-numerica'
+                ? <PopupNotaNumerica alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
+                : <PopupInstrumento alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
       )}
       {modalColumna !== null && (
-        <ModalColumna columnaEditar={modalColumna.columna} onGuardar={handleGuardarColumna} onCerrar={() => setModalColumna(null)} userEmail={user?.email} bimestres={bimestres} />
+        <ModalColumna key={modalColumna.columna?.id || 'nueva'} columnaEditar={modalColumna.columna} onGuardar={handleGuardarColumna} onCerrar={() => setModalColumna(null)} userEmail={user?.email} bimestres={bimestres} />
+      )}
+      {planillaColumna !== null && (
+        <ModalPlanilla columna={planillaColumna} alumnos={alumnosFiltrados} calificativos={calificativos} onGuardarTodo={handleGuardarTodo} onCerrar={() => setPlanillaColumna(null)} />
       )}
 
       {/* Header */}
@@ -1276,7 +2268,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
           </div>
           <div className="flex gap-2 flex-wrap items-center">
             {Object.entries(CAL_LABEL).map(([k, v]) => (
-              <span key={k} className={`px-2 py-1 rounded border text-xs font-bold ${CAL_BG[k]}`}>
+              <span key={k} className={`px-2 py-1 rounded border text-xs font-bold ${CAL_BG[k]}`} translate="no">
                 {k} <span className="opacity-70 font-normal hidden sm:inline">= {v}</span>
               </span>
             ))}
@@ -1472,13 +2464,17 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
                                   </p>
                                   <p className="text-slate-400 text-xs">
                                     {cfg.label} · {col.totalItems} {col.tipo === 'examen' ? 'preg.' : 'crit.'}
-                                    {col.tipo === 'examen' && col.itemsExamen && (
+                                    {col.tipo === 'examen' && Array.isArray(col.itemsExamen) && (
                                       <span className="ml-2 text-green-400 font-mono">Claves: {col.itemsExamen.map(i => i.correcta).join('-')}</span>
                                     )}
                                   </p>
                                 </div>
                               </div>
                               <div className="flex gap-2">
+                                <button onClick={() => setPlanillaColumna(col)}
+                                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs">
+                                  <FileSpreadsheet size={11}/> Planilla
+                                </button>
                                 <button onClick={() => setModalColumna({ columna: col })}
                                   className="flex items-center gap-1 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-xs">
                                   <Edit2 size={11}/> Editar
@@ -1499,12 +2495,10 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
         )}
 
         {/* Estados vacíos */}
-        {alumnosFiltrados.length === 0 ? (
+        {alumnos.length === 0 ? (
           <div className="text-center py-20 space-y-4">
-            <p className="text-slate-500">
-              {alumnos.length === 0 ? 'No hay alumnos registrados.' : 'Sin alumnos con ese filtro.'}
-            </p>
-            {esDocente && alumnos.length === 0 && (
+            <p className="text-slate-500">No hay alumnos registrados en el sistema.</p>
+            {esDocente && (
               <button onClick={sincronizarDesdeTurso} disabled={syncing}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl text-sm hover:from-green-400 hover:to-emerald-500 transition-all shadow-lg hover:shadow-green-500/30 disabled:opacity-50">
                 {syncing ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
@@ -1513,8 +2507,27 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
             )}
           </div>
         ) : (
-          <>
-            {columnas.length === 0 && (
+          <> {/* Aviso suave cuando la asignación no tiene match, pero SIN bloquear la vista */}
+            {asignacionSinMatch && (
+              <div className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm bg-amber-500/10 border border-amber-500/30 text-amber-300 mb-4">
+                <AlertCircle size={16} />
+                <div className="flex-1">
+                  <span className="font-bold">Asignación sin alumnos:</span> Tienes <strong>{asignacionDocente.grados.join(', ')}</strong> · Sección <strong>{asignacionDocente.secciones.join(', ')}</strong>.
+                  Mostrando todos los {alumnos.length} alumnos del sistema.
+                </div>
+                <button onClick={() => setAsignacionDocente(null)}
+                  className="text-xs text-amber-400 hover:text-amber-300 underline shrink-0">
+                  Ver todos
+                </button>
+              </div>
+            )}
+            {alumnosFiltrados.length === 0 ? (
+              <div className="text-center py-20">
+                <p className="text-slate-500">Sin alumnos con ese filtro.</p>
+              </div>
+            ) : (
+              <>
+                {columnas.length === 0 && (
               <div className="px-4 py-3 mx-4 mt-4 bg-amber-500/20 border border-amber-500/40 rounded-lg text-center">
                 <p className="text-amber-300 text-sm font-bold mb-2">⚠️ Sin columnas configuradas</p>
                 <p className="text-amber-300 text-xs mb-3">Agrega columnas de examen, lista de cotejo, ficha de observación o rúbrica</p>
@@ -1584,6 +2597,9 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
                               <span>{getTipoConfig(col.tipo).icono}</span>
                               <span className="text-slate-300 font-semibold leading-tight">{col.nombre}</span>
                               <span className="text-slate-500 font-normal">{col.totalItems} {col.tipo==='examen'?'preg.':'crit.'}</span>
+                              <button onClick={() => setPlanillaColumna(col)} className="text-[10px] text-emerald-400 hover:text-emerald-300 underline mt-0.5">
+                                📋 Planilla
+                              </button>
                               <span className={col.promediar ? 'text-green-500' : 'text-slate-600'}>
                                 {col.promediar ? '✅' : '⊘'}
                               </span>
@@ -1650,7 +2666,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
                               return (
                                 <td key={col.id} className="px-1.5 py-1.5 text-center border-r border-slate-700/30">
                                   <button onClick={() => abrirPopup(alumno, col)}
-                                    className={`w-full min-h-[40px] rounded-xl border-2 font-black text-base transition-all hover:scale-105 hover:shadow-lg ${cal ? CAL_BG[cal.calificativo] : 'border-dashed border-slate-600 text-slate-600 hover:border-cyan-500/50 hover:text-cyan-500/50'}`}>
+                                    className={`w-full min-h-[40px] rounded-xl border-2 font-black text-base transition-all hover:scale-105 hover:shadow-lg ${cal ? CAL_BG[cal.calificativo] : 'border-dashed border-slate-600 text-slate-600 hover:border-cyan-500/50 hover:text-cyan-500/50'}`} translate="no">
                                     {cal ? cal.calificativo : <Plus size={14} className="mx-auto"/>}
                                   </button>
                                   {cal && (
@@ -1740,9 +2756,11 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
               </tfoot>
             </table>
           </div>
-            </>
-        )}
-      </div>
-    </div>
+        </>
+      )}
+    </>
+  )}
+</div>
+</div>
   );
 }

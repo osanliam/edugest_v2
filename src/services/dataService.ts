@@ -34,7 +34,8 @@ export function getStorageStats() {
     'ie_alumnos', 'ie_docentes', 'sistema_usuarios', 'ie_calificativos_v2',
     'cal_columnas', 'cfg_bimestres', 'cfg_unidades', 'cfg_grados', 'cfg_secciones',
     'cfg_instrumentos', 'cfg_asignaciones', 'ie_asistencia', 'cfg_normas_convivencia',
-    'ie_registros_normas'
+    'ie_registros_normas', 'aula_aulas', 'aula_materiales', 'aula_entregas',
+    'aula_comentarios', 'aula_archivos'
   ];
   
   let totalBytes = 0;
@@ -68,9 +69,19 @@ export function getEnv() {
 }
 
 export async function syncToTurso(tipo: string, datos: any[]) {
-  if (!TURSO_ENABLED || !datos || datos.length === 0) return;
+  if (!TURSO_ENABLED || !datos) return;
   const CHUNK = 50;
   try {
+    if (datos.length === 0) {
+      // Array vacío = "borra todo" para tipos con full-replace (unidades, asignaciones)
+      await fetchWithTimeout('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo, datos: [] })
+      }, 8000);
+      console.log(`✅ Sincronizado: ${tipo} (0 registros — tabla limpiada en nube)`);
+      return;
+    }
     for (let i = 0; i < datos.length; i += CHUNK) {
       const chunk = datos.slice(i, i + CHUNK);
       const res = await fetchWithTimeout('/api/sync', {
@@ -83,7 +94,7 @@ export async function syncToTurso(tipo: string, datos: any[]) {
         console.error(`Sync error [${tipo}] chunk ${i}-${i+chunk.length}:`, body.error || res.status);
       }
     }
-    console.log(`✅ Sincronizado: ${tipo} (${datos.length} registros en ${Math.ceil(datos.length/CHUNK)} chunks)`);
+    console.log(`✅ Sincronizado: ${tipo} (${datos.length} registros)`);
   } catch (e) {
     console.error('Sync error:', e);
   }
@@ -103,43 +114,46 @@ async function loadFromTurso() {
 }
 
 export function getEstudiantes() {
-  try { return JSON.parse(localStorage.getItem('ie_alumnos') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('ie_alumnos') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 export function getMaestros() {
-  try { return JSON.parse(localStorage.getItem('ie_docentes') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('ie_docentes') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 export function getUsuarios() {
-  try { return JSON.parse(localStorage.getItem('sistema_usuarios') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('sistema_usuarios') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 export function getNotas() {
-  try { return JSON.parse(localStorage.getItem('ie_calificativos') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('ie_calificativos') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 export function getCalificativos() {
-  try { return JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]'); } catch { return []; }
+  try {
+    const data = JSON.parse(localStorage.getItem('ie_calificativos_v2') || '[]');
+    return Array.isArray(data) ? data : [];
+  } catch { return []; }
 }
 
 export function getColumnas() {
-  try { return JSON.parse(localStorage.getItem('cal_columnas') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('cal_columnas') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 export function getUnidades() {
-  try { return JSON.parse(localStorage.getItem('cfg_unidades') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('cfg_unidades') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 export function getNormas() {
-  try { return JSON.parse(localStorage.getItem('cfg_normas_convivencia') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('cfg_normas_convivencia') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 export function getRegistrosNormas() {
-  try { return JSON.parse(localStorage.getItem('ie_registros_normas') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('ie_registros_normas') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 export function getAsignaciones() {
-  try { return JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 export function guardarAsignaciones(asignaciones: any[]) {
@@ -148,7 +162,7 @@ export function guardarAsignaciones(asignaciones: any[]) {
 }
 
 export function getAsistencia() {
-  try { return JSON.parse(localStorage.getItem('ie_asistencia') || '[]'); } catch { return []; }
+  try { const d = JSON.parse(localStorage.getItem('ie_asistencia') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
 }
 
 // ── Funciones de guardado con sincronización automática ──────────────────────────
@@ -211,6 +225,12 @@ export async function syncAllToTurso(): Promise<{ ok: boolean; message: string; 
     { key: 'ie_asistencia',          tipo: 'asistencia' },
     { key: 'ie_registros_normas',    tipo: 'registros_normas' },
     { key: 'cfg_asignaciones',       tipo: 'asignaciones' },
+    { key: 'aula_aulas',             tipo: 'aulas' },
+    { key: 'aula_materiales',        tipo: 'materiales' },
+    { key: 'aula_entregas',          tipo: 'entregas' },
+    { key: 'aula_comentarios',       tipo: 'comentarios' },
+    { key: 'v5_mensajes',            tipo: 'mensajes' },
+    { key: 'v5_notificaciones',      tipo: 'notificaciones' },
   ];
 
   // En desarrollo no hay servidor — mostrar resumen local sin intentar fetch
@@ -260,6 +280,82 @@ export async function syncAllToTurso(): Promise<{ ok: boolean; message: string; 
   return { ok, message, syncedTypes };
 }
 
+// ── Aula Virtual — localStorage + sync ──────────────────────────────────
+
+export function getAulas() {
+  try { const d = JSON.parse(localStorage.getItem('aula_aulas') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
+}
+export function getMateriales() {
+  try { const d = JSON.parse(localStorage.getItem('aula_materiales') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
+}
+export function getEntregas() {
+  try { const d = JSON.parse(localStorage.getItem('aula_entregas') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
+}
+export function getComentarios() {
+  try { const d = JSON.parse(localStorage.getItem('aula_comentarios') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
+}
+
+export function guardarAulas(aulas: any[]) {
+  localStorage.setItem('aula_aulas', JSON.stringify(aulas));
+  syncToTurso('aulas', aulas);
+}
+export function guardarMateriales(materiales: any[]) {
+  localStorage.setItem('aula_materiales', JSON.stringify(materiales));
+  syncToTurso('materiales', materiales);
+}
+export function guardarEntregas(entregas: any[]) {
+  localStorage.setItem('aula_entregas', JSON.stringify(entregas));
+  syncToTurso('entregas', entregas);
+}
+export function guardarComentarios(comentarios: any[]) {
+  localStorage.setItem('aula_comentarios', JSON.stringify(comentarios));
+  syncToTurso('comentarios', comentarios);
+}
+
+// ── Mensajes ────────────────────────────────────────────────────────────
+
+export function getMensajes() {
+  try { const d = JSON.parse(localStorage.getItem('v5_mensajes') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
+}
+export function guardarMensajes(mensajes: any[]) {
+  localStorage.setItem('v5_mensajes', JSON.stringify(mensajes));
+  syncToTurso('mensajes', mensajes);
+}
+
+// ── Notificaciones ────────────────────────────────────────────────────
+
+export function getNotificaciones() {
+  try { const d = JSON.parse(localStorage.getItem('v5_notificaciones') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
+}
+export function guardarNotificaciones(notificaciones: any[]) {
+  localStorage.setItem('v5_notificaciones', JSON.stringify(notificaciones));
+  syncToTurso('notificaciones', notificaciones);
+}
+
+export function guardarArchivoAula(materialId: string, contenido: string) {
+  const store = JSON.parse(localStorage.getItem('aula_archivos') || '{}');
+  store[materialId] = contenido;
+  try { localStorage.setItem('aula_archivos', JSON.stringify(store)); } catch { console.warn('localStorage lleno, no se pudo guardar archivo'); }
+}
+export function obtenerArchivoAula(materialId: string): string | null {
+  try {
+    const store = JSON.parse(localStorage.getItem('aula_archivos') || '{}');
+    return store[materialId] || null;
+  } catch { return null; }
+}
+
+export function guardarEntregaArchivo(entregaId: string, contenido: string) {
+  const store = JSON.parse(localStorage.getItem('aula_archivos_entregas') || '{}');
+  store[entregaId] = contenido;
+  try { localStorage.setItem('aula_archivos_entregas', JSON.stringify(store)); } catch { console.warn('localStorage lleno'); }
+}
+export function obtenerEntregaArchivo(entregaId: string): string | null {
+  try {
+    const store = JSON.parse(localStorage.getItem('aula_archivos_entregas') || '{}');
+    return store[entregaId] || null;
+  } catch { return null; }
+}
+
 // ── Cargar datos del sistema ───────────────────────────────────────────────────
 
 export async function loadSystemData() {
@@ -282,7 +378,7 @@ export async function loadSystemData() {
       localStorage.setItem('cal_columnas', JSON.stringify(cloudData.columnas));
     }
     
-    if (cloudData.unidades?.length > 0) {
+    if (Array.isArray(cloudData.unidades)) {
       localStorage.setItem('cfg_unidades', JSON.stringify(cloudData.unidades));
     }
     
@@ -323,24 +419,30 @@ export async function loadSystemData() {
       localStorage.setItem('ie_registros_normas', JSON.stringify(fusionados));
     }
 
-    if (cloudData.asignaciones?.length > 0) {
-      // Las asignaciones vienen con grados/secciones/cursos como JSON strings desde Turso
-      const localAsig = getAsignaciones();
-      const fusionadas = [...localAsig];
-      cloudData.asignaciones.forEach((a: any) => {
-        // Parsear campos JSON si vienen como string
-        const parsed = {
-          ...a,
-          grados:   typeof a.grados   === 'string' ? JSON.parse(a.grados   || '[]') : (a.grados   || []),
-          secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
-          cursos:   typeof a.cursos   === 'string' ? JSON.parse(a.cursos   || '[]') : (a.cursos   || []),
-        };
-        const idx = fusionadas.findIndex(x => x.id === parsed.id);
-        if (idx >= 0) fusionadas[idx] = parsed; // actualizar si ya existe
-        else fusionadas.push(parsed);
-      });
-      localStorage.setItem('cfg_asignaciones', JSON.stringify(fusionadas));
+    if (Array.isArray(cloudData.asignaciones)) {
+      // Turso es fuente de verdad para asignaciones — reemplazar sin fusionar
+      const parseadas = cloudData.asignaciones.map((a: any) => ({
+        ...a,
+        grados:    typeof a.grados    === 'string' ? JSON.parse(a.grados    || '[]') : (a.grados    || []),
+        secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
+        cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
+      }));
+      localStorage.setItem('cfg_asignaciones', JSON.stringify(parseadas));
     }
+
+    if (Array.isArray(cloudData.aulas))       localStorage.setItem('aula_aulas', JSON.stringify(cloudData.aulas));
+    if (Array.isArray(cloudData.materiales))   localStorage.setItem('aula_materiales', JSON.stringify(cloudData.materiales));
+    if (Array.isArray(cloudData.entregas)) {
+      const localEnt = getEntregas();
+      const fusionados = [...localEnt];
+      cloudData.entregas.forEach((e: any) => {
+        if (!fusionados.find(x => x.id === e.id)) fusionados.push(e);
+      });
+      localStorage.setItem('aula_entregas', JSON.stringify(fusionados));
+    }
+    if (Array.isArray(cloudData.comentarios))  localStorage.setItem('aula_comentarios', JSON.stringify(cloudData.comentarios));
+    if (Array.isArray(cloudData.mensajes))       localStorage.setItem('v5_mensajes', JSON.stringify(cloudData.mensajes));
+    if (Array.isArray(cloudData.notificaciones)) localStorage.setItem('v5_notificaciones', JSON.stringify(cloudData.notificaciones));
   }
   
   // Sincronizar datos locales a la nube

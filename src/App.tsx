@@ -44,6 +44,7 @@ import DocentesScreen from './screens/DocentesScreen';
 import AlumnosScreen from './screens/AlumnosScreen';
 import ConfiguracionScreen from './screens/ConfiguracionScreen';
 import GroupsScreen from './screens/GroupsScreen';
+import AuditoriaScreen from './screens/AuditoriaScreen';
 import MainLayoutModern from './components/MainLayoutModern';
 
 type UserRole = 'admin' | 'director' | 'subdirector' | 'teacher' | 'student' | 'parent';
@@ -62,7 +63,7 @@ type ScreenType = 'login' | 'panel-admin' | 'inicio' | 'inicio-modern' | 'aula-v
                  'estudiantes' | 'dashboard-estudiante' | 'calificaciones' | 'horario' |
                  'asistencia' | 'normas-convivencia' | 'gestionar-usuarios' |
                  'gestion-docentes' | 'gestion-alumnos' | 'calificativos' | 'configuracion' |
-                 'reporte-alumno' | 'grupos';
+                 'reporte-alumno' | 'grupos' | 'auditoria';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -126,17 +127,17 @@ export default function App() {
         'panel-admin', 'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
         'panel-director', 'panel-subdirector', 'profesores', 'estudiantes', 'calificaciones',
         'gestionar-usuarios', 'gestion-docentes', 'gestion-alumnos', 'calificativos', 'configuracion',
-        'horario', 'asistencia', 'normas-convivencia', 'reporte-alumno', 'grupos'
+        'horario', 'asistencia', 'normas-convivencia', 'reporte-alumno', 'grupos', 'auditoria'
       ],
       director: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
         'panel-director', 'profesores', 'estudiantes', 'gestion-docentes', 'gestion-alumnos',
-        'calificativos', 'configuracion', 'asistencia', 'normas-convivencia', 'grupos'
+        'calificativos', 'configuracion', 'asistencia', 'normas-convivencia', 'grupos', 'auditoria'
       ],
       subdirector: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
         'panel-subdirector', 'panel-director', 'profesores', 'estudiantes', 'gestion-docentes', 'gestion-alumnos',
-        'calificativos', 'configuracion', 'asistencia', 'normas-convivencia', 'grupos'
+        'calificativos', 'configuracion', 'asistencia', 'normas-convivencia', 'grupos', 'auditoria'
       ],
       teacher: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
@@ -184,7 +185,7 @@ export default function App() {
         <MainLayoutModern key={`layout-${user.id}`} user={user} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} onNavigate={setCurrentScreen} currentScreen={currentScreen}>
           {currentScreen === 'panel-admin'         && <AdminPanelScreenModern_v2 />}
           {currentScreen === 'inicio'              && <DashboardScreen user={user} />}
-          {currentScreen === 'aula-virtual'        && <VirtualClassroomScreenModern_v2 />}
+          {currentScreen === 'aula-virtual'        && <VirtualClassroomScreenModern_v2 user={user} />}
           {currentScreen === 'mensajes'            && <MessagingScreen user={user} />}
           {currentScreen === 'informes'            && <ReportsScreenModern_v2 user={user} />}
           {currentScreen === 'panel-director'      && <DirectorDashboardModern user={user} />}
@@ -204,6 +205,7 @@ export default function App() {
           {currentScreen === 'normas-convivencia'  && <NormasConvivenciaScreen />}
           {currentScreen === 'reporte-alumno'     && <ReporteAlumnoScreen user={user} />}
           {currentScreen === 'grupos'              && <GroupsScreen />}
+          {currentScreen === 'auditoria'           && <AuditoriaScreen user={user} />}
         </MainLayoutModern>
       )}
     </>

@@ -3,6 +3,9 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, Users, BookOpen, AlertCircle, Calendar, Clock, Award, BarChart3, Zap, Activity, GraduationCap, UserCheck, FileText } from 'lucide-react';
 import { User } from '../types';
+import ConexionStatus from '../components/ConexionStatus';
+import PanelDiagnostico from '../components/PanelDiagnostico';
+import MigrarFirebasePanel from '../components/MigrarFirebasePanel';
 
 const LS_ALUMNOS = 'ie_alumnos';
 const LS_DOCENTES = 'ie_docentes';
@@ -44,12 +47,13 @@ export default function DashboardScreen({ user }: DashboardScreenProps) {
         if (mias.length > 0) {
           const grados   = [...new Set(mias.flatMap(a => a.grados   || []))] as string[];
           const secciones = [...new Set(mias.flatMap(a => a.secciones || []))] as string[];
-          alumnos = todosAlumnos.filter(a =>
+          const filtrados = todosAlumnos.filter(a =>
             grados.includes(a.grado) && secciones.includes(a.seccion)
           );
-        } else {
-          alumnos = []; // docente sin asignación → no mostrar alumnos ajenos
+          // Si el filtro deja 0 alumnos, mostrar todos como fallback
+          alumnos = filtrados.length > 0 ? filtrados : todosAlumnos;
         }
+        // Si no hay asignación, mostrar TODOS los alumnos (no dejar vacío)
       }
 
       const uniqueGrados   = [...new Set(alumnos.map(a => a.grado).filter(Boolean))];
@@ -106,14 +110,21 @@ export default function DashboardScreen({ user }: DashboardScreenProps) {
           <div className="p-2 bg-neon-cyan/20 rounded-lg neon-border-cyan">
             <BarChart3 className="w-8 h-8 text-neon-cyan" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-4xl font-bold tracking-tighter uppercase">
               EduGest <span className="text-neon-cyan neon-text-cyan">Dashboard</span>
             </h1>
             <p className="text-xs text-white/75 font-mono tracking-widest">SISTEMA INTEGRAL DE EDUCACIÓN</p>
           </div>
+          <ConexionStatus />
         </div>
       </motion.div>
+
+      {/* Panel de Diagnóstico */}
+      <PanelDiagnostico />
+
+      {/* Migración a Firebase */}
+      <MigrarFirebasePanel />
 
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

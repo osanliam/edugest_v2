@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verificar localStorage + Fusionar Respaldo</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; margin: 0; padding: 20px; min-height: 100vh; }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { text-align: center; color: #38bdf8; margin-bottom: 10px; }
+  .subtitle { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 30px; }
+  .card { background: rgba(30,41,59,0.8); border: 1px solid rgba(56,189,248,0.2); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+  .card h2 { color: #7dd3fc; font-size: 18px; margin-top: 0; display: flex; align-items: center; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 10px; }
+  .btn-primary { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(14,165,233,0.3); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); color white; }
+  .btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+  .stat { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(148,163,184,0.1); }
+  .stat:last-child { border-bottom: none; }
+  .stat-label { color: #94a3b8; font-size: 14px; }
+  .stat-value { color: #38bdf8; font-weight: bold; font-size: 16px; }
+  .stat-value.empty { color: #ef4444; }
+  .stat-value.good { color: #4ade80; }
+  .file-input { display: none; }
+  .file-label { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 20px; border: 2px dashed rgba(56,189,248,0.3); border-radius: 12px; cursor: pointer; color: #38bdf8; transition: all 0.2s; }
+  .file-label:hover { border-color: #38bdf8; background: rgba(56,189,248,0.05); }
+  .success-box { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 12px; padding: 16px; color: #86efac; font-size: 14px; margin-top: 20px; }
+  .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 16px; color: #fca5a5; font-size: 14px; margin-top: 20px; }
+  .warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); border-radius: 12px; padding: 16px; color: #fcd34d; font-size: 14px; margin-bottom: 20px; }
+  .info-box { background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); border-radius: 12px; padding: 16px; color: #7dd3fc; font-size: 14px; margin-top: 20px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 8px; }
+  .badge-new { background: #22c55e; color: white; }
+  .badge-old { background: #f59e0b; color: white; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔍 Verificar localStorage + Fusionar</h1>
+  <p class="subtitle">Revisa qué notas tienes ahora y fúsionalas con tu respaldo sin perder nada</p>
+
+  <div class="warning">
+    ⚠️ <strong>Abre esta página en el mismo navegador</strong> donde usas EduGest. Así podrá leer tu localStorage actual.
+  </div>
+
+  <!-- SECCIÓN 1: localStorage actual -->
+  <div class="card">
+    <h2>💾 Datos actuales en tu navegador</h2>
+    <div id="statsActual"></div>
+    <button class="btn btn-primary" onclick="exportarActual()" style="margin-top:15px;">
+      💾 Hacer backup de lo actual (por seguridad)
+    </button>
+  </div>
+
+  <!-- SECCIÓN 2: Respaldo -->
+  <div class="card">
+    <h2>📁 Cargar archivo de respaldo</h2>
+    <label for="fileInput" class="file-label" id="fileLabel">
+      📂 Haz clic para elegir <code>respaldo_edugest_YYYY-MM-DD.json</code>
+    </label>
+    <input type="file" id="fileInput" class="file-input" accept=".json" onchange="onFileSelected(event)">
+    <div id="fileInfo" style="margin-top:12px; color:#94a3b8; font-size:13px;"></div>
+  </div>
+
+  <!-- SECCIÓN 3: Comparación -->
+  <div class="card" id="previewCard" style="display:none;">
+    <h2>📊 Comparación: localStorage vs Respaldo</h2>
+    <div id="comparacion"></div>
+  </div>
+
+  <!-- Botones de acción -->
+  <div id="acciones" style="display:none;">
+    <button class="btn btn-success" onclick="restaurarSoloRespaldo()">
+      📥 Sobrescribir TODO con el respaldo (pierdes lo actual)
+    </button>
+    <button class="btn btn-warning" onclick="fusionar()">
+      🔀 FUSIONAR respaldo + localStorage (recomendado)
+    </button>
+  </div>
+
+  <div id="resultado"></div>
+</div>
+
+<script>
+// ── Mapeo de campos ──────────────────────────────────────────────────────────
+const MAPEO = [
+  { campo: 'usuarios',       lsKey: 'sistema_usuarios',    nombre: 'Usuarios', idField: 'id' },
+  { campo: 'docentes',       lsKey: 'ie_docentes',         nombre: 'Docentes', idField: 'id' },
+  { campo: 'alumnos',        lsKey: 'ie_alumnos',          nombre: 'Alumnos', idField: 'id' },
+  { campo: 'columnas',       lsKey: 'cal_columnas',        nombre: 'Columnas (Instrumentos)', idField: 'id' },
+  { campo: 'calificativos',  lsKey: 'ie_calificativos_v2', nombre: 'Calificaciones/Notas', idField: null }, // clave compuesta
+  { campo: 'asistencia',     lsKey: 'ie_asistencia',       nombre: 'Registros de Asistencia', idField: null },
+];
+
+let datosRespaldo = {};
+let datosLocal = {};
+
+// ── Utilidades ───────────────────────────────────────────────────────────────
+function parsearLS(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function parsearValor(raw) {
+  if (raw === null || raw === undefined) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }
+  return [];
+}
+
+function claveCalif(cal) {
+  // Para calificativos usamos alumnoId + columnaId como clave única
+  return cal.alumnoId + '::' + cal.columnaId;
+}
+
+// ── Cargar localStorage al abrir ─────────────────────────────────────────────
+function cargarLocal() {
+  datosLocal = {};
+  const div = document.getElementById('statsActual');
+  div.innerHTML = '';
+  let total = 0;
+  let hayAlgo = false;
+
+  for (const map of MAPEO) {
+    const items = parsearLS(map.lsKey);
+    datosLocal[map.lsKey] = items;
+    total += items.length;
+    if (items.length > 0) hayAlgo = true;
+
+    const divStat = document.createElement('div');
+    divStat.className = 'stat';
+    divStat.innerHTML = `
+      <span class="stat-label">${map.nombre}</span>
+      <span class="stat-value ${items.length === 0 ? 'empty' : 'good'}">${items.length} registros</span>
+    `;
+    div.appendChild(divStat);
+  }
+
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'stat';
+  totalDiv.style.borderTop = '2px solid rgba(56,189,248,0.3)';
+  totalDiv.style.marginTop = '10px';
+  totalDiv.style.paddingTop = '15px';
+  totalDiv.innerHTML = `
+    <span class="stat-label" style="font-size:16px; color:#e2e8f0;">TOTAL</span>
+    <span class="stat-value" style="font-size:18px;">${total} registros</span>
+  `;
+  div.appendChild(totalDiv);
+
+  if (!hayAlgo) {
+    div.innerHTML += `
+      <div class="info-box" style="margin-top:15px;">
+        ℹ️ No se encontraron datos en localStorage. Probablemente ya se limpiaron. 
+        Carga tu respaldo y restáuralo directamente.
+      </div>
+    `;
+  }
+}
+
+function exportarActual() {
+  const payload = {};
+  for (const map of MAPEO) {
+    payload[map.campo] = datosLocal[map.lsKey] || [];
+  }
+  payload.exportado = new Date().toISOString();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup_localStorage_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  document.getElementById('resultado').innerHTML = `
+    <div class="success-box">✅ Backup descargado. Guárdalo por seguridad.</div>
+  `;
+}
+
+// ── Cargar respaldo ──────────────────────────────────────────────────────────
+function onFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  document.getElementById('fileLabel').textContent = `📄 ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+  document.getElementById('fileInfo').textContent = 'Leyendo...';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const contenido = JSON.parse(e.target.result);
+      datosRespaldo = {};
+      let totalRespaldo = 0;
+      let totalLocal = 0;
+
+      const compDiv = document.getElementById('comparacion');
+      compDiv.innerHTML = '';
+
+      for (const map of MAPEO) {
+        const rItems = parsearValor(contenido[map.campo]);
+        const lItems = datosLocal[map.lsKey] || [];
+        datosRespaldo[map.lsKey] = rItems;
+        totalRespaldo += rItems.length;
+        totalLocal += lItems.length;
+
+        const div = document.createElement('div');
+        div.className = 'stat';
+        div.innerHTML = `
+          <span class="stat-label">${map.nombre}</span>
+          <span class="stat-value">
+            <span class="badge badge-new">Navegador: ${lItems.length}</span>
+            <span class="badge badge-old">Respaldo: ${rItems.length}</span>
+          </span>
+        `;
+        compDiv.appendChild(div);
+      }
+
+      const totalDiv = document.createElement('div');
+      totalDiv.className = 'stat';
+      totalDiv.style.borderTop = '2px solid rgba(56,189,248,0.3)';
+      totalDiv.style.marginTop = '10px';
+      totalDiv.style.paddingTop = '15px';
+      totalDiv.innerHTML = `
+        <span class="stat-label" style="font-size:16px; color:#e2e8f0;">TOTAL</span>
+        <span class="stat-value" style="font-size:18px;">
+          <span class="badge badge-new">Navegador: ${totalLocal}</span>
+          <span class="badge badge-old">Respaldo: ${totalRespaldo}</span>
+        </span>
+      `;
+      compDiv.appendChild(totalDiv);
+
+      document.getElementById('previewCard').style.display = 'block';
+      document.getElementById('acciones').style.display = 'block';
+      document.getElementById('fileInfo').textContent = 'Listo. Elige si quieres sobrescribir todo o fusionar.';
+    } catch (err) {
+      document.getElementById('fileInfo').textContent = '';
+      document.getElementById('resultado').innerHTML = `
+        <div class="error-box">❌ Error al leer el archivo: ${err.message}</div>
+      `;
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── Sobrescribir ─────────────────────────────────────────────────────────────
+function restaurarSoloRespaldo() {
+  if (!confirm('⚠️ Esto BORRARÁ los datos actuales de tu navegador y los reemplazará con el respaldo.\n\n¿Seguro?')) return;
+
+  let total = 0;
+  for (const map of MAPEO) {
+    const items = datosRespaldo[map.lsKey] || [];
+    if (items.length > 0) {
+      localStorage.setItem(map.lsKey, JSON.stringify(items));
+      total += items.length;
+    } else {
+      localStorage.removeItem(map.lsKey);
+    }
+  }
+
+  document.getElementById('resultado').innerHTML = `
+    <div class="success-box">✅ Sobrescrito completamente. ${total} registros del respaldo ahora están en localStorage.</div>
+  `;
+  cargarLocal(); // refrescar
+}
+
+// ── Fusionar (recomendado) ───────────────────────────────────────────────────
+function fusionar() {
+  if (!confirm('🔀 Esto combinará los datos del respaldo con los de tu navegador.\nSi hay notas duplicadas (misma columna + alumno), se conservarán las MÁS RECIENTES según fecha.\n\n¿Continuar?')) return;
+
+  let totalNuevos = 0;
+  let totalReemplazados = 0;
+  let totalIgnorados = 0;
+
+  for (const map of MAPEO) {
+    const locales = datosLocal[map.lsKey] || [];
+    const respaldo = datosRespaldo[map.lsKey] || [];
+
+    if (map.lsKey === 'ie_calificativos_v2' || map.lsKey === 'ie_asistencia') {
+      // Fusionar por clave compuesta, conservando el más reciente
+      const mapa = new Map();
+      for (const item of locales) {
+        mapa.set(claveCalif(item), item);
+      }
+      for (const item of respaldo) {
+        const k = claveCalif(item);
+        const existente = mapa.get(k);
+        if (!existente) {
+          mapa.set(k, item);
+          totalNuevos++;
+        } else {
+          const fechaExistente = new Date(existente.fecha || '2000-01-01').getTime();
+          const fechaNueva = new Date(item.fecha || '2000-01-01').getTime();
+          if (fechaNueva > fechaExistente) {
+            mapa.set(k, item);
+            totalReemplazados++;
+          } else {
+            totalIgnorados++;
+          }
+        }
+      }
+      const fusionado = Array.from(mapa.values());
+      localStorage.setItem(map.lsKey, JSON.stringify(fusionado));
+    } else {
+      // Fusionar por id único
+      const mapa = new Map();
+      for (const item of locales) {
+        mapa.set(item[map.idField], item);
+      }
+      for (const item of respaldo) {
+        const k = item[map.idField];
+        if (!mapa.has(k)) {
+          totalNuevos++;
+        } else {
+          totalIgnorados++;
+        }
+        mapa.set(k, item); // respaldo gana en configuración general
+      }
+      const fusionado = Array.from(mapa.values());
+      localStorage.setItem(map.lsKey, JSON.stringify(fusionado));
+    }
+  }
+
+  document.getElementById('resultado').innerHTML = `
+    <div class="success-box">
+      ✅ <strong>Fusión completada</strong><br>
+      • ${totalNuevos} registros nuevos agregados<br>
+      • ${totalReemplazados} registros actualizados por fecha más reciente<br>
+      • ${totalIgnorados} registros sin cambios (el más reciente ya estaba)
+    </div>
+  `;
+  cargarLocal(); // refrescar vista
+}
+
+// Inicializar
+cargarLocal();
+</script>
+</body>
+</html>

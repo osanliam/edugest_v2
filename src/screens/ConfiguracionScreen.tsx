@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle, Wifi, WifiOff, Database, Key, Server, Settings, Download } from 'lucide-react';
 import HeaderElegante from '../components/HeaderElegante';
 import { getStorageStats, isSyncedToCloud, syncAllToTurso, syncToTurso } from '../services/dataService';
-import { getAsignaciones as getAsignacionesTurso } from '../utils/apiClient';
+import { getAsignaciones as getAsignacionesTurso, guardarCursos, getCursos, cargarTodo } from '../utils/apiClient';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Bimestre {
@@ -17,7 +17,7 @@ interface Bimestre {
 interface Instrumento {
   id: string;
   nombre: string;
-  tipo: 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica' | 'portafolio-evidencias' | 'registro-anecdotico' | 'escala-valoracion';
+  tipo: 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica' | 'rubrica-2' | 'portafolio-evidencias' | 'registro-anecdotico' | 'escala-valoracion';
   calificativo: 'ABC' | 'AD_A_B_C';
   descripcion: string;
   columnas?: number;
@@ -52,6 +52,49 @@ function lsSet(key: string, val: any) {
   localStorage.setItem(key, JSON.stringify(val));
 }
 
+// Guardar configuración en Turso (nube) como respaldo automático
+async function lsSetCloud(key: string, val: any) {
+  lsSet(key, val);
+  try {
+    if (key === 'cfg_unidades') {
+      await syncToTurso('unidades', val);
+    } else if (key === 'cfg_cursos') {
+      await guardarCursos(val.map((c: any) => ({ ...c, creado: c.creado || new Date().toISOString() })));
+    } else {
+      await guardarConfiguraciones({ [key]: val });
+    }
+  } catch (err) {
+    console.warn('Error sync config a Turso:', err);
+  }
+}
+
+// Cargar configuración: Turso primero, localStorage fallback
+async function lsGetCloud(key: string, def: any = []) {
+  try {
+    if (key === 'cfg_unidades') {
+      const todo = await cargarTodo('unidades');
+      if (todo.unidades?.length > 0) {
+        lsSet(key, todo.unidades);
+        return todo.unidades;
+      }
+    } else if (key === 'cfg_cursos') {
+      const cursos = await getCursos();
+      if (cursos.length > 0) {
+        const mapped = cursos.map((c: any) => ({ id: c.id, nombre: c.nombre, color: c.color || 'from-violet-500 to-purple-600' }));
+        lsSet(key, mapped);
+        return mapped;
+      }
+    } else {
+      const configs = await getConfiguraciones();
+      if (configs[key] !== undefined) {
+        lsSet(key, configs[key]);
+        return configs[key];
+      }
+    }
+  } catch { /* Turso no disponible */ }
+  return lsGet(key, def);
+}
+
 const inputCls = "w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm";
 const sectionCls = "bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4";
 
@@ -70,30 +113,32 @@ function BimestresSection() {
   const [form, setForm] = useState<Bimestre | null>(null);
   const [msg, setMsg] = useState<{tipo:'ok'|'err';texto:string}|null>(null);
 
-  useEffect(() => { setLista(lsGet(LS.bimestres)); }, []);
+  useEffect(() => {
+    lsGetCloud(LS.bimestres).then(d => setLista(Array.isArray(d) ? d : []));
+  }, []);
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!form?.nombre) return setMsg({tipo:'err',texto:'Ingresa el nombre del bimestre'});
     const todos = [...lista];
     const idx = todos.findIndex(b => b.id === form.id);
     if (idx >= 0) todos[idx] = form;
     else todos.push({ ...form, id: 'bim-' + Date.now() });
-    lsSet(LS.bimestres, todos);
+    await lsSetCloud(LS.bimestres, todos);
     setLista(todos);
     setForm(null);
     setMsg({tipo:'ok',texto:'Bimestre guardado'});
     setTimeout(() => setMsg(null), 2500);
   };
 
-  const eliminar = (id: string) => {
+  const eliminar = async (id: string) => {
     const todos = lista.filter(b => b.id !== id);
-    lsSet(LS.bimestres, todos);
+    await lsSetCloud(LS.bimestres, todos);
     setLista(todos);
   };
 
-  const toggleActivo = (id: string) => {
+  const toggleActivo = async (id: string) => {
     const todos = lista.map(b => ({ ...b, activo: b.id === id ? !b.activo : b.activo }));
-    lsSet(LS.bimestres, todos);
+    await lsSetCloud(LS.bimestres, todos);
     setLista(todos);
   };
 
@@ -162,24 +207,26 @@ function InstrumentosSection() {
   const [form, setForm] = useState<Instrumento | null>(null);
   const [msg, setMsg] = useState<{tipo:'ok'|'err';texto:string}|null>(null);
 
-  useEffect(() => { setLista(lsGet(LS.instrumentos)); }, []);
+  useEffect(() => {
+    lsGetCloud(LS.instrumentos).then(d => setLista(Array.isArray(d) ? d : []));
+  }, []);
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!form?.nombre) return setMsg({tipo:'err',texto:'Ingresa el nombre del instrumento'});
     const todos = [...lista];
     const idx = todos.findIndex(i => i.id === form.id);
     if (idx >= 0) todos[idx] = form;
     else todos.push({ ...form, id: 'ins-' + Date.now() });
-    lsSet(LS.instrumentos, todos);
+    await lsSetCloud(LS.instrumentos, todos);
     setLista(todos);
     setForm(null);
     setMsg({tipo:'ok',texto:'Instrumento guardado'});
     setTimeout(() => setMsg(null), 2500);
   };
 
-  const eliminar = (id: string) => {
+  const eliminar = async (id: string) => {
     const todos = lista.filter(i => i.id !== id);
-    lsSet(LS.instrumentos, todos);
+    await lsSetCloud(LS.instrumentos, todos);
     setLista(todos);
   };
 
@@ -188,6 +235,7 @@ function InstrumentosSection() {
     { v: 'lista-cotejo', l: 'Lista de Cotejo' },
     { v: 'ficha-observacion', l: 'Ficha de Observación' },
     { v: 'rubrica', l: 'Rúbrica' },
+    { v: 'rubrica-2', l: 'Rúbrica Mixta' },
     { v: 'portafolio-evidencias', l: 'Portafolio de Evidencias' },
     { v: 'registro-anecdotico', l: 'Registro Anecdótico' },
     { v: 'escala-valoracion', l: 'Escala de Valoración' },
@@ -267,8 +315,8 @@ function InstrumentosSection() {
             <div>
               <span className="text-white font-bold text-sm">{ins.nombre}</span>
               <div className="flex gap-2 mt-0.5 flex-wrap">
-                <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded">{ins.tipo === 'examen' ? 'Examen' : 'Instrumento'}</span>
-                <span className="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded">
+                <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded" translate="no">{ins.tipo === 'examen' ? 'Examen' : ins.tipo === 'rubrica-2' ? 'Rúbrica Mixta' : 'Instrumento'}</span>
+                <span className="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded" translate="no">
                   {ins.calificativo === 'AD_A_B_C' ? 'C/B/A/AD' : 'C/B/A'}
                 </span>
                 {ins.descripcion && <span className="text-xs text-slate-400">{ins.descripcion}</span>}
@@ -294,35 +342,32 @@ function UnidadesSection() {
   const [mostrarActivas, setMostrarActivas] = useState(true);
 
   useEffect(() => {
-    setLista(lsGet(LS.unidades));
-    setBimestres(lsGet(LS.bimestres));
+    lsGetCloud(LS.unidades).then(d => setLista(Array.isArray(d) ? d : []));
+    lsGetCloud(LS.bimestres).then(d => setBimestres(Array.isArray(d) ? d : []));
   }, []);
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!form?.nombre || form.numero === null || form.numero === undefined) return setMsg({tipo:'err',texto:'Completa número y nombre'});
     const todos = [...lista];
     const idx = todos.findIndex(u => u.id === form.id);
     if (idx >= 0) todos[idx] = form;
     else todos.push({ ...form, id: 'uni-' + Date.now(), activa: form.activa !== false });
-    lsSet(LS.unidades, todos);
-    syncToTurso('unidades', todos);
+    await lsSetCloud(LS.unidades, todos);
     setLista(todos);
     setForm(null);
     setMsg({tipo:'ok',texto:'Unidad guardada'});
     setTimeout(() => setMsg(null), 2500);
   };
 
-  const toggleActiva = (u: Unidad) => {
+  const toggleActiva = async (u: Unidad) => {
     const todos = lista.map(x => x.id === u.id ? { ...x, activa: !x.activa } : x);
-    lsSet(LS.unidades, todos);
-    syncToTurso('unidades', todos);
+    await lsSetCloud(LS.unidades, todos);
     setLista(todos);
   };
 
-  const eliminar = (id: string) => {
+  const eliminar = async (id: string) => {
     const todos = lista.filter(u => u.id !== id);
-    lsSet(LS.unidades, todos);
-    syncToTurso('unidades', todos);
+    await lsSetCloud(LS.unidades, todos);
     setLista(todos);
   };
 
@@ -411,24 +456,26 @@ function AniosSection() {
   const [lista, setLista] = useState<AnioAcademico[]>([]);
   const [nuevoAnio, setNuevoAnio] = useState(new Date().getFullYear());
 
-  useEffect(() => { setLista(lsGet(LS.anios)); }, []);
+  useEffect(() => {
+    lsGetCloud(LS.anios).then(d => setLista(Array.isArray(d) ? d : []));
+  }, []);
 
-  const agregar = () => {
+  const agregar = async () => {
     if (lista.some(a => a.año === nuevoAnio)) return;
     const todos = [...lista, { id: 'yr-' + Date.now(), año: nuevoAnio, activo: false }];
-    lsSet(LS.anios, todos);
+    await lsSetCloud(LS.anios, todos);
     setLista(todos);
   };
 
-  const setActivo = (id: string) => {
+  const setActivo = async (id: string) => {
     const todos = lista.map(a => ({ ...a, activo: a.id === id }));
-    lsSet(LS.anios, todos);
+    await lsSetCloud(LS.anios, todos);
     setLista(todos);
   };
 
-  const eliminar = (id: string) => {
+  const eliminar = async (id: string) => {
     const todos = lista.filter(a => a.id !== id);
-    lsSet(LS.anios, todos);
+    await lsSetCloud(LS.anios, todos);
     setLista(todos);
   };
 
@@ -473,25 +520,24 @@ function CompetenciasSection() {
   const [nuevo, setNuevo] = useState('');
 
   useEffect(() => {
-    const guardadas = lsGet(LS_KEY, [
+    lsGetCloud(LS_KEY, [
       'Lee textos diversos',
       'Produce textos escritos',
       'Interactúa oralmente',
-    ]);
-    setLista(guardadas);
+    ]).then(d => setLista(Array.isArray(d) ? d : []));
   }, []);
 
-  const agregar = () => {
+  const agregar = async () => {
     if (!nuevo.trim() || lista.includes(nuevo.trim())) return;
     const todas = [...lista, nuevo.trim()];
-    lsSet(LS_KEY, todas);
+    await lsSetCloud(LS_KEY, todas);
     setLista(todas);
     setNuevo('');
   };
 
-  const eliminar = (idx: number) => {
+  const eliminar = async (idx: number) => {
     const todas = lista.filter((_, i) => i !== idx);
-    lsSet(LS_KEY, todas);
+    await lsSetCloud(LS_KEY, todas);
     setLista(todas);
   };
 
@@ -529,34 +575,59 @@ function CursosSection() {
   const [cursos, setCursos] = useState<Curso[]>([]);
 
   useEffect(() => {
-    setCursos(lsGet(LS_CURSOS, [{ id:'cur-1', nombre:'Comunicación', color:'from-violet-500 to-purple-600' }]));
+    const cargar = async () => {
+      const local = lsGet(LS_CURSOS, []);
+      try {
+        const fromTurso = await getCursos();
+        if (fromTurso.length > 0) {
+          const mapped = fromTurso.map((c: any) => ({ id: c.id, nombre: c.nombre, color: c.color || COLORES_CURSO[0] }));
+          lsSet(LS_CURSOS, mapped);
+          setCursos(mapped);
+        } else if (local.length > 0) {
+          setCursos(local);
+        } else {
+          setCursos([{ id:'cur-1', nombre:'Comunicación', color:'from-violet-500 to-purple-600' }]);
+        }
+      } catch {
+        setCursos(local.length > 0 ? local : [{ id:'cur-1', nombre:'Comunicación', color:'from-violet-500 to-purple-600' }]);
+      }
+    };
+    cargar();
   }, []);
   const [nuevo, setNuevo] = useState('');
   const [editId, setEditId] = useState<string|null>(null);
   const [editNombre, setEditNombre] = useState('');
   const [msg, setMsg] = useState<{tipo:'ok'|'err';texto:string}|null>(null);
 
-  const guardar = (data: Curso[]) => { lsSet(LS_CURSOS, data); setCursos(data); };
+  const guardar = async (data: Curso[]) => {
+    lsSet(LS_CURSOS, data);
+    setCursos(data);
+    try {
+      await guardarCursos(data.map(c => ({ ...c, creado: new Date().toISOString() })));
+    } catch (err) {
+      console.warn('Error sync cursos:', err);
+    }
+  };
   const flash = (tipo:'ok'|'err', texto:string) => { setMsg({tipo,texto}); setTimeout(()=>setMsg(null),3000); };
 
-  const agregar = () => {
+  const agregar = async () => {
     if (!nuevo.trim()) return flash('err','Escribe el nombre del curso');
     if (cursos.some(c=>c.nombre.toLowerCase()===nuevo.trim().toLowerCase())) return flash('err','Ese curso ya existe');
     const nc: Curso = { id:'cur-'+Date.now(), nombre:nuevo.trim(), color: COLORES_CURSO[cursos.length % COLORES_CURSO.length] };
-    guardar([...cursos, nc]);
+    await guardar([...cursos, nc]);
     setNuevo('');
     flash('ok','Curso agregado');
   };
 
-  const eliminar = (id: string) => {
+  const eliminar = async (id: string) => {
     if (!confirm('¿Eliminar este curso?')) return;
-    guardar(cursos.filter(c=>c.id!==id));
+    await guardar(cursos.filter(c=>c.id!==id));
     flash('ok','Curso eliminado');
   };
 
-  const guardarEdit = (id: string) => {
+  const guardarEdit = async (id: string) => {
     if (!editNombre.trim()) return;
-    guardar(cursos.map(c=>c.id===id?{...c,nombre:editNombre.trim()}:c));
+    await guardar(cursos.map(c=>c.id===id?{...c,nombre:editNombre.trim()}:c));
     setEditId(null);
     flash('ok','Actualizado');
   };
@@ -623,36 +694,78 @@ function AsignacionesSection() {
   const [cursos, setCursos]             = useState<Curso[]>([]);
 
   useEffect(() => {
-    const cursosLocal: Curso[] = lsGet(LS_CURSOS, []);
-    setCursos(cursosLocal);
-
-    // Cargar docentes: API primero, fallback localStorage
-    const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || '';
-    fetch('/api/docentes', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null).catch(() => null)
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setDocentes(data);
-          localStorage.setItem(LS_DOCENTES_KEY, JSON.stringify(data));
-        } else {
-          setDocentes(lsGet(LS_DOCENTES_KEY, []));
-        }
-      });
-
-    // Cargar asignaciones: Turso primero, fallback localStorage
     (async () => {
+      // 1. Cargar cursos primero (necesarios para parsear asignaciones)
+      const localCursos = lsGet(LS_CURSOS, []);
+      let cursosCargados: Curso[] = [];
+      try {
+        const fromTurso = await getCursos();
+        if (fromTurso.length > 0) {
+          cursosCargados = fromTurso.map((c: any) => ({ id: c.id, nombre: c.nombre, color: c.color || COLORES_CURSO[0] }));
+          lsSet(LS_CURSOS, cursosCargados);
+        } else if (localCursos.length > 0) {
+          cursosCargados = localCursos;
+        } else {
+          cursosCargados = [{ id:'cur-1', nombre:'Comunicación', color:'from-violet-500 to-purple-600' }];
+          lsSet(LS_CURSOS, cursosCargados);
+        }
+      } catch {
+        cursosCargados = localCursos.length > 0 ? localCursos : [{ id:'cur-1', nombre:'Comunicación', color:'from-violet-500 to-purple-600' }];
+        lsSet(LS_CURSOS, cursosCargados);
+      }
+      setCursos(cursosCargados);
+
+      // 2. Cargar docentes: API primero, luego fusionar con localStorage para no perder locales
+      const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || '';
+      try {
+        const res = await fetch('/api/docentes', { headers: { Authorization: `Bearer ${token}` } });
+        const data = res.ok ? await res.json().catch(() => null) : null;
+        const localDocentes: any[] = lsGet(LS_DOCENTES_KEY, []);
+        if (Array.isArray(data) && data.length > 0) {
+          const apiIds = new Set(data.map((d: any) => d.id));
+          const localesNoEnAPI = localDocentes.filter((d: any) => !apiIds.has(d.id));
+          const merged = [...data, ...localesNoEnAPI];
+          setDocentes(merged);
+          localStorage.setItem(LS_DOCENTES_KEY, JSON.stringify(merged));
+        } else {
+          setDocentes(localDocentes);
+        }
+      } catch {
+        setDocentes(lsGet(LS_DOCENTES_KEY, []));
+      }
+
+      // 3. Cargar asignaciones (usa cursos ya cargados)
       const localAsigs: Asignacion[] = lsGet(LS_ASIGNACIONES, []);
       try {
         const fromTurso = await getAsignacionesTurso();
         if (fromTurso.length > 0) {
-          // Convertir cursos (nombre array) de Turso → cursoId local
-          const asigs: Asignacion[] = fromTurso.map((a: any) => {
-            const cursosArr: string[] = Array.isArray(a.cursos) ? a.cursos : [];
-            const cursoNombre = cursosArr[0] || '';
-            const cursoObj = cursosLocal.find(c => c.nombre === cursoNombre) ||
-                             cursosLocal.find(c => c.id === cursoNombre);
-            return { ...a, cursoId: (a as any).cursoId || cursoObj?.id || cursoNombre };
+          const tursoParsed: Asignacion[] = fromTurso.map((a: any) => {
+            let cursoIdRecuperado = '';
+            try {
+              const extra = typeof a.extra === 'string' ? JSON.parse(a.extra || '{}') : (a.extra || {});
+              if (extra.cursoId) cursoIdRecuperado = extra.cursoId;
+            } catch {}
+            if (!cursoIdRecuperado && a.cursoId) cursoIdRecuperado = a.cursoId;
+            if (!cursoIdRecuperado) {
+              const cursosArr: string[] = Array.isArray(a.cursos) ? a.cursos : [];
+              const cursoNombre = cursosArr[0] || '';
+              const cursoObj = cursosCargados.find(c => c.nombre === cursoNombre) ||
+                               cursosCargados.find(c => c.id === cursoNombre);
+              cursoIdRecuperado = cursoObj?.id || cursoNombre;
+            }
+            return { ...a, cursoId: cursoIdRecuperado };
           });
+
+          const merged = new Map<string, Asignacion>(localAsigs.map(a => [a.id, a]));
+          tursoParsed.forEach(a => {
+            const localA = merged.get(a.id);
+            if (!localA) {
+              merged.set(a.id, a);
+            } else if (!localA.cursoId && a.cursoId) {
+              merged.set(a.id, { ...localA, cursoId: a.cursoId });
+            }
+          });
+          const asigs = Array.from(merged.values());
           lsSet(LS_ASIGNACIONES, asigs);
           setAsignaciones(asigs);
         } else if (localAsigs.length > 0) {
@@ -671,52 +784,85 @@ function AsignacionesSection() {
   const [form, setForm] = useState<{ docenteId:string; cursoId:string; grados:string[]; secciones:string[] }>({
     docenteId:'', cursoId:'', grados:[], secciones:[]
   });
+  const [guardando, setGuardando] = useState(false);
 
   const flash = (tipo:'ok'|'err', texto:string) => { setMsg({tipo,texto}); setTimeout(()=>setMsg(null),3500); };
-  const guardarLS = (data: Asignacion[]) => {
+  const guardarLS = async (data: Asignacion[]) => {
     lsSet(LS_ASIGNACIONES, data);
     setAsignaciones(data);
-    // Convertir cursoId → cursos:[nombre] para que Turso guarde el nombre legible
+    // Enviar a Turso con cursoId en extra para recuperarlo al cargar
     const dataTurso = data.map(a => {
       const cursoObj = cursos.find(c => c.id === a.cursoId);
-      return { ...a, cursos: cursoObj ? [cursoObj.nombre] : (a.cursoId ? [a.cursoId] : []) };
+      return {
+        ...a,
+        cursos: cursoObj ? [cursoObj.nombre] : (a.cursoId ? [a.cursoId] : []),
+        extra: { ...(a as any).extra, cursoId: a.cursoId || '' },
+      };
     });
-    syncToTurso('asignaciones', dataTurso);
+    try {
+      setGuardando(true);
+      await syncToTurso('asignaciones', dataTurso);
+    } catch (err) {
+      console.warn('Sync asignaciones falló:', err);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const recargarDocentes = async () => {
+    const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || '';
+    try {
+      const res = await fetch('/api/docentes', { headers: { Authorization: `Bearer ${token}` } });
+      const data = res.ok ? await res.json().catch(() => null) : null;
+      const localDocentes: any[] = lsGet(LS_DOCENTES_KEY, []);
+      if (Array.isArray(data) && data.length > 0) {
+        const apiIds = new Set(data.map((d: any) => d.id));
+        const localesNoEnAPI = localDocentes.filter((d: any) => !apiIds.has(d.id));
+        const merged = [...data, ...localesNoEnAPI];
+        setDocentes(merged);
+        localStorage.setItem(LS_DOCENTES_KEY, JSON.stringify(merged));
+      } else {
+        setDocentes(localDocentes);
+      }
+    } catch {
+      setDocentes(lsGet(LS_DOCENTES_KEY, []));
+    }
   };
 
   const abrirNueva = () => {
     setEditAsig(null);
     setForm({ docenteId:'', cursoId:'', grados:[], secciones:[] });
+    recargarDocentes(); // Asegurar docentes actualizados al abrir modal
     setShowModal(true);
   };
 
   const abrirEditar = (a: Asignacion) => {
     setEditAsig(a);
-    setForm({ docenteId:a.docenteId, cursoId:a.cursoId, grados:[...a.grados], secciones:[...a.secciones] });
+    setForm({ docenteId:a.docenteId, cursoId:a.cursoId||'', grados:[...a.grados], secciones:[...a.secciones] });
     setShowModal(true);
   };
 
   const toggleArr = (arr: string[], val: string) =>
     arr.includes(val) ? arr.filter(x=>x!==val) : [...arr, val];
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!form.docenteId) return flash('err','Selecciona un docente');
-    if (!form.cursoId)   return flash('err','Selecciona un curso');
+    // Curso es opcional — para ver alumnos solo se necesitan grados y secciones
     if (form.grados.length===0) return flash('err','Selecciona al menos un grado');
     if (form.secciones.length===0) return flash('err','Selecciona al menos una sección');
     if (editAsig) {
-      guardarLS(asignaciones.map(a=>a.id===editAsig.id?{...editAsig,...form}:a));
+      await guardarLS(asignaciones.map(a=>a.id===editAsig.id?{...editAsig,...form}:a));
       flash('ok','Asignación actualizada');
     } else {
-      guardarLS([...asignaciones, { id:'asig-'+Date.now(), ...form }]);
+      await guardarLS([...asignaciones, { id:'asig-'+Date.now(), ...form }]);
       flash('ok','Asignación creada');
     }
     setShowModal(false);
   };
 
-  const eliminar = (id: string) => {
+  const eliminar = async (id: string) => {
     if (!confirm('¿Eliminar esta asignación?')) return;
-    guardarLS(asignaciones.filter(a=>a.id!==id));
+    await guardarLS(asignaciones.filter(a=>a.id!==id));
     flash('ok','Eliminado');
   };
 
@@ -759,11 +905,37 @@ function AsignacionesSection() {
     }
   };
 
+  const recargarDesdeTurso = async () => {
+    flash('ok', '📥 Descargando asignaciones de Turso...');
+    try {
+      const todo = await cargarTodo('asignaciones');
+      if (todo.asignaciones?.length > 0) {
+        // Parsear campos JSON que vienen como string
+        const parsed = todo.asignaciones.map((a: any) => ({
+          ...a,
+          grados:    typeof a.grados    === 'string' ? JSON.parse(a.grados    || '[]') : (a.grados    || []),
+          secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
+          cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
+        }));
+        lsSet(LS_ASIGNACIONES, parsed);
+        setAsignaciones(parsed);
+        flash('ok', `✅ ${parsed.length} asignaciones cargadas de Turso`);
+      } else {
+        flash('err', '⚠️ No hay asignaciones en Turso');
+      }
+    } catch (e: any) {
+      flash('err', '❌ Error: ' + e.message);
+    }
+  };
+
   return (
     <div className={sectionCls}>
         <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-white font-bold text-lg flex items-center gap-2">🏫 Asignaciones Docente-Curso</h2>
+        <h2 className="text-white font-bold text-lg flex items-center gap-2">🏫 Asignaciones Docente-Grado-Sección</h2>
         <div className="flex gap-2">
+          <button onClick={recargarDesdeTurso} className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-bold text-sm">
+            <RefreshCw size={15}/> Recargar de Turso
+          </button>
           {asignaciones.length > 0 && (
             <>
               <button onClick={subirAsignacionesYAlumnos} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold text-sm">
@@ -781,14 +953,20 @@ function AsignacionesSection() {
       </div>
       {msg && <Msg tipo={msg.tipo} texto={msg.texto}/>}
 
+      <div className="flex items-center justify-between">
+        <p className="text-slate-400 text-sm">{docentes.length} docente(s) disponible(s)</p>
+        <button onClick={recargarDocentes} className="text-xs text-sky-400 hover:text-sky-300 underline">
+          🔄 Recargar docentes
+        </button>
+      </div>
       {docentes.length===0 && (
         <p className="text-amber-400 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
           ⚠️ No hay docentes registrados. Ve al módulo <strong>Docentes</strong> para agregarlos primero.
         </p>
       )}
       {cursos.length===0 && (
-        <p className="text-amber-400 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
-          ⚠️ No hay cursos. Créalos en la pestaña <strong>Cursos</strong> primero.
+        <p className="text-slate-400 text-sm bg-slate-700/30 border border-slate-600/30 rounded-lg px-4 py-3">
+          ℹ️ No hay cursos creados, pero puedes asignar grados y secciones igual. El curso es opcional.
         </p>
       )}
 
@@ -801,7 +979,9 @@ function AsignacionesSection() {
               <div className="flex-1 min-w-0">
                 <p className="text-white font-bold text-sm truncate">{nombreDocente(a.docenteId)}</p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full text-xs font-bold">📖 {nombreCurso(a.cursoId)}</span>
+                  {a.cursoId && (
+                    <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full text-xs font-bold">📖 {nombreCurso(a.cursoId)}</span>
+                  )}
                   {a.grados.map(g=>(
                     <span key={g} className="px-2 py-0.5 bg-slate-600 text-slate-300 rounded-full text-xs">{g}</span>
                   ))}
@@ -841,11 +1021,11 @@ function AsignacionesSection() {
                 </select>
               </div>
 
-              {/* Curso */}
+              {/* Curso (opcional) */}
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wide">Curso / Área *</label>
+                <label className="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wide">Curso / Área <span className="text-slate-600">(opcional)</span></label>
                 <select value={form.cursoId} onChange={e=>setForm({...form,cursoId:e.target.value})} className={inputCls}>
-                  <option value="">Seleccionar curso...</option>
+                  <option value="">Sin curso específico</option>
                   {cursos.map(c=>(
                     <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
@@ -879,19 +1059,19 @@ function AsignacionesSection() {
               </div>
 
               {/* Resumen */}
-              {form.docenteId && form.cursoId && form.grados.length>0 && form.secciones.length>0 && (
+              {form.docenteId && form.grados.length>0 && form.secciones.length>0 && (
                 <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-3 text-xs text-indigo-300">
                   <p className="font-bold mb-1">✅ Resumen de asignación:</p>
-                  <p><strong>{nombreDocente(form.docenteId)}</strong> enseña <strong>{nombreCurso(form.cursoId)}</strong></p>
+                  <p><strong>{nombreDocente(form.docenteId)}</strong> {form.cursoId ? `enseña ${nombreCurso(form.cursoId)}` : ''}</p>
                   <p>Grados: {form.grados.join(', ')} · Secciones: {form.secciones.join(', ')}</p>
                 </div>
               )}
             </div>
             <div className="flex gap-3 px-6 py-4 border-t border-slate-700 flex-shrink-0">
-              <button onClick={guardar} className="flex-1 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded-xl text-sm hover:opacity-90">
-                {editAsig?'Guardar cambios':'Crear asignación'}
+              <button onClick={guardar} disabled={guardando} className={`flex-1 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded-xl text-sm hover:opacity-90 ${guardando ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                {guardando ? 'Guardando...' : (editAsig?'Guardar cambios':'Crear asignación')}
               </button>
-              <button onClick={()=>setShowModal(false)} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
+              <button onClick={()=>setShowModal(false)} disabled={guardando} className={`px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm ${guardando ? 'opacity-50 cursor-not-allowed' : ''}`}>Cancelar</button>
             </div>
           </div>
         </div>

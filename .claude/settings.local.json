@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('dependencies',{}\\), indent=2\\)\\)\")",
+      "Bash(npm run *)",
+      "Bash(npx vite *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm --version)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('lockfile version:', d.get\\('lockfileVersion'\\)\\)\")",
+      "Bash(npm config *)",
+      "Bash(npm_config_os=darwin npm install)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(k,':',v\\) for k,v in d.items\\(\\) if any\\(x in k.lower\\(\\) for x in ['os','lib','plat','arch','cpu']\\)]\")",
+      "Read(//opt/homebrew/etc/**)",
+      "Read(//opt/homebrew/**)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('devDeps:', json.dumps\\(d.get\\('devDependencies',{}\\), indent=2\\)\\); print\\('scripts:', json.dumps\\(d.get\\('scripts',{}\\), indent=2\\)\\)\")",
+      "Bash(npm test *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git rm *)",
+      "Bash(git push *)"
+    ]
+  }
+}

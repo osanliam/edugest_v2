@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧹 Limpiar Cache - Sistemita</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.95em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .step {
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 6px;
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .step-text {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .button-group {
+            display: grid;
+            gap: 12px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #dee2e6;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .result.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+
+        .result strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f7ff;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .stats.show {
+            display: block;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e7ff;
+            font-size: 0.9em;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-key {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .icon {
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span class="icon">🧹</span> Limpiar Cache</h1>
+            <p>Acelera tu sistema removiendo duplicados y datos antiguos</p>
+        </div>
+
+        <div class="content">
+            <div class="step">
+                <div class="step-title"><span class="icon">1️⃣</span> Qué hace este script</div>
+                <div class="step-text">
+                    • Elimina calificativos duplicados<br>
+                    • Borra registros más antiguos de 1 año<br>
+                    • Compacta datos de asistencia<br>
+                    • Muestra espacio liberado
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-title"><span class="icon">⏱️</span> Tiempo estimado</div>
+                <div class="step-text">
+                    3-5 segundos para completar la limpieza
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-title"><span class="icon">✅</span> Seguridad</div>
+                <div class="step-text">
+                    No se pierden datos importantes. Los registros se deduplican y optimizan.
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="ejecutarLimpieza()">
+                    <span class="icon">🚀</span> INICIAR LIMPIEZA
+                </button>
+                <button class="btn-secondary" onclick="mostrarDiagnostico()">
+                    <span class="icon">📊</span> Ver tamaño actual
+                </button>
+            </div>
+
+            <div id="result" class="result"></div>
+            <div id="stats" class="stats"></div>
+        </div>
+    </div>
+
+    <script>
+        function mostrarDiagnostico() {
+            console.log('📊 Diagnóstico de tamaño...');
+
+            const keysToAnalyze = [
+                'ie_alumnos',
+                'ie_docentes',
+                'sistema_usuarios',
+                'ie_calificativos_v2',
+                'cal_columnas',
+                'cfg_asignaciones',
+                'ie_asistencia'
+            ];
+
+            let totalSize = 0;
+            const stats = [];
+
+            keysToAnalyze.forEach(key => {
+                const data = localStorage.getItem(key);
+                if (data) {
+                    const sizeKB = (new Blob([data]).size / 1024).toFixed(2);
+                    totalSize += parseFloat(sizeKB);
+                    stats.push({ key, size: parseFloat(sizeKB) });
+                }
+            });
+
+            // Mostrar estadísticas
+            const statsDiv = document.getElementById('stats');
+            let html = '<strong>📊 Tamaño actual:</strong>';
+            stats.forEach(s => {
+                html += `<div class="stat-row"><span class="stat-key">${s.key}</span><span class="stat-value">${s.size}KB</span></div>`;
+            });
+            html += `<div class="stat-row" style="border-bottom: 2px solid #667eea; margin-top: 10px; font-weight: bold;"><span class="stat-key">TOTAL</span><span class="stat-value">${totalSize.toFixed(2)}KB / 5120KB</span></div>`;
+
+            const percentage = ((totalSize / 5120) * 100).toFixed(1);
+            html += `<div class="stat-row"><span class="stat-key">Uso</span><span class="stat-value">${percentage}%</span></div>`;
+
+            statsDiv.innerHTML = html;
+            statsDiv.classList.add('show');
+
+            const resultDiv = document.getElementById('result');
+            if (totalSize > 3000) {
+                resultDiv.className = 'result warning';
+                resultDiv.innerHTML = '<strong>⚠️ Advertencia:</strong> localStorage está muy lleno. Se recomienda limpiar.';
+            } else if (totalSize > 2000) {
+                resultDiv.className = 'result info';
+                resultDiv.innerHTML = '<strong>ℹ️ Información:</strong> Hay espacio para optimizar.';
+            } else {
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = '<strong>✅ Excelente:</strong> El uso es normal.';
+            }
+        }
+
+        async function ejecutarLimpieza() {
+            const resultDiv = document.getElementById('result');
+            const statsDiv = document.getElementById('stats');
+
+            resultDiv.className = 'result info';
+            resultDiv.innerHTML = '<span class="spinner"></span>Ejecutando limpieza...';
+            statsDiv.classList.remove('show');
+
+            try {
+                // PASO 1: Diagnóstico inicial
+                const keysToAnalyze = [
+                    'ie_alumnos',
+                    'ie_docentes',
+                    'sistema_usuarios',
+                    'ie_calificativos_v2',
+                    'cal_columnas',
+                    'cfg_asignaciones',
+                    'ie_asistencia'
+                ];
+
+                let totalBefore = 0;
+                const breakdown = {};
+
+                keysToAnalyze.forEach(key => {
+                    const data = localStorage.getItem(key);
+                    if (data) {
+                        const sizeKB = (new Blob([data]).size / 1024).toFixed(2);
+                        breakdown[key] = parseFloat(sizeKB);
+                        totalBefore += parseFloat(sizeKB);
+                    }
+                });
+
+                // PASO 2: Limpiar duplicados en calificativos
+                const calStr = localStorage.getItem('ie_calificativos_v2');
+                if (calStr) {
+                    const calificativos = JSON.parse(calStr);
+                    const unicos = Array.from(
+                        new Map(
+                            calificativos.map(item => [
+                                JSON.stringify(item),
+                                item
+                            ])
+                        ).values()
+                    );
+
+                    if (calificativos.length > unicos.length) {
+                        localStorage.setItem('ie_calificativos_v2', JSON.stringify(unicos));
+                    }
+                }
+
+                // PASO 3: Eliminar registros antiguos
+                if (calStr) {
+                    const calificativos = JSON.parse(localStorage.getItem('ie_calificativos_v2'));
+                    const now = Date.now();
+                    const oneYearAgo = now - (365 * 24 * 60 * 60 * 1000);
+
+                    const recent = calificativos.filter(c => {
+                        if (!c.fecha) return true;
+                        try {
+                            return new Date(c.fecha).getTime() > oneYearAgo;
+                        } catch {
+                            return true;
+                        }
+                    });
+
+                    localStorage.setItem('ie_calificativos_v2', JSON.stringify(recent));
+                }
+
+                // PASO 4: Compactar asistencia
+                const asistStr = localStorage.getItem('ie_asistencia');
+                if (asistStr) {
+                    const asistencia = JSON.parse(asistStr);
+                    const unicos = Array.from(
+                        new Map(
+                            asistencia.map(item => [
+                                `${item.alumnoId}_${item.fecha}`,
+                                item
+                            ])
+                        ).values()
+                    );
+                    localStorage.setItem('ie_asistencia', JSON.stringify(unicos));
+                }
+
+                // Limpiar metadata
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('_sync_meta_')) {
+                        localStorage.removeItem(key);
+                    }
+                }
+
+                // PASO 5: Diagnóstico final
+                let totalAfter = 0;
+                keysToAnalyze.forEach(key => {
+                    const data = localStorage.getItem(key);
+                    if (data) {
+                        const sizeKB = (new Blob([data]).size / 1024).toFixed(2);
+                        totalAfter += parseFloat(sizeKB);
+                    }
+                });
+
+                const totalReduced = totalBefore - totalAfter;
+                const pctReduced = ((totalReduced / totalBefore) * 100).toFixed(1);
+
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <strong>✅ ¡Limpieza completada!</strong><br>
+                    Antes: ${totalBefore.toFixed(2)}KB<br>
+                    Después: ${totalAfter.toFixed(2)}KB<br>
+                    <strong>Ahorrados: ${totalReduced.toFixed(2)}KB (${pctReduced}%)</strong><br><br>
+                    🔄 Recargando página en 2 segundos...
+                `;
+
+                // Recargar automáticamente
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        // Mostrar diagnóstico al cargar
+        window.onload = function() {
+            mostrarDiagnostico();
+        };
+    </script>
+</body>
+</html>

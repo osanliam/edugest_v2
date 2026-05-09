@@ -245,7 +245,5 @@ export function Dashboard() {
         </div>
       </GlassCard>
     </div>
-      </div>
-    </div>
   );
 }

@@ -84,21 +84,25 @@ export interface Attendance {
 export interface Message {
   id: string;
   senderId: string;
-  recipientId: string;
+  senderName: string;
+  receiverId: string;
   subject: string;
-  body: string;
-  attachments?: string[];
-  sentDate: string;
-  readDate?: string;
-  isRead: boolean;
+  text: string;
+  date: string;
+  read: boolean;
+  isBroadcast: boolean;
+  priority: 'baja' | 'normal' | 'alta' | 'urgente';
+  category: 'academico' | 'administrativo' | 'general' | 'urgente';
 }
 
 export interface Conversation {
   id: string;
-  participants: string[];
-  lastMessage: Message;
+  otherUserId: string;
+  otherUserName: string;
+  otherUserRole: string;
+  lastMessage: string;
+  lastMessageDate: string;
   unreadCount: number;
-  updatedAt: string;
 }
 
 export interface Announcement {
@@ -142,4 +146,65 @@ export interface SchoolInfo {
   logo?: string;
   establishedYear: number;
   principalName: string;
+}
+
+export interface AulaVirtual {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  docenteId: string;
+  grado: string;
+  seccion: string;
+  curso: string;
+  imagen: string;
+  estado: 'activa' | 'archivada';
+  creado: string;
+  actualizado: string;
+}
+
+export type TipoMaterial = 'video' | 'documento' | 'enlace' | 'tarea' | 'archivo';
+
+export interface Material {
+  id: string;
+  aulaId: string;
+  tipo: TipoMaterial;
+  titulo: string;
+  descripcion: string;
+  contenido: string;
+  url: string;
+  nombreArchivo: string;
+  tipoArchivo: string;
+  pesoArchivo: number;
+  fechaEntrega: string;
+  creadoPor: string;
+  creado: string;
+  actualizado: string;
+}
+
+export type EstadoEntrega = 'pendiente' | 'entregado' | 'calificado' | 'tarde';
+
+export interface Entrega {
+  id: string;
+  materialId: string;
+  alumnoId: string;
+  aulaId: string;
+  contenido: string;
+  nombreArchivo: string;
+  tipoArchivo: string;
+  pesoArchivo: number;
+  nota: number | null;
+  comentarioDoc: string;
+  estado: EstadoEntrega;
+  creado: string;
+  actualizado: string;
+}
+
+export interface Comentario {
+  id: string;
+  materialId: string;
+  aulaId: string;
+  userId: string;
+  userName: string;
+  contenido: string;
+  creado: string;
 }

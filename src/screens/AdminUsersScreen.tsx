@@ -40,33 +40,40 @@ function lsDocentes(): any[] {
 }
 
 async function apiUsers(path: string, method = 'GET', body?: object): Promise<any> {
-  if (!import.meta.env.PROD) {
-    const todos = lsCargar();
-    if (method === 'GET') return todos;
-    if (method === 'POST') {
-      const b = body as any;
-      if (todos.some(u => u.email === b.email)) throw new Error('Email ya existe');
-      const nuevo = { ...b, id: 'usr-' + Date.now(), activo: true, creado: new Date().toISOString() };
-      lsGuardar([...todos, nuevo]); return { ok: true };
+  // SIEMPRE intentar la API primero (nube primero)
+  try {
+    const res = await fetch(path, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error');
+    return data;
+  } catch (apiErr) {
+    // Fallback a localStorage solo si la API falla
+    if (!import.meta.env.PROD) {
+      console.warn('API no disponible, usando localStorage:', apiErr);
+      const todos = lsCargar();
+      if (method === 'GET') return todos;
+      if (method === 'POST') {
+        const b = body as any;
+        if (todos.some(u => u.email === b.email)) throw new Error('Email ya existe');
+        const nuevo = { ...b, id: 'usr-' + Date.now(), activo: true, creado: new Date().toISOString() };
+        lsGuardar([...todos, nuevo]); return { ok: true };
+      }
+      if (method === 'PUT') {
+        const id = path.split('id=')[1];
+        lsGuardar(todos.map(u => u.id === id ? { ...u, ...(body as any) } : u)); return { ok: true };
+      }
+      if (method === 'DELETE') {
+        const id = path.split('id=')[1];
+        lsGuardar(todos.filter(u => u.id !== id)); return { ok: true };
+      }
+      return {};
     }
-    if (method === 'PUT') {
-      const id = path.split('id=')[1];
-      lsGuardar(todos.map(u => u.id === id ? { ...u, ...(body as any) } : u)); return { ok: true };
-    }
-    if (method === 'DELETE') {
-      const id = path.split('id=')[1];
-      lsGuardar(todos.filter(u => u.id !== id)); return { ok: true };
-    }
-    return {};
+    throw apiErr;
   }
-  const res = await fetch(path, {
-    method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Error');
-  return data;
 }
 
 // Parsear CSV simple
@@ -131,11 +138,15 @@ export default function AdminUsersScreen({ user }: { user?: any }) {
           .then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
       setUsuarios(Array.isArray(us) ? us : us.users || []);
+      const localDocs = lsDocentes();
       if (Array.isArray(docsRes) && docsRes.length > 0) {
-        setDocentes(docsRes);
-        localStorage.setItem(LS_DOCENTES, JSON.stringify(docsRes));
+        const apiIds = new Set(docsRes.map((d: any) => d.id));
+        const localesNoEnAPI = localDocs.filter((d: any) => !apiIds.has(d.id));
+        const merged = [...docsRes, ...localesNoEnAPI];
+        setDocentes(merged);
+        localStorage.setItem(LS_DOCENTES, JSON.stringify(merged));
       } else {
-        setDocentes(lsDocentes());
+        setDocentes(localDocs);
       }
     } catch {
       setUsuarios(lsCargar());
