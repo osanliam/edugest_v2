@@ -3,7 +3,8 @@ import { motion } from 'motion/react';
 import { Plus, Trash2, Edit2, Check, X, Save, RefreshCw, AlertCircle, Wifi, WifiOff, Database, Key, Server, Settings, Download } from 'lucide-react';
 import HeaderElegante from '../components/HeaderElegante';
 import { getStorageStats, isSyncedToCloud, syncAllToTurso, syncToTurso } from '../services/dataService';
-import { getAsignaciones as getAsignacionesTurso, guardarCursos, getCursos, cargarTodo } from '../utils/apiClient';
+import { getAsignaciones as getAsignacionesTurso, guardarCursos, getCursos, cargarTodo, guardarConfiguraciones } from '../utils/apiClient';
+import { migrarDatosLocalesAFirebase, getColumnasFB, getAlumnosFB, getDocentesFB, getCalificativosFB, getUnidadesFB, getAsignacionesFB } from '../services/firebaseDataService';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Bimestre {
@@ -52,43 +53,59 @@ function lsSet(key: string, val: any) {
   localStorage.setItem(key, JSON.stringify(val));
 }
 
-// Guardar configuración en Turso (nube) como respaldo automático
+// Guardar configuración — Firebase primero, localStorage siempre
 async function lsSetCloud(key: string, val: any) {
   lsSet(key, val);
   try {
     if (key === 'cfg_unidades') {
-      await syncToTurso('unidades', val);
-    } else if (key === 'cfg_cursos') {
-      await guardarCursos(val.map((c: any) => ({ ...c, creado: c.creado || new Date().toISOString() })));
-    } else {
-      await guardarConfiguraciones({ [key]: val });
+      const { guardarUnidadesFB } = await import('../services/firebaseDataService');
+      await guardarUnidadesFB(val);
+    } else if (key === 'cfg_asignaciones') {
+      const { guardarAsignacionesFB } = await import('../services/firebaseDataService');
+      await guardarAsignacionesFB(val);
+    } else if (key === 'cal_columnas') {
+      const { guardarColumnasFB } = await import('../services/firebaseDataService');
+      await guardarColumnasFB(val);
     }
-  } catch (err) {
-    console.warn('Error sync config a Turso:', err);
+  } catch (fbErr) {
+    console.warn('Firebase config falló, intentando Turso:', fbErr);
+    try {
+      if (key === 'cfg_unidades') {
+        await syncToTurso('unidades', val);
+      } else if (key === 'cfg_cursos') {
+        await guardarCursos(val.map((c: any) => ({ ...c, creado: c.creado || new Date().toISOString() })));
+      } else {
+        await guardarConfiguraciones({ [key]: val });
+      }
+    } catch (err) {
+      console.warn('Error sync config a Turso:', err);
+    }
   }
 }
 
-// Cargar configuración: Turso primero, localStorage fallback
+// Cargar configuración — Firebase primero, Turso fallback, localStorage última
 async function lsGetCloud(key: string, def: any = []) {
   try {
     if (key === 'cfg_unidades') {
+      const data = await getUnidadesFB();
+      if (data.length > 0) { lsSet(key, data); return data; }
+    } else if (key === 'cfg_asignaciones') {
+      const data = await getAsignacionesFB();
+      if (data.length > 0) { lsSet(key, data); return data; }
+    } else if (key === 'cal_columnas') {
+      const data = await getColumnasFB();
+      if (data.length > 0) { lsSet(key, data); return data; }
+    }
+  } catch { /* Firebase no disponible */ }
+  try {
+    if (key === 'cfg_unidades') {
       const todo = await cargarTodo('unidades');
-      if (todo.unidades?.length > 0) {
-        lsSet(key, todo.unidades);
-        return todo.unidades;
-      }
+      if (todo.unidades?.length > 0) { lsSet(key, todo.unidades); return todo.unidades; }
     } else if (key === 'cfg_cursos') {
       const cursos = await getCursos();
       if (cursos.length > 0) {
-        const mapped = cursos.map((c: any) => ({ id: c.id, nombre: c.nombre, color: c.color || 'from-violet-500 to-purple-600' }));
-        lsSet(key, mapped);
-        return mapped;
-      }
-    } else {
-      const configs = await getConfiguraciones();
-      if (configs[key] !== undefined) {
-        lsSet(key, configs[key]);
-        return configs[key];
+        const mapped = cursos.map((c: any) => ({ id: c.id, nombre: c.nombre, color: c.color || COLORES_CURSO[0] }));
+        lsSet(key, mapped); return mapped;
       }
     }
   } catch { /* Turso no disponible */ }
@@ -1083,9 +1100,8 @@ function AsignacionesSection() {
 // ── API STATUS ────────────────────────────────────────────────────────────────
 function ApiStatusSection() {
   const [checking, setChecking] = useState(false);
-  const [tursoOk, setTursoOk] = useState<boolean | null>(null);
-  const [dbSize, setDbSize] = useState<string>('—');
-  const [lastCheck, setLastCheck] = useState<string>('');
+  const [fbOk, setFbOk] = useState<boolean | null>(null);
+  const [dbStats, setDbStats] = useState<{alumnos: number; columnas: number; calificativos: number; unidades: number; asignaciones: number} | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ ok: boolean; message: string; syncedTypes: string[] } | null>(null);
   const [diag, setDiag] = useState<any | null>(null);
@@ -1108,20 +1124,23 @@ function ApiStatusSection() {
     try { return JSON.parse(localStorage.getItem('ie_docentes') || '[]'); } catch { return []; }
   })();
 
-  const checkTurso = async () => {
+  const checkFirebase = async () => {
     setChecking(true);
-    setTursoOk(null);
+    setFbOk(null);
     try {
-      const res = await fetch('/api/sync?size=1', { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        const data = await res.json();
-        setTursoOk(true);
-        setDbSize(data.dbSize ? `${(data.dbSize / 1024).toFixed(1)} KB` : 'OK');
-      } else {
-        setTursoOk(false);
-      }
+      const [al, col, cal, uni, asig] = await Promise.all([
+        getAlumnosFB(), getColumnasFB(), getCalificativosFB(), getUnidadesFB(), getAsignacionesFB()
+      ]);
+      setFbOk(true);
+      setDbStats({
+        alumnos: al.length,
+        columnas: col.length,
+        calificativos: cal.length,
+        unidades: uni.length,
+        asignaciones: asig.length,
+      });
     } catch {
-      setTursoOk(false);
+      setFbOk(false);
     } finally {
       setChecking(false);
       setLastCheck(new Date().toLocaleTimeString('es-PE'));
@@ -1132,8 +1151,13 @@ function ApiStatusSection() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const result = await syncAllToTurso();
-      setSyncResult(result);
+      const result = await migrarDatosLocalesAFirebase();
+      setSyncResult({
+        ok: result.ok,
+        message: result.ok ? `Sincronización a Firebase completa` : 'Algunas colecciones fallaron',
+        syncedTypes: result.mensajes,
+      });
+      checkFirebase();
     } catch {
       setSyncResult({ ok: false, message: 'Error inesperado al sincronizar', syncedTypes: [] });
     } finally {
@@ -1247,10 +1271,10 @@ function ApiStatusSection() {
           <div>
             <h2 className="text-white font-bold text-base flex items-center gap-2">
               <RefreshCw size={18} className="text-green-400" />
-              Sincronización Manual a la Nube
+              Sincronización Manual a Firebase
             </h2>
             <p className="text-slate-400 text-xs mt-1">
-              Sube todo el contenido del almacenamiento local a Turso DB ahora mismo.
+              Sube todo el contenido del almacenamiento local a Firebase ahora mismo. Los demás docentes verán los cambios.
             </p>
           </div>
           <button onClick={handleSyncAll} disabled={syncing}
@@ -1274,23 +1298,18 @@ function ApiStatusSection() {
                 ))}
               </div>
             )}
-            {!cloud && (
-              <p className="text-slate-400 text-xs mt-2 italic">
-                Nota: En modo desarrollo, el sync está simulado. El push real a Turso ocurre en producción (Vercel).
-              </p>
-            )}
           </div>
         )}
       </div>
 
-      {/* Estado Turso DB */}
+      {/* Estado Firebase DB */}
       <div className={sectionCls}>
         <div className="flex items-center justify-between">
           <h2 className="text-white font-bold text-base flex items-center gap-2">
             <Database size={18} className="text-indigo-400" />
-            Estado de Turso DB (Nube)
+            Estado de Firebase (Nube)
           </h2>
-          <button onClick={checkTurso} disabled={checking}
+          <button onClick={checkFirebase} disabled={checking}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
             <RefreshCw size={13} className={checking ? 'animate-spin' : ''} />
             {checking ? 'Verificando...' : 'Verificar Conexión'}
@@ -1306,22 +1325,22 @@ function ApiStatusSection() {
               {cloud ? 'PRODUCCIÓN' : 'DESARROLLO LOCAL'}
             </div>
             <p className="text-xs text-slate-500">
-              {cloud ? 'Sync automático con Turso activo' : 'Solo localStorage — sin sync'}
+              {cloud ? 'Firebase activo como base de datos principal' : 'Solo localStorage — sin sync'}
             </p>
           </div>
 
-          {/* Turso ping */}
+          {/* Firebase ping */}
           <div className="bg-slate-700/40 rounded-xl p-4 flex flex-col gap-2">
-            <p className="text-xs text-slate-400 uppercase font-medium">Turso API</p>
-            {tursoOk === null && (
+            <p className="text-xs text-slate-400 uppercase font-medium">Firebase</p>
+            {fbOk === null && (
               <p className="text-slate-500 text-sm">{lastCheck ? 'Sin resultado' : 'Sin verificar aún'}</p>
             )}
-            {tursoOk === true && (
+            {fbOk === true && (
               <div className="flex items-center gap-2 text-green-400 font-bold">
-                <Check size={16} /> Conectado · {dbSize}
+                <Check size={16} /> Conectado
               </div>
             )}
-            {tursoOk === false && (
+            {fbOk === false && (
               <div className="flex items-center gap-2 text-red-400 font-bold">
                 <X size={16} /> Sin conexión
               </div>
@@ -1343,43 +1362,28 @@ function ApiStatusSection() {
           </div>
         </div>
 
-        {/* Detalle por tabla */}
-        <div>
-          <p className="text-xs text-slate-400 uppercase font-medium mb-3">Datos almacenados</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: 'Alumnos', count: alumnos.length, key: 'ie_alumnos', color: 'text-cyan-400' },
-              { label: 'Docentes', count: docentes.length, key: 'ie_docentes', color: 'text-indigo-400' },
-              { label: 'Usuarios', count: usuarios.length, key: 'sistema_usuarios', color: 'text-purple-400' },
-              { label: 'Asistencia', count: (() => { try { return JSON.parse(localStorage.getItem('ie_asistencia')||'[]').length; } catch { return 0; } })(), key: 'ie_asistencia', color: 'text-green-400' },
-              { label: 'Calificativos', count: (() => { try { return JSON.parse(localStorage.getItem('ie_calificativos_v2')||'[]').length; } catch { return 0; } })(), key: 'ie_calificativos_v2', color: 'text-yellow-400' },
-              { label: 'Normas', count: (() => { try { return JSON.parse(localStorage.getItem('cfg_normas_convivencia')||'[]').length; } catch { return 0; } })(), key: 'cfg_normas_convivencia', color: 'text-pink-400' },
-              { label: 'Reg. Normas', count: (() => { try { return JSON.parse(localStorage.getItem('ie_registros_normas')||'[]').length; } catch { return 0; } })(), key: 'ie_registros_normas', color: 'text-orange-400' },
-              { label: 'Columnas eval.', count: (() => { try { return JSON.parse(localStorage.getItem('cal_columnas')||'[]').length; } catch { return 0; } })(), key: 'cal_columnas', color: 'text-teal-400' },
-            ].map(item => (
-              <div key={item.key} className="bg-slate-700/40 rounded-lg px-3 py-2">
-                <p className="text-xs text-slate-400">{item.label}</p>
-                <p className={`text-xl font-black ${item.color}`}>{item.count}</p>
-                <p className="text-[10px] text-slate-600 truncate">{storage.breakdown[item.key] ? `${Math.round(storage.breakdown[item.key]/1024*10)/10} KB` : '0 KB'}</p>
-              </div>
-            ))}
+        {/* Datos en Firebase */}
+        {dbStats && (
+          <div className="mt-3">
+            <p className="text-xs text-slate-400 uppercase font-medium mb-3">Datos en Firebase</p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {[
+                { label: 'Alumnos', count: dbStats.alumnos, color: 'text-cyan-400' },
+                { label: 'Columnas', count: dbStats.columnas, color: 'text-teal-400' },
+                { label: 'Calificativos', count: dbStats.calificativos, color: 'text-yellow-400' },
+                { label: 'Unidades', count: dbStats.unidades, color: 'text-purple-400' },
+                { label: 'Asignaciones', count: dbStats.asignaciones, color: 'text-orange-400' },
+              ].map(item => (
+                <div key={item.label} className="bg-slate-700/40 rounded-lg px-3 py-2">
+                  <p className="text-xs text-slate-400">{item.label}</p>
+                  <p className={`text-xl font-black ${item.color}`}>{item.count}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Diagnóstico y Limpieza Turso */}
-      <div className={sectionCls}>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h2 className="text-white font-bold text-base flex items-center gap-2">
-              <AlertCircle size={18} className="text-amber-400" />
-              Diagnóstico y Limpieza de Turso
-            </h2>
-            <p className="text-slate-400 text-xs mt-1">
-              Revisa qué tablas ocupan espacio, detecta duplicados y limpia datos innecesarios.
-            </p>
-          </div>
-          <div className="flex gap-2">
+        <div className="flex gap-2">
             <button onClick={detectarDuplicados} disabled={dupesLoading}
               className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all">
               <RefreshCw size={13} className={dupesLoading ? 'animate-spin' : ''} />
@@ -1391,9 +1395,7 @@ function ApiStatusSection() {
               {diagLoading ? 'Analizando...' : '🔍 Diagnosticar'}
             </button>
           </div>
-        </div>
 
-        {/* Duplicados */}
         {dupes && !dupes.error && (
           <div className="space-y-3 mt-4">
             <p className="text-xs text-red-400 uppercase font-bold">Duplicados detectados</p>
@@ -1466,7 +1468,7 @@ function ApiStatusSection() {
             </div>
 
             <div className="rounded-lg p-3 bg-slate-700/30 border border-slate-600/40 text-xs text-slate-400">
-              <strong className="text-slate-300">Nota sobre VACUUM:</strong> Turso no permite ejecutar VACUUM manualmente desde SQL. El espacio liberado por los duplicados eliminados se reutilizará automáticamente en futuras inserciones. Si necesitas reducir el tamaño físico, contacta al soporte de Turso.
+              <strong className="text-slate-300">Nota:</strong> Los datos se guardan en Firebase para que todos los docentes los vean.
             </div>
           </div>
         )}
