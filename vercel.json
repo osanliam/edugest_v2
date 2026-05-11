@@ -19,6 +19,9 @@
     }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index?path=$1" }
+    { "source": "/api/docentes(.*)", "destination": "/api/index?path=docentes$1" },
+    { "source": "/api/calificaciones(.*)", "destination": "/api/index?path=calificaciones$1" },
+    { "source": "/api/configuracion/(.*)", "destination": "/api/index?path=configuracion/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

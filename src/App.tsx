@@ -142,12 +142,12 @@ export default function App() {
       teacher: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
         'calificativos', 'horario', 'asistencia', 'normas-convivencia', 'grupos',
-        'estudiantes', 'gestion-alumnos'
+        'estudiantes', 'gestion-alumnos', 'reporte-alumno'
       ],
       student: [
         'inicio', 'inicio-modern', 'aula-virtual', 'mensajes', 'informes', 'comunidad',
         'dashboard-estudiante', 'horario', 'asistencia',
-        'normas-convivencia'
+        'normas-convivencia', 'reporte-alumno'
       ],
       parent: [
         'inicio', 'inicio-modern', 'mensajes', 'informes', 'comunidad',

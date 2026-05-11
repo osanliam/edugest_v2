@@ -853,90 +853,163 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
   alumno: Alumno; columna: Columna; calActual?: Calificativo;
   onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
-  const cols = (columna.columnasEval?.length ? columna.columnasEval : ['C', 'B', 'A', 'AD']) as string[];
   const items = Array.isArray(columna.itemsExamen) ? columna.itemsExamen : [];
-  const initResp = (): string[] => {
-    if (calActual?.items?.length) return calActual.items.map((it: any) => it.respuesta || '');
-    return Array(items.length || columna.totalItems || cols.length).fill('');
+  const colLevels = (columna.columnasEval?.length ? columna.columnasEval : ['C', 'B', 'A', 'AD']) as string[];
+  const levelLabels: Record<string, string> = { C: 'INICIO', B: 'PROCESO', A: 'LOGRO', AD: 'LOGRO DESTACADO' };
+
+  const initRows = (): { criterio: string; descriptores: string[]; nivel: string }[] => {
+    const count = items.length || columna.totalItems || 4;
+    if (calActual?.items?.length) {
+      return calActual.items.map((it: any, i: number) => {
+        const cfg = items[i] || {};
+        return {
+          criterio: it.indicador || it.criterio || cfg.indicador || cfg.criterio || `Criterio ${i + 1}`,
+          descriptores: cfg.descriptores?.length === 4 ? [...cfg.descriptores] : Array(4).fill(''),
+          nivel: it.respuesta || '',
+        };
+      });
+    }
+    if (items.length > 0) {
+      return items.map((cfg: any, i: number) => ({
+        criterio: cfg.indicador || cfg.criterio || `Criterio ${i + 1}`,
+        descriptores: cfg.descriptores?.length === 4 ? [...cfg.descriptores] : Array(4).fill(''),
+        nivel: '',
+      }));
+    }
+    return Array(count).fill(null).map((_, i) => ({
+      criterio: `Criterio ${i + 1}`,
+      descriptores: Array(4).fill(''),
+      nivel: '',
+    }));
   };
-  const [respuestas, setRespuestas] = useState<string[]>(initResp);
+
+  const [rows, setRows] = useState(initRows());
   const [esAD, setEsAD] = useState(calActual?.esAD ?? false);
+  const nomAlumno = alumno.apellidos_nombres || alumno.nombre || '—';
+
+  const marcarNivel = (idx: number, nivel: string) => {
+    setRows(prev => {
+      const n = [...prev];
+      n[idx] = { ...n[idx], nivel: n[idx].nivel === nivel ? '' : nivel };
+      return n;
+    });
+  };
 
   const getCal = (): 'C'|'B'|'A'|'AD' => {
-    const answered = respuestas.filter(r => r !== '');
+    const answered = rows.filter(r => r.nivel);
     if (answered.length === 0) return 'C';
-    const maxIdx = respuestas.reduce((max, r, i) => {
-      const idx = cols.indexOf(r);
-      return idx > max ? idx : max;
-    }, -1);
-    const base = cols[maxIdx] || 'C';
-    if (esAD && base === 'A') return 'AD';
-    return base as 'C'|'B'|'A'|'AD';
+    const vals = answered.map(r => ({ C: 1, B: 2, A: 3, AD: 4 }[r.nivel] || 0));
+    const prom = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const hasAD = answered.some(r => r.nivel === 'AD');
+    const allA = answered.every(r => r.nivel === 'A');
+    if (hasAD || esAD) return 'AD';
+    if (allA) return 'A';
+    if (prom >= 3) return 'A';
+    if (prom >= 2) return 'B';
+    return 'C';
   };
   const cal = getCal();
-  const nomAlumno = alumno.apellidos_nombres || alumno.nombre || '—';
+
+  const cellColors: Record<string, string> = {
+    C: 'bg-red-500 border-red-400 text-white',
+    B: 'bg-amber-500 border-amber-400 text-white',
+    A: 'bg-emerald-500 border-emerald-400 text-white',
+    AD: 'bg-blue-500 border-blue-400 text-white',
+  };
 
   return (
     <>
     <div className="fixed inset-0 z-50 bg-black/70" onClick={onCerrar} />
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-      <div className="bg-slate-800 border border-indigo-500/30 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col pointer-events-auto">
-        <div className="px-6 py-4 border-b border-slate-700 flex-shrink-0">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-indigo-500/30 rounded-2xl w-full max-w-4xl shadow-2xl max-h-[92vh] flex flex-col pointer-events-auto">
+        <div className="px-6 py-4 border-b border-slate-700 flex-shrink-0 bg-gradient-to-r from-slate-800 to-slate-700 rounded-t-2xl">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-white font-bold text-base" translate="no">{nomAlumno}</p>
-              <p className="text-slate-300 text-xs">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
-              <span className="text-xs text-green-400">📋 {columna.nombre}</span>
+              <p className="text-white font-black text-base" translate="no">{nomAlumno}</p>
+              <p className="text-slate-300 text-xs mt-0.5">{(alumno as any).grado}° "{(alumno as any).seccion}"</p>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className="px-3 py-1.5 bg-purple-800 border border-purple-500/40 text-purple-200 rounded-lg text-xs font-bold" translate="no">📐 {columna.nombre}</span>
+                <span className="text-xs text-slate-500">Rúbrica · {rows.length} criterios</span>
+              </div>
             </div>
-            <button onClick={onCerrar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400"><X size={18}/></button>
+            <button onClick={onCerrar} className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 flex-shrink-0"><X size={18}/></button>
           </div>
         </div>
+
         <div className="flex-1 overflow-y-auto px-6 py-3">
-          <table className="w-full text-sm border-collapse">
+          <h4 className="text-xs text-purple-400 font-bold uppercase tracking-wider mb-2">Descriptores — marca el nivel alcanzado</h4>
+          <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="border-b border-slate-600">
-                <th className="text-left py-2 text-slate-400">#</th>
-                <th className="text-left py-2 text-slate-400">Indicador</th>
-                {cols.map(c => <th key={c} className="text-center py-2 text-slate-300" translate="no">{c}</th>)}
+                <th className="text-left py-2 pr-2 font-semibold w-6 text-slate-400">#</th>
+                <th className="text-left py-2 font-semibold text-slate-400 min-w-[100px]">Criterio</th>
+                {colLevels.map(nivel => (
+                  <th key={nivel} className="text-center py-2 font-semibold w-[110px]">
+                    <div className={`font-black text-xs ${nivel === 'AD' ? 'text-blue-400' : nivel === 'A' ? 'text-emerald-400' : nivel === 'B' ? 'text-amber-400' : 'text-red-400'}`} translate="no">{nivel}</div>
+                    <div className="text-[9px] text-slate-500">{levelLabels[nivel] || nivel}</div>
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody>
-              {(items.length > 0 ? items : Array(columna.totalItems || cols.length).fill({ indicador: '' })).map((item: any, i: number) => (
-                <tr key={i} className="border-b border-slate-700/50 hover:bg-slate-700/20">
-                  <td className="py-2 text-slate-400 font-bold">{i + 1}</td>
-                  <td className="py-2 text-white text-xs">{item.indicador || item.criterio || `Ítem ${i + 1}`}</td>
-                  {cols.map(c => (
-                    <td key={c} className="text-center py-2">
-                      <button onClick={() => { const n = [...respuestas]; n[i] = n[i] === c ? '' : c; setRespuestas(n); }}
-                        className={`w-10 h-10 rounded-lg font-bold text-sm transition-all border-2 ${respuestas[i] === c ? CAL_BG[c] + ' border-current shadow-lg' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-400'}`} translate="no">
-                        {c}
-                      </button>
-                    </td>
-                  ))}
-                </tr>
-              ))}
+            <tbody className="divide-y divide-slate-700/40">
+              {rows.map((row, i) => {
+                const configDesc = items[i]?.descriptores?.length === 4 ? [...items[i].descriptores] : row.descriptores;
+                return (
+                  <tr key={i} className="hover:bg-slate-700/20">
+                    <td className="py-1.5 pr-2 text-slate-400 font-bold">{i + 1}</td>
+                    <td className="py-1.5 text-white text-xs font-medium">{row.criterio || `Criterio ${i + 1}`}</td>
+                    {colLevels.map((nivel, ni) => {
+                      const selected = row.nivel === nivel;
+                      const desc = configDesc[ni] || '';
+                      return (
+                        <td key={nivel} className="py-1.5 text-center">
+                          <button onClick={() => marcarNivel(i, nivel)}
+                            className={`w-full py-2 rounded-lg border-2 text-xs font-bold transition-all ${selected ? cellColors[nivel] || '' : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-400'}`} translate="no">
+                            {nivel}
+                          </button>
+                          {desc && <div className="text-[9px] text-slate-400 leading-tight mt-0.5">{desc}</div>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-4 border-t border-slate-700 flex gap-3">
-          <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center text-3xl font-black ${CAL_BG[cal]}`} translate="no">{cal}</div>
-          <div className="flex-1">
-            <p className="text-white font-bold" translate="no">{CAL_LABEL[cal]}</p>
-            {cal === 'A' && (
-              <label className="flex items-center gap-2 cursor-pointer mt-1">
+
+        <div className="px-6 py-4 border-t border-slate-700 flex-shrink-0 space-y-3">
+          <div className="flex items-center gap-4 bg-slate-700/50 rounded-xl p-3">
+            <div className={`w-14 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black ${CAL_BG[cal]}`} translate="no">{cal}</div>
+            <div className="flex-1">
+              <p className="text-white font-bold" translate="no">{CAL_LABEL[cal]}</p>
+              <p className="text-slate-400 text-xs mt-0.5" translate="no">
+                {rows.filter(r => r.nivel).length}/{rows.length} criterios evaluados
+                {rows.some(r => r.nivel === 'AD') ? ' · ⭐ AD' : ''}
+              </p>
+            </div>
+            {cal === 'A' && !rows.some(r => r.nivel === 'AD') && (
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={esAD} onChange={e => setEsAD(e.target.checked)} className="w-4 h-4 rounded border-slate-500 text-purple-500" />
-                <span className="text-xs text-purple-300 font-bold">⭐ AD global</span>
+                <span className="text-xs text-purple-300 font-bold">AD global</span>
               </label>
             )}
           </div>
-          <button onClick={() => onGuardar({
-            alumnoId: (alumno as any).id, columnaId: columna.id, marcados: respuestas, claves: [], calificativo: cal, esAD: cal === 'AD', fecha: new Date().toISOString().split('T')[0],
-            items: respuestas.map((r, i) => ({ indicador: items[i]?.indicador || items[i]?.criterio || `Ítem ${i + 1}`, respuesta: r })),
-          })}
-            className="flex-1 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
-            <Save size={15}/> Guardar
-          </button>
-          <button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
+          <div className="flex gap-3">
+            <button onClick={() => onGuardar({
+              alumnoId: (alumno as any).id, columnaId: columna.id,
+              marcados: rows.map(r => r.nivel),
+              claves: [],
+              calificativo: cal,
+              esAD: cal === 'AD',
+              fecha: new Date().toISOString().split('T')[0],
+              items: rows.map(r => ({ indicador: r.criterio, respuesta: r.nivel, descriptores: r.descriptores })),
+            })}
+              className="flex-1 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90">
+              <Save size={15}/> Guardar
+            </button>
+            <button onClick={onCerrar} className="px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 text-sm">Cancelar</button>
+          </div>
         </div>
       </div>
     </div>
@@ -959,6 +1032,7 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
   const [correctas, setCorrectas] = useState<string[]>(Array(10).fill('A'));
   const [nuevasColumnasEval, setNuevasColumnasEval] = useState<string>('Sí,No');
   const [rub2Rows, setRub2Rows] = useState<ItemRubrica2Row[]>([]);
+  const [rubDescRows, setRubDescRows] = useState<{ criterio: string; descriptores: string[] }[]>([]);
   const unidades = bimestresProps || [];
 
   // Resetear todo cuando cambia la columna a editar (evita que datos de un instrumento "contaminen" a otro)
@@ -983,6 +1057,16 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       : t === 'registro-anecdotico' ? 'Positivo,Negativo'
       : 'Siempre,Casi siempre,A veces,Rara vez,Nunca'
     );
+    if (t === 'rubrica' && arr.length > 0) {
+      setRubDescRows(arr.map(i => ({
+        criterio: i.indicador || i.criterio || '',
+        descriptores: i.descriptores?.length === 4 ? [...(i.descriptores as string[])] : Array(4).fill(''),
+      })));
+    } else if (t === 'rubrica') {
+      setRubDescRows(Array(tot).fill(null).map((_, i) => ({
+        criterio: `Criterio ${i + 1}`, descriptores: Array(4).fill('') as string[],
+      })));
+    }
     if (t === 'rubrica-2' && arr.length > 0) {
       setRub2Rows(arr.map(i => ({
         criterio: i.criterio || '',
@@ -1002,6 +1086,10 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
   const ajustarTotal = (n: number) => {
     setTotal(n);
     setCorrectas(prev => n > prev.length ? [...prev, ...Array(n - prev.length).fill('A')] : prev.slice(0, n));
+    setRubDescRows(prev => {
+      if (n > prev.length) return [...prev, ...Array(n - prev.length).fill(null).map((_, i) => ({ criterio: `Criterio ${prev.length + i + 1}`, descriptores: Array(4).fill('') as string[] }))];
+      return prev.slice(0, n);
+    });
     setRub2Rows(prev => {
       if (n > prev.length) return [...prev, ...Array(n - prev.length).fill(null).map((_, i) => ({ criterio: `Pregunta ${prev.length + i + 1}`, clave: 'A', tipo: 'alternativa' as const, respuesta: '', nivel: '', descriptores: Array(4).fill('') as string[] }))];
       return prev.slice(0, n);
@@ -1017,6 +1105,7 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
     }
     setError('');
     const itemsExamen = tipo === 'examen' ? correctas.map(c => ({ correcta: c }))
+      : tipo === 'rubrica' ? rubDescRows.map(r => ({ indicador: r.criterio, descriptores: r.descriptores }))
       : tipo === 'rubrica-2' ? rub2Rows.map(r => ({ correcta: r.clave || '', tipo: r.tipo, criterio: r.criterio, descriptores: r.tipo === 'descriptor' ? r.descriptores : undefined }))
       : undefined;
     const cols = nuevasColumnasEval.split(',').map(c => c.trim()).filter(c => c);
@@ -1155,6 +1244,56 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Configuración de Rúbrica — descriptores por nivel */}
+          {tipo === 'rubrica' && (
+            <div>
+              <label className="block text-xs text-purple-400 font-bold uppercase tracking-wider mb-1">
+                Descriptores — marca el nivel alcanzado
+              </label>
+              <p className="text-xs text-slate-500 mb-2">Configura los criterios y los desempeños por nivel. El docente marca el nivel alcanzado.</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse min-w-[600px]">
+                  <thead className="sticky top-0 bg-slate-800 z-10">
+                    <tr className="border-b border-slate-600">
+                      <th className="text-left py-2 px-1 text-slate-400 w-6">#</th>
+                      <th className="text-left py-2 px-1 text-slate-400 min-w-[120px]">Criterio</th>
+                      {RUB2_LEVELS.map(nivel => (
+                        <th key={nivel} className="text-center py-2 px-1 min-w-[100px]">
+                          <div className={`font-black text-xs ${nivel === 'AD' ? 'text-blue-400' : nivel === 'A' ? 'text-emerald-400' : nivel === 'B' ? 'text-amber-400' : 'text-red-400'}`} translate="no">{nivel}</div>
+                          <div className="text-[9px] text-slate-500">{RUB2_LEVEL_LABELS[nivel]}</div>
+                        </th>
+                      ))}
+                      <th className="text-center py-2 px-1 w-6"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/40">
+                    {rubDescRows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-purple-500/5">
+                        <td className="py-1.5 px-1 text-purple-300 font-bold">{idx + 1}</td>
+                        <td className="py-1.5 px-1">
+                          <input type="text" value={row.criterio} onChange={e => { const n = [...rubDescRows]; n[idx] = { ...n[idx], criterio: e.target.value }; setRubDescRows(n); }}
+                            className="w-full bg-slate-700 border border-purple-500/20 rounded px-2 py-1 text-white text-xs" placeholder={`Criterio ${idx + 1}...`} />
+                        </td>
+                        {RUB2_LEVELS.map((nivel, ni) => (
+                          <td key={nivel} className="py-1.5 px-1">
+                            <input type="text" value={row.descriptores[ni] || ''} onChange={e => { const n = [...rubDescRows]; const d = [...n[idx].descriptores]; d[ni] = e.target.value; n[idx] = { ...n[idx], descriptores: d }; setRubDescRows(n); }}
+                              className={`w-full bg-slate-700/50 border rounded px-1.5 py-1 text-[10px] text-slate-300 placeholder-slate-500 ${nivel === 'AD' ? 'border-blue-500/30' : nivel === 'A' ? 'border-emerald-500/30' : nivel === 'B' ? 'border-amber-500/30' : 'border-red-500/30'}`}
+                              placeholder={RUB2_LEVEL_LABELS[nivel]} />
+                          </td>
+                        ))}
+                        <td className="py-1.5 px-1 text-center">
+                          <button onClick={() => { const n = [...rubDescRows]; n.splice(idx, 1); setRubDescRows(n); if (n.length === 0) return; setTotal(n.length); }} className="text-red-400 hover:text-red-300 text-xs">✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button onClick={() => { const n = [...rubDescRows, { criterio: `Criterio ${rubDescRows.length + 1}`, descriptores: Array(4).fill('') as string[] }]; setRubDescRows(n); setTotal(n.length); }}
+                className="text-xs text-purple-400 hover:underline mt-1 block">+ Agregar criterio</button>
             </div>
           )}
 
