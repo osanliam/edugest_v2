@@ -130,6 +130,10 @@ export default function AdminUsersScreen({ user }: { user?: any }) {
   const [docenteSelec, setDocenteSelec] = useState<any | null>(null);
   const [asignarForm, setAsignarForm] = useState({ email: '', contraseña: '', confirmar: '' });
 
+  // Modal vincular usuario a docente (para usuarios sin vínculo en ie_docentes)
+  const [showVincular, setShowVincular] = useState(false);
+  const [userVincular, setUserVincular] = useState<Usuario | null>(null);
+
   // Importación
   const [showImport, setShowImport] = useState(false);
   const [importPreview, setImportPreview] = useState<Partial<Usuario>[]>([]);
@@ -668,24 +672,56 @@ const importarDatosCompletos = () => {
         )}
 
         {/* ── SECCIÓN DOCENTES CON USUARIO ── */}
-        {docentes.filter(d => usuariosMap.has(d.id)).length > 0 && (
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-5">
-            <h2 className="text-blue-300 font-bold mb-3 flex items-center gap-2">
-              <Check size={16} /> Docentes con acceso ({docentes.filter(d => usuariosMap.has(d.id)).length})
-            </h2>
-            <div className="space-y-2">
-              {docentes.filter(d => usuariosMap.has(d.id)).map(doc => {
-                const usr = usuariosMap.get(doc.id)!;
-                return (
-                  <div key={doc.id} className="flex items-center justify-between bg-slate-800/60 rounded-lg px-4 py-3">
+        {(() => {
+          // Teachers con usuario: los de ie_docentes que tienen usuario (por docenteId)
+          const conAccesoPorId = docentes.filter(d => usuariosMap.has(d.id));
+          // Teachers en usuarios que NO están en ie_docentes (docenteId sin vínculo)
+          const sinVincular = usuarios.filter(u =>
+            u.rol === 'teacher' &&
+            !docentes.find(d => d.id === u.docenteId) &&
+            !conAccesoPorId.find(d => d.id === u.docenteId)
+          );
+          const totalConAcceso = conAccesoPorId.length + sinVincular.length;
+          return totalConAcceso > 0 && (
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-5">
+              <h2 className="text-blue-300 font-bold mb-3 flex items-center gap-2">
+                <Check size={16} /> Docentes con acceso ({totalConAcceso})
+                {sinVincular.length > 0 && <span className="text-amber-400 text-xs font-normal">({sinVincular.length} sin vincular a ie_docentes)</span>}
+              </h2>
+              <div className="space-y-2">
+                {conAccesoPorId.map(doc => {
+                  const usr = usuariosMap.get(doc.id)!;
+                  return (
+                    <div key={doc.id} className="flex items-center justify-between bg-slate-800/60 rounded-lg px-4 py-3">
+                      <div>
+                        <p className="text-white text-sm font-medium">{doc.nombre || doc.apellidos_nombres}</p>
+                        <p className="text-slate-400 text-xs">{usr.email} · {usr.activo ? '🟢 Activo' : '🔴 Suspendido'}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => abrirAsignar(doc)}
+                          className="p-1.5 bg-blue-500/20 hover:bg-blue-500/40 rounded-lg text-blue-400 text-xs">
+                          <Edit2 size={13} />
+                        </button>
+                        <button onClick={() => toggleActivo(usr.id)}
+                          className={`p-1.5 rounded-lg text-xs ${usr.activo ? 'bg-red-500/20 hover:bg-red-500/40 text-red-400' : 'bg-green-500/20 hover:bg-green-500/40 text-green-400'}`}>
+                          {usr.activo ? <UserX size={13} /> : <UserCheck size={13} />}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Docentes en usuarios sin vínculo directo a ie_docentes */}
+                {sinVincular.map(usr => (
+                  <div key={usr.id} className="flex items-center justify-between bg-slate-800/60 rounded-lg px-4 py-3 border border-amber-500/30">
                     <div>
-                      <p className="text-white text-sm font-medium">{doc.nombre || doc.apellidos_nombres}</p>
+                      <p className="text-amber-300 text-sm font-medium">{usr.nombre} ⚠️ Sin vínculo en ie_docentes</p>
                       <p className="text-slate-400 text-xs">{usr.email} · {usr.activo ? '🟢 Activo' : '🔴 Suspendido'}</p>
+                      <p className="text-amber-500/60 text-xs">docenteId actual: {usr.docenteId || '(vacío)'}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => abrirAsignar(doc)}
-                        className="p-1.5 bg-blue-500/20 hover:bg-blue-500/40 rounded-lg text-blue-400 text-xs">
-                        <Edit2 size={13} />
+                      <button onClick={() => { setUserVincular(usr); setShowVincular(true); }}
+                        className="p-1.5 bg-amber-500/20 hover:bg-amber-500/40 rounded-lg text-amber-400 text-xs">
+                        <Key size={13} /> Vincular
                       </button>
                       <button onClick={() => toggleActivo(usr.id)}
                         className={`p-1.5 rounded-lg text-xs ${usr.activo ? 'bg-red-500/20 hover:bg-red-500/40 text-red-400' : 'bg-green-500/20 hover:bg-green-500/40 text-green-400'}`}>
@@ -693,11 +729,11 @@ const importarDatosCompletos = () => {
                       </button>
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Modal asignar acceso a docente */}
         {showAsignar && docenteSelec && (
@@ -740,6 +776,51 @@ const importarDatosCompletos = () => {
                   Cancelar
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Vincular usuario a docente */}
+        {showVincular && userVincular && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-slate-800 border border-amber-500/30 rounded-2xl w-full max-w-md p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-white">🔗 Vincular docente</h2>
+                <button onClick={() => { setShowVincular(false); setUserVincular(null); }}><X size={18} className="text-slate-400" /></button>
+              </div>
+              <p className="text-amber-300 text-sm font-medium">{userVincular.nombre}</p>
+              <p className="text-slate-400 text-xs">Email: {userVincular.email}</p>
+              <p className="text-slate-400 text-xs">docenteId actual: <span className="text-amber-400">{userVincular.docenteId || '(vacío)'}</span></p>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wide">Seleccionar docente en ie_docentes *</label>
+                <select
+                  className={inputCls}
+                  onChange={async (e) => {
+                    if (!e.target.value) return;
+                    const nuevoDocenteId = e.target.value;
+                    const todos = lsCargar();
+                    const idx = todos.findIndex(u => u.id === userVincular.id);
+                    if (idx >= 0) {
+                      todos[idx].docenteId = nuevoDocenteId;
+                      lsGuardar(todos);
+                      setShowVincular(false);
+                      setUserVincular(null);
+                      mostrarMensaje('ok', 'Docente vinculado correctamente');
+                      cargar();
+                    }
+                  }}
+                  defaultValue=""
+                >
+                  <option value="">-- Seleccionar --</option>
+                  {docentes.map(d => (
+                    <option key={d.id} value={d.id}>{d.apellidos_nombres || d.nombre} ({d.id})</option>
+                  ))}
+                </select>
+              </div>
+              <button onClick={() => { setShowVincular(false); setUserVincular(null); }}
+                className="w-full py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 text-sm">
+                Cancelar
+              </button>
             </div>
           </div>
         )}
