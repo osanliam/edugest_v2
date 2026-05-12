@@ -1844,57 +1844,86 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
     if (!user?.role || user.role !== 'teacher') return;
     const docenteId = (user as any).docenteId;
     const userId    = (user as any).id;
-    const userEmail = (user as any).email;
+    const userEmail = (user as any).email?.toLowerCase();
 
-    console.log('[EduGest] Buscando asignación para docente:', { docenteId, userId, userEmail });
+    console.log('[EduGest] === aplicarAsignacion ===');
+    console.log('[EduGest] user.docenteId:', docenteId);
+    console.log('[EduGest] user.id:', userId);
+    console.log('[EduGest] user.email:', userEmail);
     console.log('[EduGest] Total asignaciones disponibles:', asigs.length);
-    if (asigs.length > 0) {
-      console.log('[EduGest] Primeras 3 asignaciones:', asigs.slice(0, 3).map(a => ({ id: a.id, docenteId: a.docenteId, grados: a.grados, secciones: a.secciones })));
-    }
 
-    // Buscar asignaciones por docenteId o, como fallback, por userId
     const parsed = parsearAsignaciones(asigs);
+
+    // MÉTODO 1: Match directo por docenteId del usuario vs docenteId del assignment
     let mias = parsed.filter((a: any) =>
       (docenteId && a.docenteId === docenteId) ||
       (userId    && a.docenteId === userId)
     );
+    console.log('[EduGest] Método 1 (docenteId directo):', mias.length, 'asignaciones');
 
-    // Fallback 2: buscar por email del usuario en el campo docenteId
+    // MÉTODO 2: Si el email del usuario está en el campo docenteId del assignment
     if (mias.length === 0 && userEmail) {
-      const emailLower = userEmail.toLowerCase();
       mias = parsed.filter((a: any) => {
-        const asigDocId = (a.docenteId || '').toLowerCase();
-        return asigDocId === emailLower || asigDocId.includes(emailLower);
+        const asigDocId = ((a.docenteId as string) || '').toLowerCase();
+        return asigDocId === userEmail || asigDocId.includes(userEmail);
       });
+      console.log('[EduGest] Método 2 (email en docenteId):', mias.length);
     }
 
-    // Fallback 3: buscar por email del docente en ie_docentes (cruzando tablas)
+    // MÉTODO 3: Cruzar con ie_docentes por EMAIL para encontrar el docenteId correcto
     if (mias.length === 0) {
       try {
-        const docentes = JSON.parse(localStorage.getItem('ie_docentes') || '[]');
+        const docentes = (() => { try { const d = JSON.parse(localStorage.getItem('ie_docentes') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; } })();
+        console.log('[EduGest] ie_docentes en localStorage:', docentes.length);
+
+        // Buscar al docente cuyo email coincida con el email del usuario
         const miDocente = docentes.find((d: any) =>
-          d.id === docenteId || d.id === userId || (d.email && d.email.toLowerCase() === userEmail?.toLowerCase())
+          (d.email && d.email.toLowerCase() === userEmail) ||
+          d.id === docenteId ||
+          d.id === userId
         );
+
         if (miDocente) {
-          mias = parsed.filter((a: any) => {
-            // El docenteId del assignment debe coincidir con el id del docente en ie_docentes
-            return a.docenteId === miDocente.id;
-          });
+          console.log('[EduGest] Docente encontrado en ie_docentes:', miDocente.id, miDocente.apellidos_nombres || miDocente.nombre);
+          // Buscar asignaciones con el ID correcto del docente en ie_docentes
+          mias = parsed.filter((a: any) => a.docenteId === miDocente.id);
+          console.log('[EduGest] Método 3 (cruce por email ie_docentes):', mias.length, '— usando docenteId:', miDocente.id);
+        } else {
+          console.warn('[EduGest] Docente NO encontrado en ie_docentes con email:', userEmail);
+          // Debug: mostrar emails disponibles en ie_docentes
+          if (docentes.length > 0) {
+            console.log('[EduGest] Primeros 3 emails en ie_docentes:', docentes.slice(0, 3).map((d: any) => d.email));
+          }
         }
-      } catch { /* silencioso */ }
+      } catch (e) {
+        console.warn('[EduGest] Error accediendo ie_docentes:', e);
+      }
     }
 
-    console.log('[EduGest] Asignaciones encontradas:', mias.length);
+    // MÉTODO 4: Buscar por email del docente en el campo docenteId de la assignment
+    // (el admin pudo haber guardado el email en lugar del ID)
+    if (mias.length === 0 && userEmail) {
+      mias = parsed.filter((a: any) => {
+        const asigDocId = ((a.docenteId as string) || '').toLowerCase();
+        return asigDocId === userEmail;
+      });
+      console.log('[EduGest] Método 4 (email exacto en docenteId):', mias.length);
+    }
+
+    console.log('[EduGest] Total asignaciones encontradas para este docente:', mias.length);
+    if (mias.length > 0) {
+      console.log('[EduGest] Asignaciones del docente:', mias.map(a => ({ id: a.id, docenteId: a.docenteId, grados: a.grados, secciones: a.secciones })));
+    }
 
     if (mias.length === 0) {
-      console.warn('[EduGest] No se encontró asignación para este docente');
+      console.warn('[EduGest] NO se encontró asignación — mostrando "sin alumnos"');
       setAsignacionDocente({ grados: [], secciones: [], cursos: [] });
       return;
     }
 
-    const grados   = [...new Set(mias.flatMap((a: any) => a.grados))] as string[];
+    const grados    = [...new Set(mias.flatMap((a: any) => a.grados))] as string[];
     const secciones = [...new Set(mias.flatMap((a: any) => a.secciones))] as string[];
-    const cursos   = [...new Set(mias.flatMap((a: any) => a.cursos || []))] as string[];
+    const cursos    = [...new Set(mias.flatMap((a: any) => a.cursos || []))] as string[];
 
     console.log('[EduGest] Grados asignados:', grados);
     console.log('[EduGest] Secciones asignadas:', secciones);
@@ -2009,46 +2038,47 @@ if (ligero.columnas?.length > 0) {
     }
   };
 
-  // cargarAsignacion: Firebase primero (como AlumnosScreen), luego localStorage, luego Turso
+  // cargarAsignacion: intenta TODAS las fuentes y siempre llama a aplicarAsignacion
   const cargarAsignacion = async () => {
     if (!user?.role || user.role !== 'teacher') return;
     try {
-      let asignaciones: any[] = [];
+      let todasLasAsigs: any[] = [];
+      let fuente = 'ninguna';
 
-      // 1) INTENTAR FIREBASE PRIMERO
+      // 1) FIREBASE
       try {
         const { getAsignacionesFB } = await import('../services/firebaseDataService');
         const fbAsigs = await getAsignacionesFB();
         if (fbAsigs.length > 0) {
-          asignaciones = fbAsigs;
-          localStorage.setItem('cfg_asignaciones', JSON.stringify(asignaciones));
+          todasLasAsigs = fbAsigs;
+          fuente = 'Firebase';
+          localStorage.setItem('cfg_asignaciones', JSON.stringify(fbAsigs));
         }
-      } catch {
-        // Firebase no disponible
-      }
+      } catch { /* Firebase no disponible */ }
 
-      // 2) Fallback: localStorage
-      if (asignaciones.length === 0) {
+      // 2) LOCALSTORAGE (mezclar si Firebase no tenía todo)
+      if (todasLasAsigs.length === 0) {
         const localAsigs = (() => { try { const d = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; } })();
         if (localAsigs.length > 0) {
-          asignaciones = parsearAsignaciones(localAsigs);
-        } else {
-          // 3) Último recurso: Turso
-          try {
-            const todo = await cargarTodo('asignaciones');
-            asignaciones = parsearAsignaciones(todo.asignaciones || []);
-            if (asignaciones.length > 0) {
-              localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
-            }
-          } catch {
-            asignaciones = [];
-          }
+          todasLasAsigs = parsearAsignaciones(localAsigs);
+          fuente = 'localStorage';
         }
       }
 
-      if (asignaciones.length > 0) {
-        aplicarAsignacion(asignaciones);
+      // 3) TURSO (último recurso)
+      if (todasLasAsigs.length === 0) {
+        try {
+          const todo = await cargarTodo('asignaciones');
+          if (todo.asignaciones?.length > 0) {
+            todasLasAsigs = parsearAsignaciones(todo.asignaciones || []);
+            fuente = 'Turso';
+            localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
+          }
+        } catch { /* Turso no disponible */ }
       }
+
+      console.log('[EduGest] Asignaciones cargadas desde:', fuente, '— total:', todasLasAsigs.length);
+      aplicarAsignacion(todasLasAsigs);
     } catch (e) {
       console.error('[EduGest] Error cargando asignación:', e);
     }

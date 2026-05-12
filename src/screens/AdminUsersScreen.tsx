@@ -798,13 +798,14 @@ const importarDatosCompletos = () => {
                   onChange={async (e) => {
                     if (!e.target.value) return;
                     const nuevoDocenteId = e.target.value;
+                    const viejoDocenteId = userVincular.docenteId;
                     const todos = lsCargar();
                     const idx = todos.findIndex(u => u.id === userVincular.id);
                     if (idx >= 0) {
                       todos[idx].docenteId = nuevoDocenteId;
-                      // Guardar local + Firebase (lsGuardar ya hace esto)
                       lsGuardar(todos);
-                      // También guardar en backend Turso para que el login siempre tenga el valor correcto
+
+                      // 1) Actualizar en backend Turso
                       try {
                         await fetch(`/api/users?id=${userVincular.id}`, {
                           method: 'PUT',
@@ -815,9 +816,51 @@ const importarDatosCompletos = () => {
                           body: JSON.stringify({ docenteId: nuevoDocenteId }),
                         });
                       } catch { /* Turso no disponible */ }
+
+                      // 2) CORREGIR ASIGNACIONES: buscar y actualizar assignments en localStorage, Firebase y Turso
+                      // Buscar assignments que tengan el viejo docenteId (o ninguno) y el email del usuario
+                      try {
+                        const asigsLS = (() => { try { return JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]'); } catch { return []; } })();
+                        let changed = false;
+                        const updated = asigsLS.map((a: any) => {
+                          // Si la assignment tiene el docenteId viejo O está vacía Y el email coincide
+                          const matchViejo = (a.docenteId === viejoDocenteId || !a.docenteId) && a.docenteId !== nuevoDocenteId;
+                          const matchEmail = userVincular.email && (a.docenteId === userVincular.email || (a.docenteId || '').toLowerCase().includes(userVincular.email.toLowerCase()));
+                          if (matchViejo || matchEmail) {
+                            changed = true;
+                            return { ...a, docenteId: nuevoDocenteId };
+                          }
+                          return a;
+                        });
+                        if (changed) {
+                          localStorage.setItem('cfg_asignaciones', JSON.stringify(updated));
+                          mostrarMensaje('ok', `Docente vinculado + ${changed ? 'asignación corregida' : ''}`);
+                        } else {
+                          mostrarMensaje('ok', 'Docente vinculado correctamente');
+                        }
+                        // 3) Corregir también en Firebase
+                        (async () => {
+                          try {
+                            const { getAsignacionesFB } = await import('../services/firebaseDataService');
+                            const fbAsigs = await getAsignacionesFB();
+                            if (fbAsigs.length > 0) {
+                              const fbUpdated = fbAsigs.map((a: any) => {
+                                const matchViejo = (a.docenteId === viejoDocenteId || !a.docenteId) && a.docenteId !== nuevoDocenteId;
+                                const matchEmail = userVincular.email && (a.docenteId === userVincular.email || (a.docenteId || '').toLowerCase().includes(userVincular.email.toLowerCase()));
+                                if (matchViejo || matchEmail) return { ...a, docenteId: nuevoDocenteId };
+                                return a;
+                              });
+                              const { guardarAsignacionesFB } = await import('../services/firebaseDataService');
+                              await guardarAsignacionesFB(fbUpdated);
+                            }
+                          } catch { /* Firebase no disponible */ }
+                        })();
+                      } catch (e) {
+                        console.warn('Error corrigiendo asignaciones:', e);
+                      }
+
                       setShowVincular(false);
                       setUserVincular(null);
-                      mostrarMensaje('ok', 'Docente vinculado correctamente');
                       cargar();
                     }
                   }}
