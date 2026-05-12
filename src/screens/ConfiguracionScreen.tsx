@@ -751,46 +751,60 @@ function AsignacionesSection() {
         setDocentes(lsGet(LS_DOCENTES_KEY, []));
       }
 
-      // 3. Cargar asignaciones (usa cursos ya cargados)
+      // 3. Cargar asignaciones (Firebase primero, Turso fallback)
       const localAsigs: Asignacion[] = lsGet(LS_ASIGNACIONES, []);
+      let asigsCargadas: Asignacion[] = localAsigs;
       try {
-        const fromTurso = await getAsignacionesTurso();
-        if (fromTurso.length > 0) {
-          const tursoParsed: Asignacion[] = fromTurso.map((a: any) => {
-            let cursoIdRecuperado = '';
-            try {
-              const extra = typeof a.extra === 'string' ? JSON.parse(a.extra || '{}') : (a.extra || {});
-              if (extra.cursoId) cursoIdRecuperado = extra.cursoId;
-            } catch {}
-            if (!cursoIdRecuperado && a.cursoId) cursoIdRecuperado = a.cursoId;
-            if (!cursoIdRecuperado) {
-              const cursosArr: string[] = Array.isArray(a.cursos) ? a.cursos : [];
-              const cursoNombre = cursosArr[0] || '';
-              const cursoObj = cursosCargados.find(c => c.nombre === cursoNombre) ||
-                               cursosCargados.find(c => c.id === cursoNombre);
-              cursoIdRecuperado = cursoObj?.id || cursoNombre;
-            }
-            return { ...a, cursoId: cursoIdRecuperado };
-          });
-
+        const { getAsignacionesFB } = await import('../services/firebaseDataService');
+        const fbAsigs = await getAsignacionesFB();
+        if (fbAsigs.length > 0) {
           const merged = new Map<string, Asignacion>(localAsigs.map(a => [a.id, a]));
-          tursoParsed.forEach(a => {
+          fbAsigs.forEach((a: any) => {
             const localA = merged.get(a.id);
             if (!localA) {
               merged.set(a.id, a);
-            } else if (!localA.cursoId && a.cursoId) {
-              merged.set(a.id, { ...localA, cursoId: a.cursoId });
+            } else {
+              merged.set(a.id, { ...localA, ...a });
             }
           });
-          const asigs = Array.from(merged.values());
-          lsSet(LS_ASIGNACIONES, asigs);
-          setAsignaciones(asigs);
-        } else if (localAsigs.length > 0) {
-          setAsignaciones(localAsigs);
+          asigsCargadas = Array.from(merged.values());
+          lsSet(LS_ASIGNACIONES, asigsCargadas);
         }
       } catch {
-        setAsignaciones(localAsigs);
+        try {
+          const fromTurso = await getAsignacionesTurso();
+          if (fromTurso.length > 0) {
+            const tursoParsed: Asignacion[] = fromTurso.map((a: any) => {
+              let cursoIdRecuperado = '';
+              try {
+                const extra = typeof a.extra === 'string' ? JSON.parse(a.extra || '{}') : (a.extra || {});
+                if (extra.cursoId) cursoIdRecuperado = extra.cursoId;
+              } catch {}
+              if (!cursoIdRecuperado && a.cursoId) cursoIdRecuperado = a.cursoId;
+              if (!cursoIdRecuperado) {
+                const cursosArr: string[] = Array.isArray(a.cursos) ? a.cursos : [];
+                const cursoNombre = cursosArr[0] || '';
+                const cursoObj = cursosCargados.find(c => c.nombre === cursoNombre) ||
+                                 cursosCargados.find(c => c.id === cursoNombre);
+                cursoIdRecuperado = cursoObj?.id || cursoNombre;
+              }
+              return { ...a, cursoId: cursoIdRecuperado };
+            });
+            const merged = new Map<string, Asignacion>(localAsigs.map(a => [a.id, a]));
+            tursoParsed.forEach(a => {
+              const localA = merged.get(a.id);
+              if (!localA) {
+                merged.set(a.id, a);
+              } else if (!localA.cursoId && a.cursoId) {
+                merged.set(a.id, { ...localA, cursoId: a.cursoId });
+              }
+            });
+            asigsCargadas = Array.from(merged.values());
+            lsSet(LS_ASIGNACIONES, asigsCargadas);
+          }
+        } catch { /* silencioso */ }
       }
+      setAsignaciones(asigsCargadas);
     })();
   }, []);
   const [msg, setMsg] = useState<{tipo:'ok'|'err';texto:string}|null>(null);
@@ -807,20 +821,26 @@ function AsignacionesSection() {
   const guardarLS = async (data: Asignacion[]) => {
     lsSet(LS_ASIGNACIONES, data);
     setAsignaciones(data);
-    // Enviar a Turso con cursoId en extra para recuperarlo al cargar
-    const dataTurso = data.map(a => {
-      const cursoObj = cursos.find(c => c.id === a.cursoId);
-      return {
-        ...a,
-        cursos: cursoObj ? [cursoObj.nombre] : (a.cursoId ? [a.cursoId] : []),
-        extra: { ...(a as any).extra, cursoId: a.cursoId || '' },
-      };
-    });
+    // Firebase primero
     try {
       setGuardando(true);
-      await syncToTurso('asignaciones', dataTurso);
-    } catch (err) {
-      console.warn('Sync asignaciones falló:', err);
+      const { guardarAsignacionesFB } = await import('../services/firebaseDataService');
+      await guardarAsignacionesFB(data as any);
+    } catch (fbErr) {
+      // Turso como fallback
+      try {
+        const dataTurso = data.map(a => {
+          const cursoObj = cursos.find(c => c.id === a.cursoId);
+          return {
+            ...a,
+            cursos: cursoObj ? [cursoObj.nombre] : (a.cursoId ? [a.cursoId] : []),
+            extra: { ...(a as any).extra, cursoId: a.cursoId || '' },
+          };
+        });
+        await syncToTurso('asignaciones', dataTurso);
+      } catch (err) {
+        console.warn('Sync asignaciones falló:', err);
+      }
     } finally {
       setGuardando(false);
     }
@@ -1110,6 +1130,7 @@ function ApiStatusSection() {
   const [cleanResult, setCleanResult] = useState<any | null>(null);
   const [dupes, setDupes] = useState<any | null>(null);
   const [dupesLoading, setDupesLoading] = useState(false);
+  const [lastCheck, setLastCheck] = useState<string>('');
   const storage = getStorageStats();
   const cloud = isSyncedToCloud();
 
