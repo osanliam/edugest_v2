@@ -56,23 +56,53 @@ async function loginFirebase(email: string, password: string): Promise<{ user: a
 }
 
 async function loginRequest(email: string, password: string) {
-  // Intentar AMBOS en paralelo: Firebase + Turso
-  // Turso nos da el token necesario para /api/* durante la transición
-  const [fbResult, tursoResult] = await Promise.allSettled([
-    loginFirebase(email, password),
-    apiLogin(email, password)
-  ]);
+  // Turso SIEMPRE tiene prioridad cuando está disponible
+  // Firebase y localStorage solo son fallback para modo offline
+  let tursoFailed = false;
+  try {
+    const turso = await apiLogin(email, password);
+    if (turso) {
+      // Turso exitosa: usar esta data siempre (tiene docenteId correcto del backend)
+      // En segundo plano: guardar/corroborar en Firebase para otros dispositivos offline
+      (async () => {
+        try {
+          const { guardarUsuarioFB } = await import('../services/firebaseDataService');
+          const fbUsuarios = await getUsuariosFB();
+          const existente = fbUsuarios.find((u: any) => u.id === turso.user.id);
+          if (!existente) {
+            await guardarUsuarioFB({
+              id: turso.user.id,
+              nombre: turso.user.name,
+              email: turso.user.email,
+              rol: turso.user.role,
+              docenteId: turso.user.docenteId || null,
+              activo: true,
+              creado: new Date().toISOString(),
+              contraseña: '',
+            });
+          } else if (!existente.docenteId && turso.user.docenteId) {
+            // Actualizar docenteId si Firebase tiene datos incompletos
+            await guardarUsuarioFB({ ...existente, docenteId: turso.user.docenteId });
+          }
+        } catch { /* Firebase no disponible */ }
+      })();
+      return turso;
+    }
+  } catch {
+    tursoFailed = true;
+  }
 
-  const fb = fbResult.status === 'fulfilled' ? fbResult.value : null;
-  const turso = tursoResult.status === 'fulfilled' ? tursoResult.value : null;
+  // Turso falló: intentar Firebase
+  if (tursoFailed) {
+    try {
+      const fb = await loginFirebase(email, password);
+      if (fb) return fb;
+    } catch { /* Firebase no disponible */ }
 
-  // Prioridad: Turso (tiene token) > Firebase > localStorage
-  if (turso) return turso;
-  if (fb) return fb;
-
-  // Fallback localStorage
-  const local = loginLocal(email, password);
-  if (local) return local;
+    // Último recurso: localStorage
+    const local = loginLocal(email, password);
+    if (local) return local;
+  }
 
   throw new Error('Usuario o contraseña incorrectos');
 }

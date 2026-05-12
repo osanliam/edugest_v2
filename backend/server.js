@@ -20,7 +20,7 @@ app.post('/api/auth/login', (req, res) => {
   const user = db.users.find(u => u.email === loginField && u.password === password);
   if (!user) return res.status(401).json({ error: 'Credenciales inválidas' });
   const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, docenteId: user.docenteId || null } });
 });
 
 const authMiddleware = (req, res, next) => {
@@ -35,15 +35,28 @@ const authMiddleware = (req, res, next) => {
 };
 
 app.get('/api/users', authMiddleware, (req, res) => {
-  res.json(db.users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role })));
+  res.json(db.users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, docenteId: u.docenteId || null })));
 });
 
 app.post('/api/users', authMiddleware, (req, res) => {
-  const { name, email, password, role } = req.body;
-  const user = { id: 'user-' + Date.now(), name, email, password, role, status: 'active' };
+  const { name, email, password, role, docenteId } = req.body;
+  const user = { id: 'user-' + Date.now(), name, email, password, role, docenteId: docenteId || null, status: 'active' };
   db.users.push(user);
   save();
   res.status(201).json({ message: 'Usuario creado', id: user.id });
+});
+
+app.put('/api/users', authMiddleware, (req, res) => {
+  const { id, name, email, password, role, docenteId } = req.body;
+  const idx = db.users.findIndex(u => u.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Usuario no encontrado' });
+  if (name !== undefined) db.users[idx].name = name;
+  if (email !== undefined) db.users[idx].email = email;
+  if (password !== undefined) db.users[idx].password = password;
+  if (role !== undefined) db.users[idx].role = role;
+  if (docenteId !== undefined) db.users[idx].docenteId = docenteId;
+  save();
+  res.json({ message: 'Usuario actualizado' });
 });
 
 app.get('/api/grades/all', authMiddleware, (req, res) => {

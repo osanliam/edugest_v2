@@ -33,7 +33,23 @@ function lsCargar(): Usuario[] {
 }
 function lsGuardar(data: Usuario[]) { 
   localStorage.setItem(LS_KEY, JSON.stringify(data));
-  guardarUsuarios(data); // Sincronizar con Turso
+  guardarUsuarios(data);
+  // Firebase: batch write sin reescribir localStorage dentro del loop
+  (async () => {
+    try {
+      const { isFirebaseConfigured, getFirebaseApp } = await import('../lib/firebase');
+      if (!isFirebaseConfigured()) return;
+      const app = getFirebaseApp();
+      if (!app) return;
+      const { getFirestore, doc, writeBatch } = await import('firebase/firestore');
+      const db = getFirestore(app);
+      const batch = writeBatch(db);
+      for (const u of data) {
+        batch.set(doc(db, 'usuarios', u.id), { ...u, creado: u.creado || new Date().toISOString() });
+      }
+      await batch.commit();
+    } catch { /* Firebase no disponible */ }
+  })();
 }
 function lsDocentes(): any[] {
   try { return JSON.parse(localStorage.getItem(LS_DOCENTES) || '[]'); } catch { return []; }
@@ -132,21 +148,41 @@ export default function AdminUsersScreen({ user }: { user?: any }) {
   const cargar = async () => {
     setCargando(true);
     try {
-      const [us, docsRes] = await Promise.all([
-        apiUsers('/api/users'),
-        fetch('/api/docentes', { headers: { Authorization: `Bearer ${getToken()}` } })
-          .then(r => r.ok ? r.json() : null).catch(() => null),
-      ]);
-      setUsuarios(Array.isArray(us) ? us : us.users || []);
+      // 1) LOCALSTORAGE PRIMERO (fuente de verdad del admin)
+      const localUs = lsCargar();
       const localDocs = lsDocentes();
-      if (Array.isArray(docsRes) && docsRes.length > 0) {
-        const apiIds = new Set(docsRes.map((d: any) => d.id));
-        const localesNoEnAPI = localDocs.filter((d: any) => !apiIds.has(d.id));
-        const merged = [...docsRes, ...localesNoEnAPI];
-        setDocentes(merged);
-        localStorage.setItem(LS_DOCENTES, JSON.stringify(merged));
-      } else {
+      if (localUs.length > 0 || localDocs.length > 0) {
+        setUsuarios(localUs);
         setDocentes(localDocs);
+        // En segundo plano: sincronizar con Turso para respaldo en la nube
+        (async () => {
+          try {
+            const us = await apiUsers('/api/users');
+            const tursoUs = Array.isArray(us) ? us : us.users || [];
+            if (tursoUs.length > 0) {
+              localStorage.setItem(LS_KEY, JSON.stringify(tursoUs));
+              setUsuarios(tursoUs);
+            }
+          } catch { /* Turso no disponible */ }
+        })();
+      } else {
+        // 2) Turso como fuente si localStorage vacío
+        try {
+          const us = await apiUsers('/api/users');
+          const tursoUs = Array.isArray(us) ? us : us.users || [];
+          if (tursoUs.length > 0) {
+            setUsuarios(tursoUs);
+            localStorage.setItem(LS_KEY, JSON.stringify(tursoUs));
+          }
+        } catch { /* Turso falló */ }
+        try {
+          const docsRes = await fetch('/api/docentes', { headers: { Authorization: `Bearer ${getToken()}` } })
+            .then(r => r.ok ? r.json() : null).catch(() => null);
+          if (Array.isArray(docsRes) && docsRes.length > 0) {
+            setDocentes(docsRes);
+            localStorage.setItem(LS_DOCENTES, JSON.stringify(docsRes));
+          }
+        } catch { /* Turso falló */ }
       }
     } catch {
       setUsuarios(lsCargar());
