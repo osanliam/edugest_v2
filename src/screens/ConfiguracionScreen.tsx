@@ -926,39 +926,31 @@ function AsignacionesSection() {
   };
 
   const subirAsignacionesYAlumnos = async () => {
-    flash('ok', '📤 Subiendo asignaciones y alumnos...');
+    flash('ok', '📤 Subiendo asignaciones y alumnos a Firebase...');
     try {
       const alumnos = lsGet('ie_alumnos', []);
-      const asigs: Asignacion[] = lsGet('cfg_asignaciones', []);
-      const asigsTurso = asigs.map(a => {
-        const cursoObj = cursos.find(c => c.id === a.cursoId);
-        return { ...a, cursos: cursoObj ? [cursoObj.nombre] : (a.cursoId ? [a.cursoId] : []) };
-      });
-      await syncToTurso('asignaciones', asigsTurso);
-      await syncToTurso('alumnos', alumnos);
-      flash('ok', `✅ Subidos: ${asigs.length} asignaciones, ${alumnos.length} alumnos`);
+      const { guardarAsignacionesFB, getAlumnosFB, guardarAlumnosBatchFB } = await import('../services/firebaseDataService');
+      await guardarAsignacionesFB(asignaciones as any);
+      const fbAlumnos = await getAlumnosFB();
+      const merged = [...fbAlumnos, ...alumnos.filter((a: any) => !fbAlumnos.some((f: any) => f.id === a.id))];
+      await guardarAlumnosBatchFB(merged as any);
+      flash('ok', `✅ Subidos: ${asignaciones.length} asignaciones, ${alumnos.length} alumnos a Firebase`);
     } catch (e: any) {
       flash('err', '❌ Error subiendo: ' + e.message);
     }
   };
 
-  const recargarDesdeTurso = async () => {
-    flash('ok', '📥 Descargando asignaciones de Turso...');
+  const recargarDesdeFirebase = async () => {
+    flash('ok', '📥 Descargando asignaciones de Firebase...');
     try {
-      const todo = await cargarTodo('asignaciones');
-      if (todo.asignaciones?.length > 0) {
-        // Parsear campos JSON que vienen como string
-        const parsed = todo.asignaciones.map((a: any) => ({
-          ...a,
-          grados:    typeof a.grados    === 'string' ? JSON.parse(a.grados    || '[]') : (a.grados    || []),
-          secciones: typeof a.secciones === 'string' ? JSON.parse(a.secciones || '[]') : (a.secciones || []),
-          cursos:    typeof a.cursos    === 'string' ? JSON.parse(a.cursos    || '[]') : (a.cursos    || []),
-        }));
-        lsSet(LS_ASIGNACIONES, parsed);
-        setAsignaciones(parsed);
-        flash('ok', `✅ ${parsed.length} asignaciones cargadas de Turso`);
+      const { getAsignacionesFB } = await import('../services/firebaseDataService');
+      const fbAsigs = await getAsignacionesFB();
+      if (fbAsigs.length > 0) {
+        lsSet(LS_ASIGNACIONES, fbAsigs);
+        setAsignaciones(fbAsigs);
+        flash('ok', `✅ ${fbAsigs.length} asignaciones cargadas de Firebase`);
       } else {
-        flash('err', '⚠️ No hay asignaciones en Turso');
+        flash('err', '⚠️ No hay asignaciones en Firebase');
       }
     } catch (e: any) {
       flash('err', '❌ Error: ' + e.message);
@@ -970,13 +962,13 @@ function AsignacionesSection() {
         <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-white font-bold text-lg flex items-center gap-2">🏫 Asignaciones Docente-Grado-Sección</h2>
         <div className="flex gap-2">
-          <button onClick={recargarDesdeTurso} className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-bold text-sm">
-            <RefreshCw size={15}/> Recargar de Turso
+          <button onClick={recargarDesdeFirebase} className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-bold text-sm">
+            <RefreshCw size={15}/> Recargar de Firebase
           </button>
           {asignaciones.length > 0 && (
             <>
               <button onClick={subirAsignacionesYAlumnos} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold text-sm">
-                <RefreshCw size={15}/> Subir a la nube
+                <RefreshCw size={15}/> Subir a Firebase
               </button>
               <button onClick={exportarParaDocentes} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-sm">
                 <Download size={15}/> Exportar para docentes

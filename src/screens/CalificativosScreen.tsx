@@ -1888,8 +1888,7 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
 
     if (mias.length === 0) {
       console.warn('[EduGest] No se encontró asignación para este docente');
-      // Si no hay asignación, mostrar TODOS los alumnos (no vacío)
-      setAsignacionDocente(null);
+      setAsignacionDocente({ grados: [], secciones: [], cursos: [] });
       return;
     }
 
@@ -2165,20 +2164,14 @@ if (ligero.columnas?.length > 0) {
 
   // Base de alumnos: si docente, solo los de sus grados+secciones
   const alumnosBase = React.useMemo(() => {
-    if (!esDocente || !asignacionDocente) return alumnos;
+    if (!esDocente) return alumnos;
+    if (!asignacionDocente || asignacionDocente.grados.length === 0) return [];
     const gradosNorm    = asignacionDocente.grados.map(normGrado);
     const seccionesNorm = asignacionDocente.secciones.map(s => s.trim().toUpperCase());
     const filtrados = alumnos.filter(a =>
       gradosNorm.includes(normGrado((a as any).grado)) &&
       seccionesNorm.includes(((a as any).seccion || '').trim().toUpperCase())
     );
-    // FALLBACK: si el filtro por asignación deja 0 alumnos, mostrar TODOS
-    // para que el docente no se quede sin ver nada. Esto indica que la
-    // asignación está mal configurada.
-    if (filtrados.length === 0 && alumnos.length > 0) {
-      console.warn('[EduGest] Filtro por asignación dejó 0 alumnos. Mostrando todos como fallback.');
-      return alumnos; // ← fallback crítico: nunca bloquear al docente
-    }
     return filtrados;
   }, [alumnos, esDocente, asignacionDocente]);
 

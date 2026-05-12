@@ -325,9 +325,11 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
 
       const docenteId = (user as any).docenteId;
       const userId    = (user as any).id;
+      const userEmail = user?.email?.toLowerCase();
       const mias = asignaciones.filter((a: any) =>
         (docenteId && a.docenteId === docenteId) ||
-        (userId    && a.docenteId === userId)
+        (userId    && a.docenteId === userId) ||
+        (userEmail && a.docenteId?.toLowerCase() === userEmail)
       );
       if (mias.length > 0) {
         const grados   = [...new Set(mias.flatMap((a: any) => a.grados || []))] as string[];
@@ -706,18 +708,14 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
   // ── Filtrado por asignación docente ─────────────────────────────────
   const normGrado = (g: string) => String(g || '').trim().replace(/°$/, '');
   const alumnosBase = React.useMemo(() => {
-    if (!esDocente || !asignacionDocente) return alumnos;
+    if (!esDocente) return alumnos;
+    if (!asignacionDocente || asignacionDocente.grados.length === 0) return [];
     const gradosNorm    = asignacionDocente.grados.map(normGrado);
     const seccionesNorm = asignacionDocente.secciones.map(s => s.trim().toUpperCase());
     const filtrados = alumnos.filter(a =>
       gradosNorm.includes(normGrado(a.grado)) &&
       seccionesNorm.includes((a.seccion || '').trim().toUpperCase())
     );
-    // FALLBACK: si el filtro deja 0 alumnos, mostrar TODOS
-    if (filtrados.length === 0 && alumnos.length > 0) {
-      console.warn('[EduGest] AlumnosScreen: filtro dejó 0 alumnos. Mostrando todos como fallback.');
-      return alumnos;
-    }
     return filtrados;
   }, [alumnos, esDocente, asignacionDocente]);
 

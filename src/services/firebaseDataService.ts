@@ -474,18 +474,41 @@ export async function getAsignacionesFB(): Promise<AsignacionFB[]> {
   }
 }
 
+export async function getAsignacionesPorDocenteFB(docenteId: string): Promise<AsignacionFB[]> {
+  const db = getDB();
+  if (!db) {
+    const local = lsGet<AsignacionFB[]>('cfg_asignaciones', []);
+    return local.filter(a => a.docenteId === docenteId);
+  }
+  try {
+    const snap = await getDocs(query(collection(db, 'asignaciones'), where('docenteId', '==', docenteId)));
+    return snap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        docenteId: data.docenteId || '',
+        grados: data.grados || [],
+        secciones: data.secciones || [],
+        cursos: data.cursos || [],
+      } as AsignacionFB;
+    });
+  } catch {
+    return lsGet<AsignacionFB[]>('cfg_asignaciones', []).filter((a: any) => a.docenteId === docenteId);
+  }
+}
+
 export async function guardarAsignacionesFB(asignaciones: AsignacionFB[]): Promise<void> {
   const db = getDB();
-  if (db) {
-    try {
-      const existentes = await getDocs(collection(db, 'asignaciones'));
-      const batch = writeBatch(db);
-      existentes.docs.forEach(d => batch.delete(d.ref));
+  const batch = writeBatch(db);
+  try {
+    if (db) {
       for (const a of asignaciones) {
         batch.set(doc(db, 'asignaciones', a.id), a);
       }
       await batch.commit();
-    } catch {}
+    }
+  } catch {
+    if (batch) {}
   }
   lsSet('cfg_asignaciones', asignaciones);
 }
