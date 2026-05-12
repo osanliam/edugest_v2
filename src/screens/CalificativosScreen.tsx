@@ -1859,26 +1859,26 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
       (userId    && a.docenteId === userId)
     );
 
-    // Fallback 2: si no encontramos, buscar por email del usuario
+    // Fallback 2: buscar por email del usuario en el campo docenteId
     if (mias.length === 0 && userEmail) {
-      mias = parsed.filter((a: any) =>
-        a.docenteId === userEmail || a.docenteId?.includes(userEmail)
-      );
+      const emailLower = userEmail.toLowerCase();
+      mias = parsed.filter((a: any) => {
+        const asigDocId = (a.docenteId || '').toLowerCase();
+        return asigDocId === emailLower || asigDocId.includes(emailLower);
+      });
     }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-    // Fallback 3: buscar por nombre del docente en la lista de docentes
+    // Fallback 3: buscar por email del docente en ie_docentes (cruzando tablas)
     if (mias.length === 0) {
       try {
         const docentes = JSON.parse(localStorage.getItem('ie_docentes') || '[]');
         const miDocente = docentes.find((d: any) =>
-          d.id === docenteId || d.id === userId
+          d.id === docenteId || d.id === userId || (d.email && d.email.toLowerCase() === userEmail?.toLowerCase())
         );
-        if (miDocente?.apellidos_nombres) {
+        if (miDocente) {
           mias = parsed.filter((a: any) => {
-            const docAsig = docentes.find((d: any) => d.id === a.docenteId);
-            return docAsig?.apellidos_nombres === miDocente.apellidos_nombres;
+            // El docenteId del assignment debe coincidir con el id del docente en ie_docentes
+            return a.docenteId === miDocente.id;
           });
         }
       } catch { /* silencioso */ }
@@ -2009,23 +2009,49 @@ if (ligero.columnas?.length > 0) {
     }
   };
 
-  // cargarAsignacion: reutiliza localStorage (ya actualizado por cargar())
-  // Se mantiene para que sincronizarDesdeTurso() también pueda llamarla
+  // cargarAsignacion: Firebase primero (como AlumnosScreen), luego localStorage, luego Turso
   const cargarAsignacion = async () => {
     if (!user?.role || user.role !== 'teacher') return;
     try {
-      const localAsigs = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]');
-      if (localAsigs.length > 0) {
-        aplicarAsignacion(localAsigs);
-        return;
+      let asignaciones: any[] = [];
+
+      // 1) INTENTAR FIREBASE PRIMERO
+      try {
+        const { getAsignacionesFB } = await import('../services/firebaseDataService');
+        const fbAsigs = await getAsignacionesFB();
+        if (fbAsigs.length > 0) {
+          asignaciones = fbAsigs;
+          localStorage.setItem('cfg_asignaciones', JSON.stringify(asignaciones));
+        }
+      } catch {
+        // Firebase no disponible
       }
-      // Si no hay en localStorage, consultar Turso directamente
-      const todo = await cargarTodo('asignaciones');
-      if (todo.asignaciones?.length > 0) {
-        localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
-        aplicarAsignacion(todo.asignaciones);
+
+      // 2) Fallback: localStorage
+      if (asignaciones.length === 0) {
+        const localAsigs = (() => { try { const d = JSON.parse(localStorage.getItem('cfg_asignaciones') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; } })();
+        if (localAsigs.length > 0) {
+          asignaciones = parsearAsignaciones(localAsigs);
+        } else {
+          // 3) Último recurso: Turso
+          try {
+            const todo = await cargarTodo('asignaciones');
+            asignaciones = parsearAsignaciones(todo.asignaciones || []);
+            if (asignaciones.length > 0) {
+              localStorage.setItem('cfg_asignaciones', JSON.stringify(todo.asignaciones));
+            }
+          } catch {
+            asignaciones = [];
+          }
+        }
       }
-    } catch (_) {}
+
+      if (asignaciones.length > 0) {
+        aplicarAsignacion(asignaciones);
+      }
+    } catch (e) {
+      console.error('[EduGest] Error cargando asignación:', e);
+    }
   };
 
   // Firebase primero: si hay datos en la nube, úsalos inmediatamente
@@ -2056,6 +2082,13 @@ if (ligero.columnas?.length > 0) {
       } catch { /* si falla, cargar() intentará Turso/localStorage */ }
     })();
   }, []);
+
+  // Cargar asignacion Firebase-first cuando el usuario se carga (cubre dispositivo fresco / Firebase vacío)
+  useEffect(() => {
+    if (user) {
+      cargarAsignacion();
+    }
+  }, [user]);
 
   useEffect(() => {
     cargar();
