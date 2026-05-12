@@ -2485,10 +2485,10 @@ if (ligero.columnas?.length > 0) {
 
   const nombre = (a: Alumno) => a.apellidos_nombres || a.nombre || '—';
   // Columnas filtradas por docente: admin ve todo, docentes solo los suyos
-  const misColumnas = React.useMemo(() =>
-    esAdmin ? columnas : columnas.filter(c => !c.creatorId || c.creatorId === user?.email),
-    [columnas, esAdmin, user]
-  );
+  const misColumnas = React.useMemo(() => {
+    const isAdmin = user?.role === 'admin';
+    return isAdmin ? columnas : columnas.filter(c => !c.creatorId || c.creatorId === user?.email);
+  }, [columnas, user]);
   const colPorComp = (cid: string) => misColumnas.filter(c => {
     const matchUnidad = !filtroUnidad || c.bimestreId === filtroUnidad || !c.bimestreId;
     return c.competenciaId === cid && matchUnidad;
