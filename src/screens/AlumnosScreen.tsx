@@ -332,7 +332,7 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
         (userEmail && a.docenteId?.toLowerCase() === userEmail)
       );
       if (mias.length > 0) {
-        const grados   = [...new Set(mias.flatMap((a: any) => a.grados || []))] as string[];
+        const grados    = [...new Set(mias.flatMap((a: any) => a.grados || []))] as string[];
         const secciones = [...new Set(mias.flatMap((a: any) => a.secciones || []))] as string[];
         setAsignacionDocente({ grados, secciones });
       }
@@ -707,15 +707,40 @@ export default function AlumnosScreen({ user }: AlumnosScreenProps = {}) {
 
   // ── Filtrado por asignación docente ─────────────────────────────────
   const normGrado = (g: string) => String(g || '').trim().replace(/°$/, '');
+  const normSeccion = (s: string) => String(s || '').trim().toUpperCase();
   const alumnosBase = React.useMemo(() => {
     if (!esDocente) return alumnos;
     if (!asignacionDocente || asignacionDocente.grados.length === 0) return [];
-    const gradosNorm    = asignacionDocente.grados.map(normGrado);
-    const seccionesNorm = asignacionDocente.secciones.map(s => s.trim().toUpperCase());
-    const filtrados = alumnos.filter(a =>
-      gradosNorm.includes(normGrado(a.grado)) &&
-      seccionesNorm.includes((a.seccion || '').trim().toUpperCase())
-    );
+    // Construir mapa grado→secciones desde los assignments originales
+    const mapaGradoSecciones: Record<string, string[]> = {};
+    asignacionDocente.grados.forEach(g => {
+      const gn = normGrado(g);
+      if (!mapaGradoSecciones[gn]) mapaGradoSecciones[gn] = [];
+    });
+    // Mapear secciones por índice (si arrays correspondientes) o combinar
+    if (asignacionDocente.grados.length === asignacionDocente.secciones.length) {
+      asignacionDocente.grados.forEach((g, i) => {
+        const gn = normGrado(g);
+        const s = asignacionDocente.secciones[i];
+        if (s && !mapaGradoSecciones[gn].includes(normSeccion(s))) {
+          mapaGradoSecciones[gn].push(normSeccion(s));
+        }
+      });
+    } else {
+      // Arrays planos: cada sección aplica a todos los grados
+      asignacionDocente.secciones.forEach(s => {
+        const sn = normSeccion(s);
+        Object.keys(mapaGradoSecciones).forEach(g => {
+          if (!mapaGradoSecciones[g].includes(sn)) mapaGradoSecciones[g].push(sn);
+        });
+      });
+    }
+    const filtrados = alumnos.filter(a => {
+      const gn = normGrado(a.grado);
+      const sn = normSeccion(a.seccion);
+      const seccionesDelGrado = mapaGradoSecciones[gn] || [];
+      return Object.keys(mapaGradoSecciones).includes(gn) && seccionesDelGrado.includes(sn);
+    });
     return filtrados;
   }, [alumnos, esDocente, asignacionDocente]);
 

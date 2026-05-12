@@ -1818,7 +1818,14 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
   const [compExpand,    setCompExpand]    = useState<Record<string, boolean>>({ comp1: true, comp2: true, comp3: true });
   const [syncing,       setSyncing]       = useState(false);
   const [syncMsg,       setSyncMsg]       = useState<{tipo:'ok'|'err';texto:string}|null>(null);
-  const [asignacionDocente, setAsignacionDocente] = useState<{grados:string[]; secciones:string[]; cursos:string[]} | null>(null);
+  const [asignacionDocente, setAsignacionDocente] = useState<{
+    // Estructura original: cada assignment tiene sus propios grados y secciones
+    assignments: { grado: string; secciones: string[]; cursos?: string[] }[];
+    // Para compatibilidad: grados y secciones planos (calculados)
+    grados: string[];
+    secciones: string[];
+    cursos: string[];
+  } | null>(null);
   const [ultimaSync,    setUltimaSync]    = useState<Date | null>(null);
   const [cambiosRemotos, setCambiosRemotos] = useState(0);
   const [showRespaldo,  setShowRespaldo]  = useState(false);
@@ -1917,9 +1924,16 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
 
     if (mias.length === 0) {
       console.warn('[EduGest] NO se encontró asignación — mostrando "sin alumnos"');
-      setAsignacionDocente({ grados: [], secciones: [], cursos: [] });
+      setAsignacionDocente(null);
       return;
     }
+
+    // Construir la estructura original: cada assignment conserva sus propios grados y secciones
+    const assignments = mias.map((a: any) => ({
+      grado: Array.isArray(a.grados) ? a.grados[0] || '' : (a.grados || ''),
+      secciones: Array.isArray(a.secciones) ? a.secciones : (typeof a.secciones === 'string' ? [a.secciones] : []),
+      cursos: Array.isArray(a.cursos) ? a.cursos : (a.cursos ? [a.cursos] : []),
+    }));
 
     const grados    = [...new Set(mias.flatMap((a: any) => a.grados))] as string[];
     const secciones = [...new Set(mias.flatMap((a: any) => a.secciones))] as string[];
@@ -1927,9 +1941,10 @@ export default function CalificativosScreen({ user }: { user?: UserProp }) {
 
     console.log('[EduGest] Grados asignados:', grados);
     console.log('[EduGest] Secciones asignadas:', secciones);
+    console.log('[EduGest] Assignments:', assignments);
 
     if (grados.length > 0 || secciones.length > 0) {
-      setAsignacionDocente({ grados, secciones, cursos });
+      setAsignacionDocente({ assignments, grados, secciones, cursos });
     } else {
       setAsignacionDocente(null);
     }
@@ -2249,18 +2264,67 @@ if (ligero.columnas?.length > 0) {
     );
   }, [alumnos, esDocente, asignacionDocente]);
 
+  // Para docentes: mapa grado → secciones (desde las asignaciones reales)
+  const mapaGradoSecciones: Record<string, string[]> = React.useMemo(() => {
+    if (!esDocente || !asignacionDocente) return {};
+    const mapa: Record<string, string[]> = {};
+    // USAR assignments para construir el mapa grado→secciones correctamente
+    if (asignacionDocente.assignments && asignacionDocente.assignments.length > 0) {
+      asignacionDocente.assignments.forEach(a => {
+        const gn = normGrado(a.grado);
+        if (!mapa[gn]) mapa[gn] = [];
+        (a.secciones || []).forEach(s => {
+          if (s && !mapa[gn].includes(s)) mapa[gn].push(s);
+        });
+      });
+    } else {
+      // Fallback: arrays planos (sin correspondencia de índice)
+      asignacionDocente.grados.forEach(g => {
+        const gn = normGrado(g);
+        if (!mapa[gn]) mapa[gn] = [];
+      });
+      asignacionDocente.secciones.forEach(s => {
+        Object.keys(mapa).forEach(g => {
+          if (s && !mapa[g].includes(s)) mapa[g].push(s);
+        });
+      });
+    }
+    Object.keys(mapa).forEach(g => mapa[g].sort());
+    return mapa;
+  }, [esDocente, asignacionDocente]);
+
+  // Secciones visibles: si hay grado seleccionado, solo secciones de ese grado
+  const seccionesVisibles: string[] = React.useMemo(() => {
+    if (!esDocente || !asignacionDocente) {
+      return [...new Set(alumnos.map(a => (a as any).seccion).filter(Boolean))].sort();
+    }
+    if (filtroGrado) {
+      const gn = normGrado(filtroGrado);
+      return mapaGradoSecciones[gn] || [];
+    }
+    // Sin filtro de grado: todas las secciones únicas
+    return [...new Set(asignacionDocente.secciones)].sort();
+  }, [esDocente, asignacionDocente, filtroGrado, alumnos]);
+
   const grados = esDocente && asignacionDocente
-    ? asignacionDocente.grados.sort()
+    ? [...new Set(asignacionDocente.grados.map(normGrado))].sort()
     : [...new Set(alumnos.map(a => (a as any).grado).filter(Boolean))].sort();
-  const secciones = esDocente && asignacionDocente
-    ? asignacionDocente.secciones.sort()
-    : [...new Set(alumnos.map(a => (a as any).seccion).filter(Boolean))].sort();
 
   const alumnosFiltrados = alumnosBase.filter(a => {
-    const matchG = !filtroGrado   || normGrado((a as any).grado)   === normGrado(filtroGrado);
-    const matchS = !filtroSeccion || normSeccion((a as any).seccion) === normSeccion(filtroSeccion);
+    const gradoAlumno   = normGrado((a as any).grado);
+    const seccionAlumno = normSeccion((a as any).seccion);
+    const matchG = !filtroGrado || gradoAlumno === normGrado(filtroGrado);
+    // Filtrar por sección: si hay filtro de grado Y conocemos las secciones para ese grado,
+    // excluir alumnos cuya sección NO esté asignada a ese grado
+    let matchS = !filtroSeccion || seccionAlumno === normSeccion(filtroSeccion);
+    if (matchG && filtroGrado && !filtroSeccion) {
+      const seccionesDelGrado = mapaGradoSecciones[normGrado(filtroGrado)] || [];
+      if (seccionesDelGrado.length > 0) {
+        matchS = seccionesDelGrado.some(s => normSeccion(s) === seccionAlumno);
+      }
+    }
     const searchTerm = busqueda.toLowerCase();
-    const matchSearch = !busqueda || 
+    const matchSearch = !busqueda ||
       (a.apellidos_nombres || a.nombre || '').toLowerCase().includes(searchTerm) ||
       ((a as any).dni || '').toLowerCase().includes(searchTerm);
     return matchG && matchS && matchSearch;
@@ -2420,13 +2484,18 @@ if (ligero.columnas?.length > 0) {
   };
 
   const nombre = (a: Alumno) => a.apellidos_nombres || a.nombre || '—';
-  const colPorComp = (cid: string) => columnas.filter(c => {
+  // Columnas filtradas por docente: admin ve todo, docentes solo los suyos
+  const misColumnas = React.useMemo(() =>
+    esAdmin ? columnas : columnas.filter(c => !c.creatorId || c.creatorId === user?.email),
+    [columnas, esAdmin, user]
+  );
+  const colPorComp = (cid: string) => misColumnas.filter(c => {
     const matchUnidad = !filtroUnidad || c.bimestreId === filtroUnidad || !c.bimestreId;
     return c.competenciaId === cid && matchUnidad;
   });
   const avance = (alumnoId: string) => {
-    if (columnas.length === 0) return 0;
-    return Math.round(columnas.filter(c => getCal(alumnoId, c.id)).length / columnas.length * 100);
+    if (misColumnas.length === 0) return 0;
+    return Math.round(misColumnas.filter(c => getCal(alumnoId, c.id)).length / misColumnas.length * 100);
   };
 
   // Abrir pop-up correcto según tipo
@@ -2550,9 +2619,9 @@ if (ligero.columnas?.length > 0) {
           <select value={filtroSeccion} onChange={e => setFiltroSeccion(e.target.value)}
             className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-500">
             <option value="">Todas las secciones</option>
-            {secciones.map(s => <option key={s} value={s}>Sección {s}</option>)}
+            {seccionesVisibles.map(s => <option key={s} value={s}>Sección {s}</option>)}
           </select>
-          <span className="text-slate-500 text-xs">{alumnosFiltrados.length} alumnos · {columnas.length} columnas</span>
+          <span className="text-slate-500 text-xs">{alumnosFiltrados.length} alumnos · {misColumnas.length} columnas</span>
           {esDocente && asignacionDocente && (
             <span className="text-indigo-400 text-xs bg-indigo-500/10 border border-indigo-500/30 rounded-lg px-2 py-1">
               🏫 {asignacionDocente.grados.join(', ')} · Sec. {asignacionDocente.secciones.join(', ')}
@@ -2581,17 +2650,17 @@ if (ligero.columnas?.length > 0) {
                   Descarga un Excel con todos los alumnos, sus respuestas pregunta por pregunta y el calificativo.
                 </p>
               </div>
-              <button onClick={() => exportarTodas(columnas, alumnos, calificativos)}
+              <button onClick={() => exportarTodas(misColumnas, alumnosFiltrados, calificativos)}
                 className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">
-                <Download size={13}/> Exportar TODOS ({columnas.length})
+                <Download size={13}/> Exportar TODOS ({misColumnas.length})
               </button>
             </div>
-            {columnas.length === 0 ? (
+            {misColumnas.length === 0 ? (
               <p className="text-slate-500 text-sm text-center py-4">Sin columnas configuradas.</p>
             ) : (
               <div className="space-y-1">
                 {COMPETENCIAS.map(comp => {
-                  const cols = columnas.filter(c => c.competenciaId === comp.id);
+                  const cols = misColumnas.filter(c => c.competenciaId === comp.id);
                   if (cols.length === 0) return null;
                   return (
                     <div key={comp.id} className="mb-2">
@@ -2629,8 +2698,8 @@ if (ligero.columnas?.length > 0) {
         {/* Panel gestión columnas */}
         {showGestion && (
           <div className="max-w-5xl mx-auto mb-4 bg-slate-800 border border-slate-700 rounded-xl p-4">
-            <h3 className="text-white font-bold text-sm mb-3">Columnas configuradas ({columnas.length})</h3>
-            {columnas.length === 0 ? (
+            <h3 className="text-white font-bold text-sm mb-3">Columnas configuradas ({misColumnas.length})</h3>
+            {misColumnas.length === 0 ? (
               <p className="text-slate-500 text-sm text-center py-4">Sin columnas. Agrega una con "Nueva columna".</p>
             ) : (
               <div className="space-y-4">
@@ -2722,7 +2791,7 @@ if (ligero.columnas?.length > 0) {
               </div>
             ) : (
               <>
-                {columnas.length === 0 && (
+                {misColumnas.length === 0 && (
               <div className="px-4 py-3 mx-4 mt-4 bg-amber-500/20 border border-amber-500/40 rounded-lg text-center">
                 <p className="text-amber-300 text-sm font-bold mb-2">⚠️ Sin columnas configuradas</p>
                 <p className="text-amber-300 text-xs mb-3">Agrega columnas de examen, lista de cotejo, ficha de observación o rúbrica</p>
