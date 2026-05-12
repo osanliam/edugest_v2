@@ -2484,18 +2484,13 @@ if (ligero.columnas?.length > 0) {
   };
 
   const nombre = (a: Alumno) => a.apellidos_nombres || a.nombre || '—';
-  // Columnas filtradas por docente: admin ve todo, docentes solo los suyos
-  const misColumnas = React.useMemo(() => {
-    const isAdmin = user?.role === 'admin';
-    return isAdmin ? columnas : columnas.filter(c => !c.creatorId || c.creatorId === user?.email);
-  }, [columnas, user]);
-  const colPorComp = (cid: string) => misColumnas.filter(c => {
+  const colPorComp = (cid: string) => columnas.filter(c => {
     const matchUnidad = !filtroUnidad || c.bimestreId === filtroUnidad || !c.bimestreId;
     return c.competenciaId === cid && matchUnidad;
   });
   const avance = (alumnoId: string) => {
-    if (misColumnas.length === 0) return 0;
-    return Math.round(misColumnas.filter(c => getCal(alumnoId, c.id)).length / misColumnas.length * 100);
+    if (columnas.length === 0) return 0;
+    return Math.round(columnas.filter(c => getCal(alumnoId, c.id)).length / columnas.length * 100);
   };
 
   // Abrir pop-up correcto según tipo
@@ -2621,7 +2616,7 @@ if (ligero.columnas?.length > 0) {
             <option value="">Todas las secciones</option>
             {seccionesVisibles.map(s => <option key={s} value={s}>Sección {s}</option>)}
           </select>
-          <span className="text-slate-500 text-xs">{alumnosFiltrados.length} alumnos · {misColumnas.length} columnas</span>
+          <span className="text-slate-500 text-xs">{alumnosFiltrados.length} alumnos · {columnas.length} columnas</span>
           {esDocente && asignacionDocente && (
             <span className="text-indigo-400 text-xs bg-indigo-500/10 border border-indigo-500/30 rounded-lg px-2 py-1">
               🏫 {asignacionDocente.grados.join(', ')} · Sec. {asignacionDocente.secciones.join(', ')}
@@ -2650,17 +2645,17 @@ if (ligero.columnas?.length > 0) {
                   Descarga un Excel con todos los alumnos, sus respuestas pregunta por pregunta y el calificativo.
                 </p>
               </div>
-              <button onClick={() => exportarTodas(misColumnas, alumnosFiltrados, calificativos)}
+              <button onClick={() => exportarTodas(columnas, alumnosFiltrados, calificativos)}
                 className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">
-                <Download size={13}/> Exportar TODOS ({misColumnas.length})
+                <Download size={13}/> Exportar TODOS ({columnas.length})
               </button>
             </div>
-            {misColumnas.length === 0 ? (
+            {columnas.length === 0 ? (
               <p className="text-slate-500 text-sm text-center py-4">Sin columnas configuradas.</p>
             ) : (
               <div className="space-y-1">
                 {COMPETENCIAS.map(comp => {
-                  const cols = misColumnas.filter(c => c.competenciaId === comp.id);
+                  const cols = columnas.filter(c => c.competenciaId === comp.id);
                   if (cols.length === 0) return null;
                   return (
                     <div key={comp.id} className="mb-2">
@@ -2698,8 +2693,8 @@ if (ligero.columnas?.length > 0) {
         {/* Panel gestión columnas */}
         {showGestion && (
           <div className="max-w-5xl mx-auto mb-4 bg-slate-800 border border-slate-700 rounded-xl p-4">
-            <h3 className="text-white font-bold text-sm mb-3">Columnas configuradas ({misColumnas.length})</h3>
-            {misColumnas.length === 0 ? (
+            <h3 className="text-white font-bold text-sm mb-3">Columnas configuradas ({columnas.length})</h3>
+            {columnas.length === 0 ? (
               <p className="text-slate-500 text-sm text-center py-4">Sin columnas. Agrega una con "Nueva columna".</p>
             ) : (
               <div className="space-y-4">
@@ -2791,7 +2786,7 @@ if (ligero.columnas?.length > 0) {
               </div>
             ) : (
               <>
-                {misColumnas.length === 0 && (
+                {columnas.length === 0 && (
               <div className="px-4 py-3 mx-4 mt-4 bg-amber-500/20 border border-amber-500/40 rounded-lg text-center">
                 <p className="text-amber-300 text-sm font-bold mb-2">⚠️ Sin columnas configuradas</p>
                 <p className="text-amber-300 text-xs mb-3">Agrega columnas de examen, lista de cotejo, ficha de observación o rúbrica</p>
