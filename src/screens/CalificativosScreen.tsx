@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
+import { Plus, X, Save, Settings, ChevronDown, ChevronRight, Edit2, Search, RefreshCw, Download, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { cargarTodo, guardarCalificativos, guardarUnCalificativo, guardarColumnas, getAsignaciones, getCalificacionesDesdeFecha, cargarCalPaginado, getCacheCalificaciones, setCacheCalificaciones, actualizarCalEnCache } from '../utils/apiClient';
 import { guardarCalificativoFB, guardarCalificativosBatchFB, guardarColumnasFB, eliminarColumnaFB, eliminarCalificativosPorColumnaFB } from '../services/firebaseDataService';
