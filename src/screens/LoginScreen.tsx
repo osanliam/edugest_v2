@@ -64,25 +64,35 @@ async function loginRequest(email: string, password: string) {
     if (turso) {
       // Turso exitosa: usar esta data siempre (tiene docenteId correcto del backend)
       // En segundo plano: guardar/corroborar en Firebase para otros dispositivos offline
+      const userData = turso.user;
       (async () => {
         try {
           const { guardarUsuarioFB } = await import('../services/firebaseDataService');
           const fbUsuarios = await getUsuariosFB();
-          const existente = fbUsuarios.find((u: any) => u.id === turso.user.id);
+          const existente = fbUsuarios.find((u: any) => u.id === userData.id);
           if (!existente) {
+            // Usuario nuevo: crear en Firebase
             await guardarUsuarioFB({
-              id: turso.user.id,
-              nombre: turso.user.name,
-              email: turso.user.email,
-              rol: turso.user.role,
-              docenteId: turso.user.docenteId || null,
+              id: userData.id,
+              nombre: userData.name,
+              email: userData.email,
+              rol: userData.role,
+              docenteId: userData.docenteId || null,
               activo: true,
               creado: new Date().toISOString(),
               contraseña: '',
             });
-          } else if (!existente.docenteId && turso.user.docenteId) {
-            // Actualizar docenteId si Firebase tiene datos incompletos
-            await guardarUsuarioFB({ ...existente, docenteId: turso.user.docenteId });
+          } else {
+            // Usuario existente: siempre sobrescribir docenteId con el del backend (fuente de verdad)
+            // El admin actualiza via backend; el login lo replica a Firebase
+            await guardarUsuarioFB({
+              ...existente,
+              nombre: userData.name,
+              email: userData.email,
+              rol: userData.role,
+              docenteId: userData.docenteId || existente.docenteId || null,
+              activo: true,
+            });
           }
         } catch { /* Firebase no disponible */ }
       })();

@@ -802,7 +802,19 @@ const importarDatosCompletos = () => {
                     const idx = todos.findIndex(u => u.id === userVincular.id);
                     if (idx >= 0) {
                       todos[idx].docenteId = nuevoDocenteId;
+                      // Guardar local + Firebase (lsGuardar ya hace esto)
                       lsGuardar(todos);
+                      // También guardar en backend Turso para que el login siempre tenga el valor correcto
+                      try {
+                        await fetch(`/api/users?id=${userVincular.id}`, {
+                          method: 'PUT',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${getToken()}`
+                          },
+                          body: JSON.stringify({ docenteId: nuevoDocenteId }),
+                        });
+                      } catch { /* Turso no disponible */ }
                       setShowVincular(false);
                       setUserVincular(null);
                       mostrarMensaje('ok', 'Docente vinculado correctamente');
