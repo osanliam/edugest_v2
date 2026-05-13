@@ -1389,20 +1389,20 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
                       {rub2Rows.filter(r => r.tipo === 'descriptor').map((row, idx) => {
                         const realIdx = rub2Rows.indexOf(row);
                         return (
-                          <tr key={realIdx} className="hover:bg-purple-500/5">
-                            <td className="py-1.5 px-1 text-purple-300 font-bold">{idx + 1}</td>
-                            <td className="py-1.5 px-1">
-                              <input type="text" value={row.criterio} onChange={e => { const n = [...rub2Rows]; n[realIdx] = { ...n[realIdx], criterio: e.target.value }; setRub2Rows(n); }}
-                                className="w-full bg-slate-700 border border-purple-500/20 rounded px-2 py-1 text-white text-xs" placeholder={`Criterio ${idx + 1}...`} />
+                          <tr key={realIdx} className="hover:bg-purple-500/5 align-top">
+                            <td className="py-2 px-1 text-purple-300 font-bold w-6">{idx + 1}</td>
+                            <td className="py-2 px-1 w-44">
+                              <textarea value={row.criterio} rows={2} onChange={e => { const n = [...rub2Rows]; n[realIdx] = { ...n[realIdx], criterio: e.target.value }; setRub2Rows(n); }}
+                                className="w-full bg-slate-700 border border-purple-500/20 rounded px-2 py-1.5 text-white text-xs resize-none" placeholder={`Criterio ${idx + 1}...`} />
                             </td>
                             {RUB2_LEVELS.map((nivel, ni) => (
-                              <td key={nivel} className="py-1.5 px-1">
-                                <input type="text" value={row.descriptores[ni] || ''} onChange={e => { const n = [...rub2Rows]; const d = [...n[realIdx].descriptores]; d[ni] = e.target.value; n[realIdx] = { ...n[realIdx], descriptores: d }; setRub2Rows(n); }}
-                                  className={`w-full bg-slate-700/50 border rounded px-1.5 py-1 text-[10px] text-slate-300 placeholder-slate-500 ${nivel === 'AD' ? 'border-blue-500/30' : nivel === 'A' ? 'border-emerald-500/30' : nivel === 'B' ? 'border-amber-500/30' : 'border-red-500/30'}`}
+                              <td key={nivel} className="py-2 px-1 w-44">
+                                <textarea value={row.descriptores[ni] || ''} rows={3} onChange={e => { const n = [...rub2Rows]; const d = [...n[realIdx].descriptores]; d[ni] = e.target.value; n[realIdx] = { ...n[realIdx], descriptores: d }; setRub2Rows(n); }}
+                                  className={`w-full bg-slate-700/50 border rounded px-2 py-1.5 text-xs text-slate-300 placeholder-slate-500 resize-none ${nivel === 'AD' ? 'border-blue-500/30' : nivel === 'A' ? 'border-emerald-500/30' : nivel === 'B' ? 'border-amber-500/30' : 'border-red-500/30'}`}
                                   placeholder={RUB2_LEVEL_LABELS[nivel]} />
                               </td>
                             ))}
-                            <td className="py-1.5 px-1 text-center">
+                            <td className="py-2 px-1 text-center w-6">
                               <button onClick={() => { const n = [...rub2Rows]; n.splice(realIdx, 1); setRub2Rows(n); }} className="text-red-400 hover:text-red-300 text-xs">✕</button>
                             </td>
                           </tr>
