@@ -66,7 +66,8 @@ interface Columna {
   itemsExamen?: ItemExamen[];
   items?: string[];
   columnasEval?: string[];
-  creatorId?: string; // email de quien creó la columna
+  creatorId?: string;
+  grados?: string[]; // grados en los que aplica esta columna (vacío = todos)
 }
 
 interface Calificativo {
@@ -1020,9 +1021,16 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // Modal NUEVA / EDITAR columna
 // ─────────────────────────────────────────────────────────────────────────────
-function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres: bimestresProps }: {
-  columnaEditar?: Columna; onGuardar: (c: Columna) => void; onCerrar: () => void; userEmail?: string; bimestres?: any[];
+function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres: bimestresProps, filtroGrado, asignacionDocente }: {
+  columnaEditar?: Columna;
+  onGuardar: (c: Columna) => void;
+  onCerrar: () => void;
+  userEmail?: string;
+  bimestres?: any[];
+  filtroGrado?: string;
+  asignacionDocente?: { grados: string[] } | null;
 }) {
+  const normG = (g: string) => String(g || '').trim().replace(/°$/, '');
   const [nombre,    setNombre]    = useState('');
   const [tipo,      setTipo]      = useState<TipoInstrumento>('lista-cotejo');
   const [total,     setTotal]     = useState(10);
@@ -1109,7 +1117,7 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       : tipo === 'rubrica-2' ? rub2Rows.map(r => ({ correcta: r.clave || '', tipo: r.tipo, criterio: r.criterio, descriptores: r.tipo === 'descriptor' ? r.descriptores : undefined }))
       : undefined;
     const cols = nuevasColumnasEval.split(',').map(c => c.trim()).filter(c => c);
-    onGuardar({ id: columnaEditar?.id ?? 'col-' + Date.now(), nombre: nombre.trim(), tipo, totalItems: total, competenciaId: compId, bimestreId: bimestreId || undefined, promediar, itemsExamen, columnasEval: cols.length > 0 ? cols : undefined, creatorId: userEmail || 'admin' });
+    onGuardar({ id: columnaEditar?.id ?? 'col-' + Date.now(), nombre: nombre.trim(), tipo, totalItems: total, competenciaId: compId, bimestreId: bimestreId || undefined, promediar, itemsExamen, columnasEval: cols.length > 0 ? cols : undefined, creatorId: userEmail || 'admin', grados: columnaEditar?.id ? (columnaEditar.grados || []) : (filtroGrado && normG(filtroGrado) ? [filtroGrado] : (asignacionDocente?.grados || [])) });
   };
 
   const inp = "w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-500";
@@ -2486,7 +2494,8 @@ if (ligero.columnas?.length > 0) {
   const nombre = (a: Alumno) => a.apellidos_nombres || a.nombre || '—';
   const colPorComp = (cid: string) => columnas.filter(c => {
     const matchUnidad = !filtroUnidad || c.bimestreId === filtroUnidad || !c.bimestreId;
-    return c.competenciaId === cid && matchUnidad;
+    const matchGrado = !filtroGrado || !c.grados?.length || c.grados.some(g => normGrado(g) === normGrado(filtroGrado));
+    return c.competenciaId === cid && matchUnidad && matchGrado;
   });
   const avance = (alumnoId: string) => {
     if (columnas.length === 0) return 0;
@@ -2512,7 +2521,7 @@ if (ligero.columnas?.length > 0) {
                 : <PopupInstrumento alumno={popup.alumno} columna={popup.columna} calActual={getCal((popup.alumno as any).id, popup.columna.id)} onGuardar={handleGuardarCal} onCerrar={() => setPopup(null)} />
       )}
       {modalColumna !== null && (
-        <ModalColumna key={modalColumna.columna?.id || 'nueva'} columnaEditar={modalColumna.columna} onGuardar={handleGuardarColumna} onCerrar={() => setModalColumna(null)} userEmail={user?.email} bimestres={bimestres} />
+        <ModalColumna key={modalColumna.columna?.id || 'nueva'} columnaEditar={modalColumna.columna} onGuardar={handleGuardarColumna} onCerrar={() => setModalColumna(null)} userEmail={user?.email} bimestres={bimestres} filtroGrado={filtroGrado} asignacionDocente={asignacionDocente} />
       )}
       {planillaColumna !== null && (
         <ModalPlanilla columna={planillaColumna} alumnos={alumnosFiltrados} calificativos={calificativos} onGuardarTodo={handleGuardarTodo} onCerrar={() => setPlanillaColumna(null)} />
