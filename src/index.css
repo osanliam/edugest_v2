@@ -138,20 +138,85 @@
 
   /* SCROLLBARS PERSONALIZADAS */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-slate-900/50;
+    background: rgba(15, 23, 42, 0.5);
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-600/50 rounded-full;
+    background: rgba(71, 85, 105, 0.5);
+    border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-500;
+    background: rgba(100, 116, 139, 0.7);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Selección de texto */
+  ::selection {
+    background: rgba(99, 102, 241, 0.35);
+    color: #e0e7ff;
+  }
+
+  /* Focus ring global */
+  :focus-visible {
+    outline: 2px solid rgba(99, 102, 241, 0.6);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Smooth scroll global */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Animación shimmer para skeletons */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(30, 41, 59, 0.4) 25%,
+      rgba(51, 65, 85, 0.4) 50%,
+      rgba(30, 41, 59, 0.4) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+
+  /* Focus ring suave */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400;
+  }
+
+  /* Transiciones globales */
+  .transition-base {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Fila de tabla con hover */
+  .table-row-hover {
+    @apply transition-colors duration-150;
+  }
+
+  .table-row-hover:hover {
+    background: rgba(51, 65, 85, 0.3);
+  }
+
+  /* Glass overlay */
+  .glass-overlay {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
   }
 
   /* UTILITY CLASSES */
