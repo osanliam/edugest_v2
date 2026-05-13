@@ -2819,15 +2819,7 @@ if (ligero.columnas?.length > 0) {
                                   <FileSpreadsheet size={11}/> Planilla
                                 </button>
                                 <button onClick={() => {
-                                  const g = filtroGrado || '';
-                                  const esGradoVacio = gradoConItemsVacios(g);
-                                  let colParaModal: Columna;
-                                  if (esGradoVacio) {
-                                    colParaModal = { ...col, itemsExamen: [] };
-                                  } else {
-                                    colParaModal = col;
-                                  }
-                                  setModalColumna({ columna: colParaModal });
+                                  setModalColumna({ columna: col });
                                 }}
                                   className="flex items-center gap-1 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-xs">
                                   <Edit2 size={11}/> Editar
