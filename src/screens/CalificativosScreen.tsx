@@ -1081,16 +1081,16 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
   const [rubDescRows, setRubDescRows] = useState<{ criterio: string; descriptores: string[] }[]>([]);
   const unidades = bimestresProps || [];
 
-  // Resetear todo cuando cambia la columna a editar (evita que datos de un instrumento "contaminen" a otro)
-  // Para grados 2-5: SIEMPRE abre con itemsExamen vacío (columna en blanco lista para crear)
-  // Para grado 1: preserva itemsExamen guardado tal cual
+  // Resetear todo cuando cambia la columna a editar
+  // - Si es edición (columnaEditar existe): SIEMPRE cargar itemsExamen guardados
+  // - Si es creación nueva: para 1° preserva defaults, para 2-5° arranca vacío
   useEffect(() => {
     const t = columnaEditar?.tipo ?? 'lista-cotejo';
     const tot = columnaEditar?.totalItems ?? 10;
     const arrRaw = Array.isArray(columnaEditar?.itemsExamen) ? columnaEditar.itemsExamen : [];
     const g = filtroGrado || '';
-    // Para 2-5: siempre vacío; para 1: conserva lo guardado
-    const usarItems = gradoConservarItems(g) && arrRaw.length > 0;
+    const esEdicion = !!columnaEditar;
+    const usarItems = esEdicion ? arrRaw.length > 0 : (gradoConservarItems(g) && arrRaw.length > 0);
     const arr = usarItems ? arrRaw : [];
     setNombre(columnaEditar?.nombre ?? '');
     setTipo(t);
@@ -1120,7 +1120,7 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
         descriptores: Array(4).fill('') as string[],
       })));
     }
-    if (t === 'rubrica-2' && arr.length > 0 && gradoConservarItems(g)) {
+    if (t === 'rubrica-2' && arr.length > 0) {
       setRub2Rows(arr.map((i: any) => ({
         criterio: i.criterio || '',
         clave: i.correcta || '',
