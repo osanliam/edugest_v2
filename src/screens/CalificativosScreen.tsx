@@ -617,26 +617,36 @@ function PopupRubrica2({ alumno, columna, calActual, onGuardar, onCerrar }: {
     if (calActual?.items?.length) {
       return calActual.items.map((it: any, idx: number) => {
         const cfg = itemsConfig[idx] || {};
-        const tipo = (cfg.tipo as 'alternativa' | 'descriptor') || (cfg.correcta && cfg.correcta.trim() ? 'alternativa' : 'descriptor');
+        const savedTipo = it.tipo || cfg.tipo;
+        const tipo = (savedTipo as 'alternativa' | 'descriptor') || (cfg.correcta && cfg.correcta.trim() ? 'alternativa' : 'descriptor');
+        const savedClave = it.clave || it.correcta;
+        const savedDesc = Array.isArray(it.descriptores) && it.descriptores.length === 4 ? it.descriptores : undefined;
+        const cfgDesc = Array.isArray(cfg.descriptores) && cfg.descriptores.length === 4 ? cfg.descriptores : Array(4).fill('') as string[];
         return {
           criterio: it.criterio || cfg.criterio || '',
-          clave: it.clave || it.correcta || cfg.correcta || '',
+          clave: savedClave || cfg.correcta || '',
           tipo,
           respuesta: it.respuesta || '',
           nivel: it.nivel || '',
-          descriptores: cfg.descriptores?.length === 4 ? [...cfg.descriptores] : Array(4).fill('') as string[],
+          descriptores: savedDesc || cfgDesc,
         };
       });
     }
     if (itemsConfig.length > 0) {
-      return itemsConfig.map((cfg: any) => ({
-        criterio: cfg.criterio || '',
-        clave: cfg.correcta || '',
-        tipo: (cfg.tipo as 'alternativa' | 'descriptor') || (cfg.correcta && cfg.correcta.trim() ? 'alternativa' : 'descriptor'),
-        respuesta: '',
-        nivel: '',
-        descriptores: (cfg.descriptores?.length === 4 ? [...cfg.descriptores] : Array(4).fill('')) as string[],
-      }));
+      const savedItems = calActual?.items || [];
+      return itemsConfig.map((cfg: any, idx: number) => {
+        const it = savedItems[idx];
+        const savedDesc = Array.isArray(it?.descriptores) && it.descriptores.length === 4 ? it.descriptores : undefined;
+        const cfgDesc = Array.isArray(cfg.descriptores) && cfg.descriptores.length === 4 ? [...cfg.descriptores] : Array(4).fill('') as string[];
+        return {
+          criterio: (it?.criterio || cfg.criterio || '') || `Ítem ${idx + 1}`,
+          clave: (it?.clave || it?.correcta || cfg.correcta || '') as string,
+          tipo: (cfg.tipo as 'alternativa' | 'descriptor') || (cfg.correcta && cfg.correcta.trim() ? 'alternativa' : 'descriptor'),
+          respuesta: '',
+          nivel: '',
+          descriptores: savedDesc || cfgDesc,
+        };
+      });
     }
     return Array(num).fill(null).map((_, i) => ({
       criterio: `Ítem ${i + 1}`,
@@ -863,19 +873,27 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
     if (calActual?.items?.length) {
       return calActual.items.map((it: any, i: number) => {
         const cfg = items[i] || {};
+        const savedDesc = Array.isArray(it.descriptores) && it.descriptores.length === 4 ? it.descriptores : undefined;
+        const cfgDesc = Array.isArray(cfg.descriptores) && cfg.descriptores.length === 4 ? [...cfg.descriptores] : Array(4).fill('');
         return {
           criterio: it.indicador || it.criterio || cfg.indicador || cfg.criterio || `Criterio ${i + 1}`,
-          descriptores: cfg.descriptores?.length === 4 ? [...cfg.descriptores] : Array(4).fill(''),
+          descriptores: savedDesc || cfgDesc,
           nivel: it.respuesta || '',
         };
       });
     }
     if (items.length > 0) {
-      return items.map((cfg: any, i: number) => ({
-        criterio: cfg.indicador || cfg.criterio || `Criterio ${i + 1}`,
-        descriptores: cfg.descriptores?.length === 4 ? [...cfg.descriptores] : Array(4).fill(''),
-        nivel: '',
-      }));
+      const savedItems = calActual?.items || [];
+      return items.map((cfg: any, i: number) => {
+        const it = savedItems[i];
+        const savedDesc = Array.isArray(it?.descriptores) && it.descriptores.length === 4 ? it.descriptores : undefined;
+        const cfgDesc = Array.isArray(cfg.descriptores) && cfg.descriptores.length === 4 ? [...cfg.descriptores] : Array(4).fill('');
+        return {
+          criterio: (it?.indicador || it?.criterio || cfg.indicador || cfg.criterio || `Criterio ${i + 1}`) as string,
+          descriptores: savedDesc || cfgDesc,
+          nivel: '',
+        };
+      });
     }
     return Array(count).fill(null).map((_, i) => ({
       criterio: `Criterio ${i + 1}`,
@@ -1116,11 +1134,8 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       : tipo === 'rubrica' ? rubDescRows.map(r => ({ indicador: r.criterio, descriptores: r.descriptores }))
       : tipo === 'rubrica-2' ? rub2Rows.map(r => ({ correcta: r.clave || '', tipo: r.tipo, criterio: r.criterio, descriptores: r.tipo === 'descriptor' ? r.descriptores : undefined }))
       : undefined;
-    const gradoKey = filtroGrado ? '-' + normG(filtroGrado) + '°' : '';
     const cols = nuevasColumnasEval.split(',').map(c => c.trim()).filter(c => c);
-    const baseId = columnaEditar?.id ? columnaEditar.id.replace(/-\d+°$/, '') : 'col-' + Date.now();
-    const colId = baseId + gradoKey;
-    onGuardar({ id: colId, nombre: nombre.trim(), tipo, totalItems: total, competenciaId: compId, bimestreId: bimestreId || undefined, promediar, itemsExamen, columnasEval: cols.length > 0 ? cols : undefined, creatorId: userEmail || 'admin', grados: columnaEditar?.id ? (columnaEditar.grados || []) : (filtroGrado && normG(filtroGrado) ? [filtroGrado] : (asignacionDocente?.grados || [])) });
+    onGuardar({ id: columnaEditar?.id ?? 'col-' + Date.now(), nombre: nombre.trim(), tipo, totalItems: total, competenciaId: compId, bimestreId: bimestreId || undefined, promediar, itemsExamen, columnasEval: cols.length > 0 ? cols : undefined, creatorId: userEmail || 'admin', grados: columnaEditar?.id ? (columnaEditar.grados || []) : (filtroGrado && normG(filtroGrado) ? [filtroGrado] : (asignacionDocente?.grados || [])) });
   };
 
   const inp = "w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-500";
