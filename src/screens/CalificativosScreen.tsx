@@ -1084,11 +1084,14 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
   const unidades = bimestresProps || [];
 
   // Resetear todo cuando cambia la columna a editar (evita que datos de un instrumento "contaminen" a otro)
+  // Para grados 2-5: SIEMPRE abre con itemsExamen vacío (columna en blanco lista para crear)
+  // Para grado 1: preserva itemsExamen guardado tal cual
   useEffect(() => {
     const t = columnaEditar?.tipo ?? 'lista-cotejo';
     const tot = columnaEditar?.totalItems ?? 10;
     const arrRaw = Array.isArray(columnaEditar?.itemsExamen) ? columnaEditar.itemsExamen : [];
     const g = filtroGrado || '';
+    // Para 2-5: siempre vacío; para 1: conserva lo guardado
     const usarItems = gradoConservarItems(g) && arrRaw.length > 0;
     const arr = usarItems ? arrRaw : [];
     setNombre(columnaEditar?.nombre ?? '');
@@ -2792,7 +2795,12 @@ if (ligero.columnas?.length > 0) {
                                   className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs">
                                   <FileSpreadsheet size={11}/> Planilla
                                 </button>
-                                <button onClick={() => setModalColumna({ columna: col })}
+                                <button onClick={() => {
+                                  const colParaModal = gradoConItemsVacios(filtroGrado)
+                                    ? { ...col, itemsExamen: [] }
+                                    : col;
+                                  setModalColumna({ columna: colParaModal });
+                                }}
                                   className="flex items-center gap-1 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-xs">
                                   <Edit2 size={11}/> Editar
                                 </button>
