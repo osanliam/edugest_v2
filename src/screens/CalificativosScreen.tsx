@@ -2428,20 +2428,18 @@ if (ligero.columnas?.length > 0) {
     localStorage.setItem('ie_calificativos_v2', JSON.stringify(todos));
     setSyncMsg({ tipo: 'ok', texto: `✅ Calificación guardada` });
     setTimeout(() => setSyncMsg(null), 2000);
-    // 1) Firebase primero
+    // Turso siempre (fuente de verdad para carga)
+    try {
+      await guardarUnCalificativo(cal);
+    } catch (e: any) {
+      console.warn('Turso falló:', e.message);
+    }
+    // Firebase además
     try {
       await guardarCalificativoFB(cal as any);
       setUltimaSync(new Date());
     } catch (fbErr) {
-      // 2) Turso como fallback
-      try {
-        await guardarUnCalificativo(cal);
-        setUltimaSync(new Date());
-      } catch (err: any) {
-        setSyncMsg({ tipo: 'err', texto: `⚠️ Sin internet — guardado local` });
-        setTimeout(() => setSyncMsg(null), 5000);
-        console.warn('Turso fallback:', err.message);
-      }
+      console.warn('Firebase falló:', (fbErr as any)?.message);
     }
   };
 
@@ -2462,7 +2460,13 @@ if (ligero.columnas?.length > 0) {
     setCalificativos(todos);
     setPlanillaColumna(null);
     localStorage.setItem('ie_calificativos_v2', JSON.stringify(todos));
-    // 1) Firebase primero (batch)
+    // Turso siempre (fuente de verdad para carga)
+    try {
+      await guardarCalificativos(cals);
+    } catch (e: any) {
+      console.warn('Turso falló:', e.message);
+    }
+    // Firebase además (batch)
     try {
       await guardarCalificativosBatchFB(cals as any);
       setUltimaSync(new Date());
@@ -2472,20 +2476,9 @@ if (ligero.columnas?.length > 0) {
       setSyncMsg({ tipo: 'ok', texto: msg });
       setTimeout(() => setSyncMsg(null), 3000);
     } catch (fbErr) {
-      // 2) Turso como fallback
-      try {
-        await guardarCalificativos(cals);
-        setUltimaSync(new Date());
-        const msg = idsEliminar?.length
-          ? `✅ ${cals.length} guardadas en Turso · ${idsEliminar.length} limpiadas`
-          : `✅ ${cals.length} calificaciones guardadas en Turso`;
-        setSyncMsg({ tipo: 'ok', texto: msg });
-        setTimeout(() => setSyncMsg(null), 3000);
-      } catch (err: any) {
-        setSyncMsg({ tipo: 'err', texto: `⚠️ Guardado local — sin internet` });
-        setTimeout(() => setSyncMsg(null), 5000);
-        console.warn('Error guardando calificativos:', err.message);
-      }
+      console.warn('Firebase falló:', (fbErr as any)?.message);
+      setSyncMsg({ tipo: 'ok', texto: `✅ ${cals.length} guardadas en Turso` });
+      setTimeout(() => setSyncMsg(null), 3000);
     }
   };
 
@@ -2511,17 +2504,18 @@ if (ligero.columnas?.length > 0) {
     setTimeout(() => setSyncMsg(null), 3000);
     localStorage.setItem('cal_columnas', JSON.stringify(todas));
 
-    // 1) Firebase primero
+    // 1) Turso SIEMPRE (es la fuente de verdad para carga)
+    try {
+      await guardarColumnas(todas);
+    } catch (err: any) {
+      console.warn('Turso falló:', err.message);
+    }
+    // 2) Firebase además (como backup online)
     try {
       await guardarColumnasFB(todas as any);
       setUltimaSync(new Date());
     } catch (fbErr) {
-      // 2) Turso como fallback
-      try {
-        await guardarColumnas(todas);
-      } catch (err: any) {
-        console.warn('Sync columnas falló:', err.message);
-      }
+      console.warn('Firebase falló:', (fbErr as any)?.message);
     }
   };
 
