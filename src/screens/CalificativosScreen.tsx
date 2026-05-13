@@ -15,6 +15,26 @@ const COMPETENCIAS = [
 // ── Tipos de instrumento ──────────────────────────────────────────────────────
 type TipoInstrumento = 'examen' | 'lista-cotejo' | 'ficha-observacion' | 'rubrica' | 'rubrica-2' | 'portafolio-evidencias' | 'registro-anecdotico' | 'escala-valoracion' | 'nota-numerica';
 
+// Grado que preserva itemsExamen tal como están guardados (no se toca)
+const GRADO_CONSERVAR_ITEMS = '1° de Secundaria';
+
+// Grados que siempre cargan con itemsExamen vacíos (para crear desde cero)
+const GRADOS_SIN_ITEMS = ['2° de Secundaria', '3° de Secundaria', '4° de Secundaria', '5° de Secundaria'];
+
+const GRADO_CONSERVAR_ITEMS_KEY = '1° de Secundaria';
+
+function gradoConservarItems(grado: string | undefined | null): boolean {
+  if (!grado) return true;
+  const g = String(grado).trim().replace(/°$/, '');
+  return g === '1° de Secundaria' || g === '1 de Secundaria';
+}
+
+function gradoConItemsVacios(grado: string | undefined | null): boolean {
+  if (!grado) return false;
+  const g = String(grado).trim();
+  return ['2° de Secundaria', '3° de Secundaria', '4° de Secundaria', '5° de Secundaria', '2 de Secundaria', '3 de Secundaria', '4 de Secundaria', '5 de Secundaria'].some(gg => g === gg);
+}
+
 const TIPO_CONFIG: Record<string, { label: string; icono: string; puedeAD: boolean }> = {
   'lista-cotejo':           { label: 'Lista de Cotejo',          icono: '☑️', puedeAD: false },
   'ficha-observacion':      { label: 'Ficha de Observación',     icono: '🔍', puedeAD: false },
@@ -614,6 +634,7 @@ function PopupRubrica2({ alumno, columna, calActual, onGuardar, onCerrar }: {
 
   const initRows = (): ItemRubrica2Row[] => {
     const num = itemsConfig.length || columna.totalItems || 2;
+    const g = (alumno as any).grado || '';
     if (calActual?.items?.length) {
       return calActual.items.map((it: any, idx: number) => {
         const cfg = itemsConfig[idx] || {};
@@ -632,7 +653,7 @@ function PopupRubrica2({ alumno, columna, calActual, onGuardar, onCerrar }: {
         };
       });
     }
-    if (itemsConfig.length > 0) {
+    if (itemsConfig.length > 0 && gradoConservarItems(g)) {
       const savedItems = calActual?.items || [];
       return itemsConfig.map((cfg: any, idx: number) => {
         const it = savedItems[idx];
@@ -649,7 +670,7 @@ function PopupRubrica2({ alumno, columna, calActual, onGuardar, onCerrar }: {
       });
     }
     return Array(num).fill(null).map((_, i) => ({
-      criterio: `Ítem ${i + 1}`,
+      criterio: '',
       clave: '',
       tipo: 'alternativa' as const,
       respuesta: '',
@@ -870,6 +891,7 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
 
   const initRows = (): { criterio: string; descriptores: string[]; nivel: string }[] => {
     const count = items.length || columna.totalItems || 4;
+    const g = (alumno as any).grado || '';
     if (calActual?.items?.length) {
       return calActual.items.map((it: any, i: number) => {
         const cfg = items[i] || {};
@@ -882,7 +904,7 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
         };
       });
     }
-    if (items.length > 0) {
+    if (items.length > 0 && gradoConservarItems(g)) {
       const savedItems = calActual?.items || [];
       return items.map((cfg: any, i: number) => {
         const it = savedItems[i];
@@ -896,7 +918,7 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
       });
     }
     return Array(count).fill(null).map((_, i) => ({
-      criterio: `Criterio ${i + 1}`,
+      criterio: '',
       descriptores: Array(4).fill(''),
       nivel: '',
     }));
@@ -1065,14 +1087,17 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
   useEffect(() => {
     const t = columnaEditar?.tipo ?? 'lista-cotejo';
     const tot = columnaEditar?.totalItems ?? 10;
-    const arr = Array.isArray(columnaEditar?.itemsExamen) ? columnaEditar.itemsExamen : [];
+    const arrRaw = Array.isArray(columnaEditar?.itemsExamen) ? columnaEditar.itemsExamen : [];
+    const g = filtroGrado || '';
+    const usarItems = gradoConservarItems(g) && arrRaw.length > 0;
+    const arr = usarItems ? arrRaw : [];
     setNombre(columnaEditar?.nombre ?? '');
     setTipo(t);
     setTotal(tot);
     setCompId(columnaEditar?.competenciaId ?? 'comp1');
     setBimestreId(columnaEditar?.bimestreId ?? '');
     setPromediar(columnaEditar?.promediar ?? true);
-    setCorrectas(arr.length > 0 ? arr.map(i => i.correcta) : Array(tot).fill('A'));
+    setCorrectas(arr.length > 0 ? arr.map((i: any) => i.correcta) : Array(tot).fill('A'));
     setNuevasColumnasEval(
       columnaEditar?.columnasEval ? columnaEditar.columnasEval.join(', ')
       : t === 'lista-cotejo' ? 'Sí,No'
@@ -1084,30 +1109,36 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       : 'Siempre,Casi siempre,A veces,Rara vez,Nunca'
     );
     if (t === 'rubrica' && arr.length > 0) {
-      setRubDescRows(arr.map(i => ({
+      setRubDescRows(arr.map((i: any) => ({
         criterio: i.indicador || i.criterio || '',
-        descriptores: i.descriptores?.length === 4 ? [...(i.descriptores as string[])] : Array(4).fill(''),
+        descriptores: Array.isArray(i.descriptores) && i.descriptores.length === 4 ? [...(i.descriptores as string[])] : Array(4).fill(''),
       })));
     } else if (t === 'rubrica') {
       setRubDescRows(Array(tot).fill(null).map((_, i) => ({
-        criterio: `Criterio ${i + 1}`, descriptores: Array(4).fill('') as string[],
+        criterio: gradoConItemsVacios(g) ? '' : `Criterio ${i + 1}`,
+        descriptores: Array(4).fill('') as string[],
       })));
     }
-    if (t === 'rubrica-2' && arr.length > 0) {
-      setRub2Rows(arr.map(i => ({
+    if (t === 'rubrica-2' && arr.length > 0 && gradoConservarItems(g)) {
+      setRub2Rows(arr.map((i: any) => ({
         criterio: i.criterio || '',
         clave: i.correcta || '',
         tipo: (i.tipo as 'alternativa' | 'descriptor') || (i.correcta && i.correcta.trim() ? 'alternativa' : 'descriptor'),
         respuesta: '',
         nivel: '',
-        descriptores: i.descriptores?.length === 4 ? [...(i.descriptores as string[])] : Array(4).fill(''),
+        descriptores: Array.isArray(i.descriptores) && i.descriptores.length === 4 ? [...(i.descriptores as string[])] : Array(4).fill(''),
       })));
     } else if (t === 'rubrica-2') {
       setRub2Rows(Array(tot).fill(null).map((_, i) => ({
-        criterio: `Pregunta ${i + 1}`, clave: 'A', tipo: 'alternativa' as const, respuesta: '', nivel: '', descriptores: Array(4).fill('') as string[],
+        criterio: gradoConItemsVacios(g) ? '' : `Pregunta ${i + 1}`,
+        clave: '',
+        tipo: 'alternativa' as const,
+        respuesta: '',
+        nivel: '',
+        descriptores: Array(4).fill('') as string[],
       })));
     }
-  }, [columnaEditar?.id]);
+  }, [columnaEditar?.id, filtroGrado]);
 
   const ajustarTotal = (n: number) => {
     setTotal(n);
