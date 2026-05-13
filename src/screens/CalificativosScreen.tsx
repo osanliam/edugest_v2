@@ -634,7 +634,6 @@ function PopupRubrica2({ alumno, columna, calActual, onGuardar, onCerrar }: {
 
   const initRows = (): ItemRubrica2Row[] => {
     const num = itemsConfig.length || columna.totalItems || 2;
-    const g = (alumno as any).grado || '';
     if (calActual?.items?.length) {
       return calActual.items.map((it: any, idx: number) => {
         const cfg = itemsConfig[idx] || {};
@@ -653,7 +652,7 @@ function PopupRubrica2({ alumno, columna, calActual, onGuardar, onCerrar }: {
         };
       });
     }
-    if (itemsConfig.length > 0 && gradoConservarItems(g)) {
+    if (itemsConfig.length > 0) {
       const savedItems = calActual?.items || [];
       return itemsConfig.map((cfg: any, idx: number) => {
         const it = savedItems[idx];
@@ -891,7 +890,6 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
 
   const initRows = (): { criterio: string; descriptores: string[]; nivel: string }[] => {
     const count = items.length || columna.totalItems || 4;
-    const g = (alumno as any).grado || '';
     if (calActual?.items?.length) {
       return calActual.items.map((it: any, i: number) => {
         const cfg = items[i] || {};
@@ -904,7 +902,7 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
         };
       });
     }
-    if (items.length > 0 && gradoConservarItems(g)) {
+    if (items.length > 0) {
       const savedItems = calActual?.items || [];
       return items.map((cfg: any, i: number) => {
         const it = savedItems[i];
