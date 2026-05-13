@@ -1164,7 +1164,7 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       return;
     }
     setError('');
-    const itemsExamen = tipo === 'examen' ? correctas.map(c => ({ correcta: c }))
+    const itemsParaGuardar = tipo === 'examen' ? correctas.map(c => ({ correcta: c }))
       : tipo === 'rubrica' ? rubDescRows.map(r => ({ indicador: r.criterio, descriptores: r.descriptores }))
       : tipo === 'rubrica-2' ? rub2Rows.map(r => ({ correcta: r.clave || '', tipo: r.tipo, criterio: r.criterio, descriptores: r.tipo === 'descriptor' ? r.descriptores : undefined }))
       : undefined;
@@ -1174,7 +1174,25 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
     const gradoKey = esGradoVaciado && g ? '-' + normG(g) + '°' : '';
     const baseId = columnaEditar?.id ? columnaEditar.id.replace(/-\d+°$/, '') : 'col-' + Date.now();
     const colId = baseId + gradoKey;
-    onGuardar({ id: colId, nombre: nombre.trim(), tipo, totalItems: total, competenciaId: compId, bimestreId: bimestreId || undefined, promediar, itemsExamen: itemsExamen || [], columnasEval: cols.length > 0 ? cols : undefined, creatorId: userEmail || 'admin', grados: columnaEditar?.id ? (columnaEditar.grados || []) : (filtroGrado && normG(filtroGrado) ? [filtroGrado] : (asignacionDocente?.grados || [])) });
+    const colAGuardar: Columna = {
+      id: colId,
+      nombre: nombre.trim(),
+      tipo,
+      totalItems: total,
+      competenciaId: compId,
+      bimestreId: bimestreId || undefined,
+      promediar,
+      columnasEval: cols.length > 0 ? cols : undefined,
+      creatorId: userEmail || 'admin',
+      grados: columnaEditar?.id ? (columnaEditar.grados || []) : (filtroGrado && normG(filtroGrado) ? [filtroGrado] : (asignacionDocente?.grados || [])),
+    };
+    if (itemsParaGuardar !== undefined) {
+      colAGuardar.itemsExamen = itemsParaGuardar as any[];
+    }
+    if (columnaEditar?.columnasEval !== undefined) {
+      colAGuardar.columnasEval = columnaEditar.columnasEval;
+    }
+    onGuardar(colAGuardar);
   };
 
   const inp = "w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-500";
@@ -2474,15 +2492,23 @@ if (ligero.columnas?.length > 0) {
   const handleGuardarColumna = async (col: Columna) => {
     const todas = Array.isArray(columnas) ? [...columnas] : [];
     const idx = todas.findIndex(c => c.id === col.id);
-    if (idx >= 0) todas[idx] = col; else todas.push(col);
+    const columnaExistente = idx >= 0 ? todas[idx] : null;
+    const itemsAnteriores = columnaExistente?.itemsExamen;
+    const columnasEvalAnteriores = columnaExistente?.columnasEval;
+    if (idx >= 0) {
+      todas[idx] = {
+        ...col,
+        itemsExamen: col.itemsExamen !== undefined ? col.itemsExamen : itemsAnteriores,
+        columnasEval: col.columnasEval !== undefined ? col.columnasEval : columnasEvalAnteriores,
+      };
+    } else {
+      todas.push(col);
+    }
 
-    // Actualizar estado React y cerrar modal primero
     setColumnas(todas);
     setModalColumna(null);
     setSyncMsg({ tipo: 'ok', texto: `✅ Columna "${col.nombre}" ${idx >= 0 ? 'actualizada' : 'creada'}` });
     setTimeout(() => setSyncMsg(null), 3000);
-
-    // Guardar en localStorage (persiste incluso si algo falla después)
     localStorage.setItem('cal_columnas', JSON.stringify(todas));
 
     // 1) Firebase primero
