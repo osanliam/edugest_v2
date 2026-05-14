@@ -84,6 +84,7 @@ interface Columna {
   bimestreId?: string;
   promediar: boolean;
   itemsExamen?: ItemExamen[];
+  itemsExamenPorGrado?: Record<string, ItemExamen[]>;
   items?: string[];
   columnasEval?: string[];
   creatorId?: string;
@@ -626,7 +627,8 @@ function PopupRubrica2({ alumno, columna, calActual, onGuardar, onCerrar }: {
   alumno: Alumno; columna: Columna; calActual?: Calificativo;
   onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
-  const itemsConfig = Array.isArray(columna.itemsExamen) ? columna.itemsExamen : [];
+  const g = (alumno as any).grado || '';
+  const itemsConfig = columna.itemsExamenPorGrado?.[g] || Array.isArray(columna.itemsExamen) ? columna.itemsExamen || [] : [];
   const ALT_LETRAS = ['A', 'B', 'C', 'D'] as const;
 
   const altItems = itemsConfig.filter((it: any) => it.tipo === 'alternativa');
@@ -884,7 +886,8 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
   alumno: Alumno; columna: Columna; calActual?: Calificativo;
   onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
-  const items = Array.isArray(columna.itemsExamen) ? columna.itemsExamen : [];
+  const g = (alumno as any).grado || '';
+  const items = columna.itemsExamenPorGrado?.[g] || Array.isArray(columna.itemsExamen) ? columna.itemsExamen || [] : [];
   const colLevels = (columna.columnasEval?.length ? columna.columnasEval : ['C', 'B', 'A', 'AD']) as string[];
   const levelLabels: Record<string, string> = { C: 'INICIO', B: 'PROCESO', A: 'LOGRO', AD: 'LOGRO DESTACADO' };
 
@@ -1082,23 +1085,15 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
   const unidades = bimestresProps || [];
 
   // Resetear todo cuando cambia la columna a editar
-  // - Si es edición (columnaEditar existe): SIEMPRE cargar itemsExamen guardados
-  // - Si es creación nueva: para 1° preserva defaults, para 2-5° arranca vacío
+  // Carga itemsExamen de itemsExamenPorGrado[g] (grado actual) o itemsExamen global
   useEffect(() => {
     const t = columnaEditar?.tipo ?? 'lista-cotejo';
     const tot = columnaEditar?.totalItems ?? 10;
-    const arrRaw = Array.isArray(columnaEditar?.itemsExamen) ? columnaEditar.itemsExamen : [];
     const g = filtroGrado || '';
+    // Prioridad: itemsExamenPorGrado[g] > itemsExamen global (backward compat)
+    const rawArr = columnaEditar?.itemsExamenPorGrado?.[g] || columnaEditar?.itemsExamen || [];
+    const arr = Array.isArray(rawArr) ? rawArr : [];
     const esEdicion = !!columnaEditar;
-    const usarItems = esEdicion ? arrRaw.length > 0 : (gradoConservarItems(g) && arrRaw.length > 0);
-    const arr = usarItems ? arrRaw : [];
-    setNombre(columnaEditar?.nombre ?? '');
-    setTipo(t);
-    setTotal(tot);
-    setCompId(columnaEditar?.competenciaId ?? 'comp1');
-    setBimestreId(columnaEditar?.bimestreId ?? '');
-    setPromediar(columnaEditar?.promediar ?? true);
-    setCorrectas(arr.length > 0 ? arr.map((i: any) => i.correcta) : Array(tot).fill('A'));
     setNuevasColumnasEval(
       columnaEditar?.columnasEval ? columnaEditar.columnasEval.join(', ')
       : t === 'lista-cotejo' ? 'Sí,No'
@@ -1168,10 +1163,8 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       : undefined;
     const cols = nuevasColumnasEval.split(',').map(c => c.trim()).filter(c => c);
     const g = filtroGrado || '';
-    const esGradoVaciado = gradoConItemsVacios(g);
-    const gradoKey = esGradoVaciado && g ? '-' + normG(g) + '°' : '';
-    const baseId = columnaEditar?.id ? columnaEditar.id.replace(/-\d+°$/, '') : 'col-' + Date.now();
-    const colId = baseId + gradoKey;
+    const colId = columnaEditar?.id ?? 'col-' + Date.now();
+    const itemsExamenGlobal = itemsParaGuardar !== undefined ? (itemsParaGuardar as any[]) : undefined;
     const colAGuardar: Columna = {
       id: colId,
       nombre: nombre.trim(),
@@ -1183,9 +1176,18 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       columnasEval: cols.length > 0 ? cols : undefined,
       creatorId: userEmail || 'admin',
       grados: columnaEditar?.id ? (columnaEditar.grados || []) : (filtroGrado && normG(filtroGrado) ? [filtroGrado] : (asignacionDocente?.grados || [])),
+      itemsExamenPorGrado: columnaEditar?.itemsExamenPorGrado ? { ...columnaEditar.itemsExamenPorGrado } : {},
     };
-    if (itemsParaGuardar !== undefined) {
-      colAGuardar.itemsExamen = itemsParaGuardar as any[];
+    // Guardar items del grado actual en itemsExamenPorGrado
+    if (g && itemsParaGuardar !== undefined) {
+      colAGuardar.itemsExamenPorGrado![g] = itemsParaGuardar as any[];
+    }
+    // itemsExamen global se actualiza SOLO si no hay datos por grado (columna antigua/compartida)
+    if (!colAGuardar.itemsExamenPorGrado || Object.keys(colAGuardar.itemsExamenPorGrado).length === 0) {
+      if (itemsExamenGlobal) colAGuardar.itemsExamen = itemsExamenGlobal;
+    } else {
+      // Si ya hay datos por grado, itemsExamen se deja como estaba
+      colAGuardar.itemsExamen = columnaEditar?.itemsExamen;
     }
     if (columnaEditar?.columnasEval !== undefined) {
       colAGuardar.columnasEval = columnaEditar.columnasEval;
@@ -2502,18 +2504,18 @@ if (ligero.columnas?.length > 0) {
     setTimeout(() => setSyncMsg(null), 3000);
     localStorage.setItem('cal_columnas', JSON.stringify(todas));
 
-    // 1) Turso SIEMPRE (es la fuente de verdad para carga)
-    try {
-      await guardarColumnas(todas);
-    } catch (err: any) {
-      console.warn('Turso falló:', err.message);
-    }
-    // 2) Firebase además (como backup online)
+    // 1) Firebase (fuente primaria que el usuario configuró)
     try {
       await guardarColumnasFB(todas as any);
       setUltimaSync(new Date());
     } catch (fbErr) {
       console.warn('Firebase falló:', (fbErr as any)?.message);
+    }
+    // 2) Turso siempre (necesario para que cargarTodo funcione)
+    try {
+      await guardarColumnas(todas);
+    } catch (err: any) {
+      console.warn('Turso falló:', err.message);
     }
   };
 

@@ -179,6 +179,7 @@ async function ensureTables(c) {
   await alterSafe(`ALTER TABLE users ADD COLUMN docenteId TEXT`);
   await alterSafe(`ALTER TABLE calificaciones ADD COLUMN docenteId TEXT`);
   await alterSafe(`ALTER TABLE calificaciones ADD COLUMN updated_at DATETIME`);
+  await alterSafe(`ALTER TABLE columnas ADD COLUMN itemsExamenPorGrado TEXT`);
 
   // ── Aula Virtual ──────────────────────────────────────────────────────
   await alterSafe(`CREATE TABLE IF NOT EXISTS aulas (
@@ -721,11 +722,13 @@ export default async function handler(req, res) {
       if (tiposSolicitados.includes('columnas')) {
         const rawCols = await ejecutar('SELECT * FROM columnas');
         const toArr = (v) => { try { const p = typeof v === 'string' ? JSON.parse(v || '[]') : v; return Array.isArray(p) ? p : []; } catch { return []; } };
+        const toRec = (v) => { try { const p = typeof v === 'string' ? JSON.parse(v || '{}') : v; return (p && typeof p === 'object') ? p : {}; } catch { return {}; } };
         data.columnas = rawCols.map(c => ({
           ...c,
           itemsExamen: toArr(c.itemsExamen),
           items: toArr(c.items),
           columnasEval: toArr(c.columnasEval),
+          itemsExamenPorGrado: toRec(c.itemsExamenPorGrado),
         }));
       }
       if (tiposSolicitados.includes('calificaciones')) {
@@ -948,9 +951,9 @@ export default async function handler(req, res) {
       else if (tipo === 'columnas') {
         for (const col of datos) {
           const e = await safeExec(c,
-            `INSERT OR REPLACE INTO columnas (id, nombre, tipo, totalItems, competenciaId, bimestreId, promediar, itemsExamen, items, columnasEval, creatorId)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [col.id, col.nombre || '', col.tipo || '', col.totalItems || null, col.competenciaId || null, col.bimestreId || null, col.promediar ? 1 : 0, JSON.stringify(col.itemsExamen || []), JSON.stringify(col.items || []), JSON.stringify(col.columnasEval || []), col.creatorId || null]
+            `INSERT OR REPLACE INTO columnas (id, nombre, tipo, totalItems, competenciaId, bimestreId, promediar, itemsExamen, items, columnasEval, creatorId, itemsExamenPorGrado)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [col.id, col.nombre || '', col.tipo || '', col.totalItems || null, col.competenciaId || null, col.bimestreId || null, col.promediar ? 1 : 0, JSON.stringify(col.itemsExamen || []), JSON.stringify(col.items || []), JSON.stringify(col.columnasEval || []), col.creatorId || null, col.itemsExamenPorGrado ? JSON.stringify(col.itemsExamenPorGrado) : null]
           );
           e ? errores.push(`columna ${col.id}: ${e}`) : ok++;
         }
