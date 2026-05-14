@@ -627,8 +627,7 @@ function PopupRubrica2({ alumno, columna, calActual, onGuardar, onCerrar }: {
   alumno: Alumno; columna: Columna; calActual?: Calificativo;
   onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
-  const g = (alumno as any).grado || '';
-  const itemsConfig = columna.itemsExamenPorGrado?.[g] || Array.isArray(columna.itemsExamen) ? columna.itemsExamen || [] : [];
+  const itemsConfig = Array.isArray(columna.itemsExamen) ? columna.itemsExamen : [];
   const ALT_LETRAS = ['A', 'B', 'C', 'D'] as const;
 
   const altItems = itemsConfig.filter((it: any) => it.tipo === 'alternativa');
@@ -886,8 +885,7 @@ function PopupRubrica({ alumno, columna, calActual, onGuardar, onCerrar }: {
   alumno: Alumno; columna: Columna; calActual?: Calificativo;
   onGuardar: (c: Calificativo) => void; onCerrar: () => void;
 }) {
-  const g = (alumno as any).grado || '';
-  const items = columna.itemsExamenPorGrado?.[g] || Array.isArray(columna.itemsExamen) ? columna.itemsExamen || [] : [];
+  const items = Array.isArray(columna.itemsExamen) ? columna.itemsExamen : [];
   const colLevels = (columna.columnasEval?.length ? columna.columnasEval : ['C', 'B', 'A', 'AD']) as string[];
   const levelLabels: Record<string, string> = { C: 'INICIO', B: 'PROCESO', A: 'LOGRO', AD: 'LOGRO DESTACADO' };
 
@@ -1085,15 +1083,12 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
   const unidades = bimestresProps || [];
 
   // Resetear todo cuando cambia la columna a editar
-  // Carga itemsExamen de itemsExamenPorGrado[g] (grado actual) o itemsExamen global
+  // Cada columna ahora es independiente por grado (ID con sufijo)
   useEffect(() => {
     const t = columnaEditar?.tipo ?? 'lista-cotejo';
     const tot = columnaEditar?.totalItems ?? 10;
-    const g = filtroGrado || '';
-    // Prioridad: itemsExamenPorGrado[g] > itemsExamen global (backward compat)
-    const rawArr = columnaEditar?.itemsExamenPorGrado?.[g] || columnaEditar?.itemsExamen || [];
-    const arr = Array.isArray(rawArr) ? rawArr : [];
-    const esEdicion = !!columnaEditar;
+    const rawArr = Array.isArray(columnaEditar?.itemsExamen) ? columnaEditar.itemsExamen : [];
+    const arr = rawArr;
     setNuevasColumnasEval(
       columnaEditar?.columnasEval ? columnaEditar.columnasEval.join(', ')
       : t === 'lista-cotejo' ? 'Sí,No'
@@ -1111,7 +1106,7 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       })));
     } else if (t === 'rubrica') {
       setRubDescRows(Array(tot).fill(null).map((_, i) => ({
-        criterio: gradoConItemsVacios(g) ? '' : `Criterio ${i + 1}`,
+        criterio: `Criterio ${i + 1}`,
         descriptores: Array(4).fill('') as string[],
       })));
     }
@@ -1126,7 +1121,7 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       })));
     } else if (t === 'rubrica-2') {
       setRub2Rows(Array(tot).fill(null).map((_, i) => ({
-        criterio: gradoConItemsVacios(g) ? '' : `Pregunta ${i + 1}`,
+        criterio: `Pregunta ${i + 1}`,
         clave: '',
         tipo: 'alternativa' as const,
         respuesta: '',
@@ -1163,7 +1158,10 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       : undefined;
     const cols = nuevasColumnasEval.split(',').map(c => c.trim()).filter(c => c);
     const g = filtroGrado || '';
-    const colId = columnaEditar?.id ?? 'col-' + Date.now();
+    // ID con sufijo de grado para que CADA grado tenga su propia columna independiente
+    const suffixed = g ? '-' + normG(g) + '°' : '';
+    const baseId = columnaEditar?.id ? columnaEditar.id.replace(/-\d+°$/, '') : 'col-' + Date.now();
+    const colId = baseId + suffixed;
     const itemsExamenGlobal = itemsParaGuardar !== undefined ? (itemsParaGuardar as any[]) : undefined;
     const colAGuardar: Columna = {
       id: colId,
@@ -1175,22 +1173,16 @@ function ModalColumna({ columnaEditar, onGuardar, onCerrar, userEmail, bimestres
       promediar,
       columnasEval: cols.length > 0 ? cols : undefined,
       creatorId: userEmail || 'admin',
-      grados: columnaEditar?.id ? (columnaEditar.grados || []) : (filtroGrado && normG(filtroGrado) ? [filtroGrado] : (asignacionDocente?.grados || [])),
-      itemsExamenPorGrado: columnaEditar?.itemsExamenPorGrado ? { ...columnaEditar.itemsExamenPorGrado } : {},
+      grados: g ? [g] : [],
     };
-    // Guardar items del grado actual en itemsExamenPorGrado
-    if (g && itemsParaGuardar !== undefined) {
-      colAGuardar.itemsExamenPorGrado![g] = itemsParaGuardar as any[];
+    if (itemsParaGuardar !== undefined) {
+      colAGuardar.itemsExamen = itemsParaGuardar as any[];
     }
-    // itemsExamen global se actualiza SOLO si no hay datos por grado (columna antigua/compartida)
-    if (!colAGuardar.itemsExamenPorGrado || Object.keys(colAGuardar.itemsExamenPorGrado).length === 0) {
-      if (itemsExamenGlobal) colAGuardar.itemsExamen = itemsExamenGlobal;
-    } else {
-      // Si ya hay datos por grado, itemsExamen se deja como estaba
-      colAGuardar.itemsExamen = columnaEditar?.itemsExamen;
-    }
-    if (columnaEditar?.columnasEval !== undefined) {
+    if (columnaEditar?.columnasEval !== undefined && cols.length === 0) {
       colAGuardar.columnasEval = columnaEditar.columnasEval;
+    }
+    if (columnaEditar?.itemsExamenPorGrado) {
+      colAGuardar.itemsExamenPorGrado = columnaEditar.itemsExamenPorGrado;
     }
     onGuardar(colAGuardar);
   };
@@ -2569,10 +2561,25 @@ if (ligero.columnas?.length > 0) {
   };
 
   const nombre = (a: Alumno) => a.apellidos_nombres || a.nombre || '—';
+  // Filtro inteligente: si hay una columna con sufijo de grado, oculta la versión sin sufijo
   const colPorComp = (cid: string) => columnas.filter(c => {
     const matchUnidad = !filtroUnidad || c.bimestreId === filtroUnidad || !c.bimestreId;
-    const matchGrado = !filtroGrado || !c.grados?.length || c.grados.some(g => normGrado(g) === normGrado(filtroGrado));
-    return c.competenciaId === cid && matchUnidad && matchGrado;
+    const matchComp = c.competenciaId === cid;
+    let matchGrado = true;
+    if (filtroGrado) {
+      const suffix = '-' + normGrado(filtroGrado) + '°';
+      const hasSuffix = c.id.endsWith(suffix);
+      const isUnsuffixed = !/-\d+°$/.test(c.id) && !/°$/.test(c.id);
+      if (hasSuffix) {
+        matchGrado = true;
+      } else if (isUnsuffixed) {
+        const suffixedExists = columnas.some(other => other.id === c.id + suffix);
+        matchGrado = !suffixedExists;
+      } else {
+        matchGrado = false;
+      }
+    }
+    return matchComp && matchUnidad && matchGrado;
   });
   const avance = (alumnoId: string) => {
     if (columnas.length === 0) return 0;
